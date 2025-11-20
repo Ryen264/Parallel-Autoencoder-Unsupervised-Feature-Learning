@@ -14,28 +14,24 @@ void cpu_conv2D(
       for (int j = 0; j < width; ++j) {
         // Get current out pixel index (depth 0)
         float *cur = out + image * GET_1D_INDEX(i, j, 0, width, n_filter);
-        // Get filter offset
-        int filter_offset = GET_1D_INDEX(i, j, 0, width, FILTER_DEPTH);
 
         for (int f = 0; f < n_filter; ++f) {
           float sum = 0;
           for (int f_i = 0; f_i < CONV_FILTER_SIZE; ++f_i) {
             // If the row needs padding, we skip since we pad with 0
             int row = i + f_i - CONV_FILTER_SIZE / 2;
-            if (row < 0 || row >= n)
+            if (row < 0 || row >= width)
               continue;
 
             for (int f_j = 0; f_j < CONV_FILTER_SIZE; ++f_j) {
               // Same with column
               int col = j + f_j - CONV_FILTER_SIZE / 2;
-              if (col < 0 || col >= n)
+              if (col < 0 || col >= width)
                 continue;
 
               // Calculate start of filter
-              float *cur_filter = filter +
-                                  filter_offset +
-                                  f *
-                                  GET_1D_INDEX(f_i, f_j, 0, CONV_FILTER_SIZE, depth);
+              float *cur_filter =
+                  filter + f * GET_1D_INDEX(f_i, f_j, 0, CONV_FILTER_SIZE, depth);
 
               // Calculate start of input
               float *in_start = in + image * GET_1D_INDEX(row, col, 0, width, depth);

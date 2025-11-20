@@ -49,6 +49,21 @@ void cpu_conv2D(
   }
 }
 
+void cpu_add_bias(float *in, float *bias, float *out, int n, int width, int depth) {
+  for (int image = 0; image < n; ++image) {
+    for (int i = 0; i < width; ++i) {
+      for (int j = 0; j < width; ++j) {
+        int    cur_idx    = image * GET_1D_INDEX(i, j, 0, width, depth);
+        float *in_offset  = in + cur_idx;
+        float *out_offset = out + cur_idx;
+
+        for (int d = 0; d < depth; ++d)
+          out_offset[d] = in_offset[d] + bias[d];
+      }
+    }
+  }
+}
+
 void cpu_relu(float *in, float *out, int n, int width, int depth) {
   for (int i = 0; i < n * width * width * depth; ++i)
     out[i] = MAX(0.0, in[i]);
@@ -103,24 +118,10 @@ void cpu_upsampling(float *in, float *out, int n, int width, int depth) {
 }
 
 float cpu_mse_loss(float *expected, float *actual, int n, int width, int depth) {
-  float sum = 0;
-  for (int i = 0; i < n * width * width * depth; ++i)
+  float sum   = 0;
+  int   total = n * width * width * depth;
+  for (int i = 0; i < total; ++i)
     sum += SQR(expected[i] - actual[i]);
 
-  return sum / n;
-}
-
-void cpu_add_bias(float *in, float *bias, float *out, int n, int width, int depth) {
-  for (int image = 0; image < n; ++image) {
-    for (int i = 0; i < width; ++i) {
-      for (int j = 0; j < width; ++j) {
-        int    cur_idx    = image * GET_1D_INDEX(i, j, 0, width, depth);
-        float *in_offset  = in + cur_idx;
-        float *out_offset = out + cur_idx;
-
-        for (int d = 0; d < depth; ++d)
-          out_offset[d] = in_offset[d] + bias[d];
-      }
-    }
-  }
+  return sum / total;
 }

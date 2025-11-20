@@ -202,8 +202,8 @@ if __name__ == "__main__":
     train_min, train_max = train_images.min(), train_images.max()
     test_min, test_max = test_images.min(), test_images.max()
     print(f"\n✓ Preprocessing - Normalized to [0, 1]:")
-    print(f"  - Training data range: [{train_min:.3f}, {train_max:.3f}]")
-    print(f"  - Test data range: [{test_min:.3f}, {test_max:.3f}]")
+    print(f"  - Training data range: [{train_min:.2f}, {train_max:.2f}]")
+    print(f"  - Test data range: [{test_min:.2f}, {test_max:.2f}]")
     assert 0.0 <= train_min and train_max <= 1.0, "Training data not properly normalized"
     assert 0.0 <= test_min and test_max <= 1.0, "Test data not properly normalized"
     
@@ -222,5 +222,5 @@ if __name__ == "__main__":
     batch_images, batch_labels = dataset.get_batch(batch_size=128, shuffle=True)
     print(f"  Batch images shape: {batch_images.shape}")
     print(f"  Batch labels shape: {batch_labels.shape}")
-    print(f"  Batch pixel range: [{batch_images.min():.3f}, {batch_images.max():.3f}]")
+    print(f"  Batch pixel range: [{batch_images.min():.2f}, {batch_images.max():.2f}]")
     print(f"  Sample labels: {batch_labels[:10]}")

@@ -1,5 +1,5 @@
-#include "cpu_layers.h"
 #include "constants.h"
+#include "cpu_layers.h"
 
 #define SQR(x)                          ((x) * (x))
 #define MAX(a, b)                       ((a) > (b) ? (a) : (b))
@@ -7,7 +7,7 @@
 
 void cpu_conv2D(
     float *in, float *filter, float *out, int n, int width, int depth, int n_filter) {
-  const int FILTER_DEPTH = CONV_FILTER_SIZE * CONV_FILTER_SIZE * depth * n_filter;
+  const int FILTER_DEPTH = CONV_FILTER_WIDTH * CONV_FILTER_WIDTH * depth * n_filter;
 
   for (int image = 0; image < n; ++image) {
     for (int i = 0; i < width; ++i) {
@@ -17,21 +17,21 @@ void cpu_conv2D(
 
         for (int f = 0; f < n_filter; ++f) {
           float sum = 0;
-          for (int f_i = 0; f_i < CONV_FILTER_SIZE; ++f_i) {
+          for (int f_i = 0; f_i < CONV_FILTER_WIDTH; ++f_i) {
             // If the row needs padding, we skip since we pad with 0
-            int row = i + f_i - CONV_FILTER_SIZE / 2;
+            int row = i + f_i - CONV_FILTER_WIDTH / 2;
             if (row < 0 || row >= width)
               continue;
 
-            for (int f_j = 0; f_j < CONV_FILTER_SIZE; ++f_j) {
+            for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
               // Same with column
-              int col = j + f_j - CONV_FILTER_SIZE / 2;
+              int col = j + f_j - CONV_FILTER_WIDTH / 2;
               if (col < 0 || col >= width)
                 continue;
 
               // Calculate start of filter
               float *cur_filter =
-                  filter + f * GET_1D_INDEX(f_i, f_j, 0, CONV_FILTER_SIZE, depth);
+                  filter + f * GET_1D_INDEX(f_i, f_j, 0, CONV_FILTER_WIDTH, depth);
 
               // Calculate start of input
               float *in_start = in + image * GET_1D_INDEX(row, col, 0, width, depth);
@@ -108,4 +108,19 @@ float cpu_mse_loss(float *expected, float *actual, int n, int width, int depth) 
     sum += SQR(expected[i] - actual[i]);
 
   return sum / n;
+}
+
+void cpu_add_bias(float *in, float *bias, float *out, int n, int width, int depth) {
+  for (int image = 0; image < n; ++image) {
+    for (int i = 0; i < width; ++i) {
+      for (int j = 0; j < width; ++j) {
+        int    cur_idx    = image * GET_1D_INDEX(i, j, 0, width, depth);
+        float *in_offset  = in + cur_idx;
+        float *out_offset = out + cur_idx;
+
+        for (int d = 0; d < depth; ++d)
+          out_offset[d] = in_offset[d] + bias[d];
+      }
+    }
+  }
 }

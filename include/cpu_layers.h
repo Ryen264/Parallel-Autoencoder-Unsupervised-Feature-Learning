@@ -61,4 +61,16 @@ void cpu_upsampling(float *in, float *out, int n, int width, int depth);
  */
 float cpu_mse_loss(float *expected, float *actual, int n, int width, int depth);
 
+/**
+ * @brief Apply bias into images
+ *
+ * @param in The input images
+ * @param bias The bias to be added
+ * @param out The output images
+ * @param n The number of images
+ * @param width The width of the images
+ * @param depth The depth of the images
+ */
+void cpu_add_bias(float *in, float *bias, float *out, int n, int width, int depth);
+
 #endif

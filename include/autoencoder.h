@@ -2,7 +2,7 @@
 #define AUTOENCODER_H
 
 #include "constants.h"
-#include "images.h"
+#include "dataset.h"
 
 /**
  * @brief Interface class that encapsulates the network
@@ -108,24 +108,24 @@ public:
   virtual ~IAutoencoder() = default;
 
   /**
-   * @brief Encodes a list of images
+   * @brief Encodes a dataset
    *
-   * @param images The images to be encoded
-   * @return Images The encoded images
+   * @param dataset The dataset to be encoded
+   * @return Dataset The encoded dataset
    */
-  virtual Images encode(const Images &images) const = 0;
+  virtual Dataset encode(const Dataset &dataset) const = 0;
   /**
-   * @brief Decodes a list of images
+   * @brief Decodes a dataset
    *
-   * @param images The images to be decoded
-   * @return Images The decoded images
+   * @param dataset The dataset to be decoded
+   * @return Dataset The decoded dataset
    */
-  virtual Images decode(const Images &images) const = 0;
+  virtual Dataset decode(const Dataset &dataset) const = 0;
 
   /**
-   * @brief Trains the model using a list of images
+   * @brief Trains the model using a dataset
    *
-   * @param images The list of images
+   * @param dataset The dataset
    * @param n_epoch The number of epochs
    * @param batch_size Minibatch size (set to 0 to disable)
    * @param learning_rate Learning rate of the model
@@ -133,12 +133,12 @@ public:
    * @param checkpoint Save the model's parameter after a specific number of epochs (set
    * to 0 to disable)
    */
-  virtual void fit(const Images &images,
-                   int           n_epoch,
-                   int           batch_size,
-                   float         learning_rate,
-                   bool          verbose,
-                   int           checkpoint) = 0;
+  virtual void fit(const Dataset &dataset,
+                   int            n_epoch,
+                   int            batch_size,
+                   float          learning_rate,
+                   bool           verbose,
+                   int            checkpoint) = 0;
 };
 
 #endif

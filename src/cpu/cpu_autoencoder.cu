@@ -12,17 +12,17 @@ Cpu_Autoencoder::Cpu_Autoencoder()
 Cpu_Autoencoder::Cpu_Autoencoder(const char *filename)
     : IAutoencoder(filename) {};
 
-Images Cpu_Autoencoder::encode(const Images &images) const {
-  int n     = images.n;
-  int width = images.width;
+Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
+  int n     = dataset.n;
+  int width = dataset.width;
 
   // First conv2D layer
-  cpu_conv2D(images.get(),
+  cpu_conv2D(dataset.get_data(),
              _encoder_filter_1.get(),
              _out_encoder_filter_1.get(),
              n,
              width,
-             images.depth,
+             dataset.depth,
              _ENCODER_FILTER_1_DEPTH);
   // Dim: n * w * w * 256
   cpu_add_bias(_out_encoder_filter_1.get(),
@@ -78,25 +78,26 @@ Images Cpu_Autoencoder::encode(const Images &images) const {
                   _ENCODER_FILTER_2_DEPTH);
 
   // Return the result (Dim: n * w/4 * w/4 * 128)
-  Images res(n, width / 4, _ENCODER_FILTER_2_DEPTH);
-  memcpy(res.get(),
+  Dataset res(n, width / 4, _ENCODER_FILTER_2_DEPTH);
+  memcpy(res.get_data(),
          _out_max_pooling_2.get(),
          n * width * width * _ENCODER_FILTER_2_DEPTH * sizeof(float) / 16);
+  memcpy(res.get_labels(), dataset.get_labels(), n * sizeof(int));
 
   return res;
 }
 
-Images Cpu_Autoencoder::decode(const Images &images) const {
-  int n     = images.n;
-  int width = images.width;
+Dataset Cpu_Autoencoder::decode(const Dataset &dataset) const {
+  int n     = dataset.n;
+  int width = dataset.width;
 
   // First conv2D layer
-  cpu_conv2D(images.get(),
+  cpu_conv2D(dataset.get_data(),
              _decoder_filter_1.get(),
              _out_decoder_filter_1.get(),
              n,
              width,
-             images.depth,
+             dataset.depth,
              _DECODER_FILTER_1_DEPTH);
   // Dim: n * w * w * 128
   cpu_add_bias(_out_decoder_filter_1.get(),
@@ -169,26 +170,28 @@ Images Cpu_Autoencoder::decode(const Images &images) const {
                _DECODER_FILTER_3_DEPTH);
 
   // Return the result (Dim: n * w/4 * w/4 * 128)
-  Images res(n, width / 4, _ENCODER_FILTER_2_DEPTH);
-  memcpy(res.get(),
+  Dataset res(n, width / 4, _ENCODER_FILTER_2_DEPTH);
+  memcpy(res.get_data(),
          _out_decoder_bias_3.get(),
          n * width * width * _DECODER_FILTER_3_DEPTH * 16 * sizeof(float));
+  memcpy(res.get_labels(), dataset.get_labels(), n * sizeof(int));
 
   return res;
 }
 
-float Cpu_Autoencoder::_fit_batch(const Images &images,
-                                  float        *d_out,
-                                  float        *d_in,
-                                  float        *d_filter,
-                                  float         learning_rate) {
+float Cpu_Autoencoder::_fit_batch(const Dataset &batch,
+                                  float         *d_out,
+                                  float         *d_in,
+                                  float         *d_filter,
+                                  float          learning_rate) {
   // Get the result after autoencoding
-  int    n     = images.n;
-  int    width = images.width;
-  Images res   = decode(encode(images));
+  int     n     = batch.n;
+  int     width = batch.width;
+  int     depth = batch.depth;
+  Dataset res   = decode(encode(batch));
 
   // Get loss gradient
-  cpu_mse_grad(images.get(), res.get(), d_out, n, width, images.depth);
+  cpu_mse_grad(batch.get_data(), res.get_data(), d_out, n, width, depth);
 
   // Update weight for the last conv2D layer
   // Update bias
@@ -314,24 +317,19 @@ float Cpu_Autoencoder::_fit_batch(const Images &images,
   cpu_update_weight(
       _encoder_bias_1.get(), d_in, _ENCODER_FILTER_1_DEPTH, learning_rate);
   cpu_conv2D_grad(
-      images.get(), d_out, d_filter, n, width, images.depth, _ENCODER_FILTER_1_DEPTH);
-  cpu_conv2D(d_out,
-             _encoder_filter_1.get(),
-             d_in,
-             n,
-             width,
-             images.depth,
-             _ENCODER_FILTER_1_DEPTH);
+      batch.get_data(), d_out, d_filter, n, width, depth, _ENCODER_FILTER_1_DEPTH);
+  cpu_conv2D(
+      d_out, _encoder_filter_1.get(), d_in, n, width, depth, _ENCODER_FILTER_1_DEPTH);
   swap(d_out, d_in);
   cpu_update_weight(
       _encoder_filter_1.get(), d_filter, _ENCODER_FILTER_1_SIZE, learning_rate);
 }
 
-void Cpu_Autoencoder::fit(const Images &images,
-                          int           n_epoch,
-                          int           batch_size,
-                          float         learning_rate,
-                          bool          verbose,
-                          int           checkpoint) {
+void Cpu_Autoencoder::fit(const Dataset &dataset,
+                          int            n_epoch,
+                          int            batch_size,
+                          float          learning_rate,
+                          bool           verbose,
+                          int            checkpoint) {
   // Create minibatches
 }

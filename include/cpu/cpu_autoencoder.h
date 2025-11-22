@@ -18,11 +18,11 @@ class Cpu_Autoencoder : IAutoencoder {
    * @param learning_rate The learning rate
    * @return float Loss of the minibatch
    */
-  float _fit_batch(const Images &batch,
-                   float        *d_out,
-                   float        *d_in,
-                   float        *d_filter,
-                   float         learning_rate);
+  float _fit_batch(const Dataset &batch,
+                   float         *d_out,
+                   float         *d_in,
+                   float         *d_filter,
+                   float          learning_rate);
 
 public:
   /**
@@ -43,37 +43,37 @@ public:
   ~Cpu_Autoencoder() override = default;
 
   /**
-   * @brief Encodes a list of images
+   * @brief Encodes a dataset
    *
-   * @param images The images to be encoded
-   * @return Images The encoded images
+   * @param dataset The dataset to be encoded
+   * @return Dataset The encoded dataset
    */
-  Images encode(const Images &images) const override;
+  Dataset encode(const Dataset &dataset) const override;
   /**
-   * @brief Decodes a list of images
+   * @brief Decodes a dataset
    *
-   * @param images The images to be decoded
-   * @return Images The decoded images
+   * @param dataset The dataset to be decoded
+   * @return Dataset The decoded dataset
    */
-  Images decode(const Images &images) const override;
+  Dataset decode(const Dataset &dataset) const override;
 
   /**
-   * @brief Trains the model using a list of images
+   * @brief Trains the model using a dataset
    *
-   * @param images The list of images
+   * @param dataset The dataset
    * @param n_epoch The number of epochs
    * @param batch_size Minibatch size (set to 0 to disable)
    * @param learning_rate Learning rate of the model
    * @param verbose Whether to disable more or less information
-   * @param checkpoint Save the model's parameter after a specific number of epochs
-   * (set to 0 to disable)
+   * @param checkpoint Save the model's parameter after a specific number of epochs (set
+   * to 0 to disable)
    */
-  void fit(const Images &images,
-           int           n_epoch,
-           int           batch_size,
-           float         learning_rate,
-           bool          verbose,
-           int           checkpoint) override;
+  void fit(const Dataset &dataset,
+           int            n_epoch,
+           int            batch_size,
+           float          learning_rate,
+           bool           verbose,
+           int            checkpoint) override;
 };
 
 #endif

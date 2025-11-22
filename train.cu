@@ -1,7 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <chrono>
-#include "cpu_autoencoder.h"
+#include "cpu_autoencoder.cu"
 #include "layers.h"
 
 // Giả sử bạn đã có class Images và data loader từ ./data_loader

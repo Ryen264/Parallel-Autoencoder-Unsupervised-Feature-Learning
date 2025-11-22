@@ -16,6 +16,12 @@ protected:
       CONV_FILTER_WIDTH * CONV_FILTER_WIDTH * IMAGE_DEPTH * _ENCODER_FILTER_1_DEPTH;
   unique_ptr<float[]> _encoder_filter_1;
   unique_ptr<float[]> _encoder_bias_1;
+  // Save output for backwards propogation
+  unique_ptr<float[]> _out_encoder_filter_1;
+  unique_ptr<float[]> _out_encoder_bias_1;
+
+  unique_ptr<float[]> _out_encoder_relu_1;
+  unique_ptr<float[]> _out_max_pooling_1;
 
   // The second conv2d layer of the encoder
   static constexpr int _ENCODER_FILTER_2_DEPTH = 128;
@@ -25,6 +31,11 @@ protected:
                                                 _ENCODER_FILTER_2_DEPTH;
   unique_ptr<float[]> _encoder_filter_2;
   unique_ptr<float[]> _encoder_bias_2;
+  unique_ptr<float[]> _out_encoder_filter_2;
+  unique_ptr<float[]> _out_encoder_bias_2;
+
+  unique_ptr<float[]> _out_encoder_relu_2;
+  unique_ptr<float[]> _out_max_pooling_2;
 
   // The first conv2d layer of the decoder
   static constexpr int _DECODER_FILTER_1_DEPTH = 128;
@@ -34,6 +45,11 @@ protected:
                                                 _DECODER_FILTER_1_DEPTH;
   unique_ptr<float[]> _decoder_filter_1;
   unique_ptr<float[]> _decoder_bias_1;
+  unique_ptr<float[]> _out_decoder_filter_1;
+  unique_ptr<float[]> _out_decoder_bias_1;
+
+  unique_ptr<float[]> _out_decoder_relu_1;
+  unique_ptr<float[]> _out_upsampling_1;
 
   // The second conv2d layer of the decoder
   static constexpr int _DECODER_FILTER_2_DEPTH = 256;
@@ -43,6 +59,11 @@ protected:
                                                 _DECODER_FILTER_2_DEPTH;
   unique_ptr<float[]> _decoder_filter_2;
   unique_ptr<float[]> _decoder_bias_2;
+  unique_ptr<float[]> _out_decoder_filter_2;
+  unique_ptr<float[]> _out_decoder_bias_2;
+
+  unique_ptr<float[]> _out_decoder_relu_2;
+  unique_ptr<float[]> _out_upsampling_2;
 
   // The third conv2d layer of the decoder
   static constexpr int _DECODER_FILTER_3_DEPTH = IMAGE_DEPTH;
@@ -52,6 +73,8 @@ protected:
                                                 _DECODER_FILTER_3_DEPTH;
   unique_ptr<float[]> _decoder_filter_3;
   unique_ptr<float[]> _decoder_bias_3;
+  unique_ptr<float[]> _out_decoder_filter_3;
+  unique_ptr<float[]> _out_decoder_bias_3;
 
   /**
    * @brief Allocate memory for the parameters

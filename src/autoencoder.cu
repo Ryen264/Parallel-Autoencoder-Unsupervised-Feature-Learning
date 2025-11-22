@@ -55,8 +55,8 @@ void IAutoencoder::_allocate_mem() {
   _decoder_filter_2 = make_unique<float[]>(_DECODER_FILTER_2_SIZE);
   _decoder_bias_2   = make_unique<float[]>(_DECODER_FILTER_2_DEPTH);
 
-  _decoder_filter_1 = make_unique<float[]>(_DECODER_FILTER_3_SIZE);
-  _decoder_bias_1   = make_unique<float[]>(_DECODER_FILTER_3_DEPTH);
+  _decoder_filter_3 = make_unique<float[]>(_DECODER_FILTER_3_SIZE);
+  _decoder_bias_3   = make_unique<float[]>(_DECODER_FILTER_3_DEPTH);
 }
 
 IAutoencoder::IAutoencoder() {

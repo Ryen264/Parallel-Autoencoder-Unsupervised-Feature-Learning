@@ -8,6 +8,22 @@
  *
  */
 class Cpu_Autoencoder : IAutoencoder {
+  /**
+   * @brief Fit a minibatch to the model
+   *
+   * @param batch The batch to fit
+   * @param d_out Temporary buffer for d_out
+   * @param d_in Temporary buffer for d_in
+   * @param d_filter Temporary buffer for d_filter
+   * @param learning_rate The learning rate
+   * @return float Loss of the minibatch
+   */
+  float _fit_batch(const Images &batch,
+                   float        *d_out,
+                   float        *d_in,
+                   float        *d_filter,
+                   float         learning_rate);
+
 public:
   /**
    * @brief Initialize a new autoencoder with random paramters
@@ -49,8 +65,8 @@ public:
    * @param batch_size Minibatch size (set to 0 to disable)
    * @param learning_rate Learning rate of the model
    * @param verbose Whether to disable more or less information
-   * @param checkpoint Save the model's parameter after a specific number of epochs (set
-   * to 0 to disable)
+   * @param checkpoint Save the model's parameter after a specific number of epochs
+   * (set to 0 to disable)
    */
   void fit(const Images &images,
            int           n_epoch,

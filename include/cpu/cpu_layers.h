@@ -90,69 +90,77 @@ cpu_mse_grad(float *expected, float *actual, float *d_out, int n, int width, int
  * @brief Backward propagation for ReLU
  *
  * @param in The input data
- * @param d_in The input delta
  * @param d_out The output delta
+ * @param d_in The input delta
  * @param n The number of images
  * @param width The width of the images
  * @param depth The depth of the images
  */
 void
-cpu_relu_backward(float *in, float *d_in, float *d_out, int n, int width, int depth);
+cpu_relu_backward(float *in, float *d_out, float *d_in, int n, int width, int depth);
 
 /**
- * @brief
+ * @brief Backward propagation for max pooling
  *
- * @param in
- * @param d_in
- * @param d_out
- * @param n
- * @param width
- * @param depth
+ * @param in The input data
+ * @param d_out The output delta
+ * @param d_in The input delta
+ * @param n The number of images
+ * @param width The width of the images
+ * @param depth The depth of the images
  */
 void cpu_max_pooling_backward(
-    float *in, float *d_in, float *d_out, int n, int width, int depth);
+    float *in, float *d_out, float *d_in, int n, int width, int depth);
 
 /**
- * @brief
+ * @brief Backward propagation for upsampling
  *
- * @param in
- * @param d_in
- * @param d_out
- * @param n
- * @param width
- * @param depth
+ * @param d_out The output delta
+ * @param d_in The input delta
+ * @param n The number of images
+ * @param width The width of the images
+ * @param depth The depth of the images
  */
-void cpu_upsampling_backward(
-    float *in, float *d_in, float *d_out, int n, int width, int depth);
+void cpu_upsampling_backward(float *d_out, float *d_in, int n, int width, int depth);
 
 /**
- * @brief
+ * @brief Calculate gradient for conv2D bias
  *
- * @param d_out
- * @param grad_bias
- * @param n
- * @param width
- * @param depth
+ * @param d_out The output delta
+ * @param grad_bias The gradient output
+ * @param n Number of images
+ * @param width Width of the images
+ * @param depth Depth of the images
  */
 void cpu_bias_grad(float *d_out, float *grad_bias, int n, int width, int depth);
 
 /**
- * @brief
+ * @brief Calculate gradient for conv2D filter
  *
- * @param in
- * @param d_out
- * @param grad_filter
- * @param n
- * @param width
- * @param depth
- * @param n_filter
+ * @param in The input images
+ * @param d_out The output delta
+ * @param grad_filter The gradient output
+ * @param n Number of images
+ * @param width Width of the images
+ * @param depth Depth of the images
+ * @param n_filter Number of filters
  */
-void cpu_filter_grad(float *in,
+void cpu_conv2D_grad(float *in,
                      float *d_out,
                      float *grad_filter,
                      int    n,
                      int    width,
                      int    depth,
                      int    n_filter);
+
+/**
+ * @brief Update the weights of the array
+ *
+ * @param in The input array
+ * @param grad The gradient
+ * @param size The size of the array
+ * @param learning_rate The learning
+ */
+void cpu_update_weight(float *in, float *grad, int size, float learning_rate);
 
 #endif

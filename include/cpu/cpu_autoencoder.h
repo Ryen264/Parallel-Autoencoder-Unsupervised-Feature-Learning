@@ -9,20 +9,42 @@
  */
 class Cpu_Autoencoder : IAutoencoder {
   /**
+   * @brief Encode while saving outputs for training
+   *
+   * @param dataset The dataset to encode
+   * @return Dataset The encoded dataset
+   */
+  Dataset _encode_save_output(const Dataset &dataset);
+  /**
+   * @brief Decode while saving outputs for training
+   *
+   * @param dataset The dataset to decode
+   * @return Dataset The decoded dataset
+   */
+  Dataset _decode_save_output(const Dataset &dataset);
+
+  /**
+   * @brief Allocate memory for the output arrays
+   *
+   * @param n The number of images
+   * @param width The width of the images
+   *
+   */
+  void _allocate_output_mem(int n, int width);
+  /**
+   * @brief Deallocate memory by the output arrays
+   *
+   */
+  void _deallocate_output_mem();
+
+  /**
    * @brief Fit a minibatch to the model
    *
    * @param batch The batch to fit
-   * @param d_out Temporary buffer for d_out
-   * @param d_in Temporary buffer for d_in
-   * @param d_filter Temporary buffer for d_filter
    * @param learning_rate The learning rate
    * @return float Loss of the minibatch
    */
-  float _fit_batch(const Dataset &batch,
-                   float         *d_out,
-                   float         *d_in,
-                   float         *d_filter,
-                   float          learning_rate);
+  float _fit_batch(const Dataset &batch, float learning_rate);
 
 public:
   /**

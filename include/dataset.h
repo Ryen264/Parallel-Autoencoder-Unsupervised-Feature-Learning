@@ -3,9 +3,11 @@
 
 // Use unique_ptr to prevent memory leak
 #include <memory>
+#include <vector>
 
 using std::move;
 using std::unique_ptr, std::make_unique;
+using std::vector;
 
 /**
  * @brief Struct that represents a list of image (either encoded or decoded)
@@ -70,5 +72,29 @@ struct Dataset {
    */
   int *get_labels() const;
 };
+
+/**
+ * @brief Load dataset from a directory
+ *
+ * @param dataset_dir The path to the dataset
+ * @return Dataset The read dataset
+ */
+Dataset load_dataset(const char *dataset_dir);
+
+/**
+ * @brief Shuffle the dataset
+ *
+ * @param dataset The dataset to be shuffle
+ */
+void shuffle_dataset(Dataset &dataset);
+
+/**
+ * @brief Create a mini batches from a dataset
+ *
+ * @param dataset The dataset
+ * @param batch_size The mini batch size
+ * @return vector<Dataset> The list of batches created
+ */
+vector<Dataset> create_minibatches(const Dataset &dataset, int batch_size);
 
 #endif

@@ -8,5 +8,10 @@ Feature engineering is a fundamental challenge in machine learning: how do we au
   - `cpu`: Header files for CPU-related tasks
   - `autoencoder.h`: Interface class representing an autoencoder. CPU version available.
   - `constants.h`: Defines constants for the project.
-  - `Images.h`: Defines a struct that represents a list of inmages.
+  - `dataset.h`: Defines a struct that represents a dataset.
 - `src`: Source codes for the corresponding header file.
+
+# Todo
+
+- Update read dataset
+- Print training process verbosely (training time per epoch, ...)

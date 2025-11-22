@@ -76,6 +76,11 @@ protected:
   unique_ptr<float[]> _out_decoder_filter_3;
   unique_ptr<float[]> _out_decoder_bias_3;
 
+  // Gradients
+  unique_ptr<float[]> _d_in;
+  unique_ptr<float[]> _d_out;
+  unique_ptr<float[]> _d_filter;
+
   /**
    * @brief Allocate memory for the parameters
    *

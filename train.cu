@@ -20,7 +20,7 @@ struct Tensor4D {
     inline const float32& at(int n,int c,int h,int w) const {
         return data[ ((n*C + c)*H + h)*W + w ];
     }
-    void fill(float32 v){ fill(data.begin(), data.end(), v); }
+    void fill(float32 v){ std::fill(data.begin(), data.end(), v); }
 };
 
 static inline int idx4(int N,int C,int H,int W,int n,int c,int h,int w){
@@ -152,8 +152,8 @@ struct Conv2D {
 
     Tensor4D backward(const Tensor4D &grad_output, float32 lr){
         int N = grad_output.N, H = grad_output.H, W = grad_output.W;
-        fill(grad_w.begin(), grad_w.end(), 0.0f);
-        fill(grad_b.begin(), grad_b.end(), 0.0f);
+        std::fill(grad_w.begin(), grad_w.end(), 0.0f);
+        std::fill(grad_b.begin(), grad_b.end(), 0.0f);
         Tensor4D grad_input(N, in_channels, H, W);
         grad_input.fill(0.0f);
 
@@ -193,12 +193,16 @@ struct Conv2D {
     void save(const string &prefix){
         string fn = prefix + "_w.bin";
         FILE *f = fopen(fn.c_str(),"wb");
-        fwrite(weight.data(), sizeof(float32), weight.size(), f);
-        fclose(f);
+        if(f){
+            fwrite(weight.data(), sizeof(float32), weight.size(), f);
+            fclose(f);
+        }
         string fn2 = prefix + "_b.bin";
         f = fopen(fn2.c_str(),"wb");
-        fwrite(bias.data(), sizeof(float32), bias.size(), f);
-        fclose(f);
+        if(f){
+            fwrite(bias.data(), sizeof(float32), bias.size(), f);
+            fclose(f);
+        }
     }
     void load(const string &prefix){
         string fn = prefix + "_w.bin";
@@ -428,9 +432,6 @@ struct Autoencoder {
         float32 L = loss.forward(pred, input);
         // backward pass
         Tensor4D grad = loss.backward(pred); // dL/dpred
-
-        // clip grad to respect clamping: we used clamp after conv3 output; but gradient flows through deconv3.forward outputs before clamping
-        // For simplicity, proceed with gradient as-is.
 
         // decoder backward
         Tensor4D g_deconv3 = deconv3.backward(grad, lr); // returns grad wrt rd2

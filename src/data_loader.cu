@@ -334,64 +334,27 @@ void printDatasetInfo(CIFAR10Dataset* dataset) {
     printf("  - Test data range: [%.2f, %.2f]\n", test_min, test_max);
 }
 
-// Main function
-int main(int argc, char** argv) {
-    // Check CUDA availability
-    int deviceCount;
-    cudaError_t error = cudaGetDeviceCount(&deviceCount);
-    bool use_cuda = (error == cudaSuccess && deviceCount > 0);
-    
-    if (use_cuda) {
-        cudaDeviceProp prop;
-        cudaGetDeviceProperties(&prop, 0);
-        printf("\nCUDA Device Found: %s\n", prop.name);
-        printf("Using CUDA for data normalization\n");
-    } else {
-        printf("\nNo CUDA device found. Using CPU mode.\n");
-    }
-    
-    // Data directory
-    const char* data_dir = "/content/data/cifar-10-batches-bin";
-    
-    // Load dataset
-    CIFAR10Dataset* dataset = initCIFAR10Dataset(data_dir, use_cuda);
-    printf("\n✓ Dataset loaded successfully!\n");
-    
-    // Print dataset information and verification
-    printDatasetInfo(dataset);
-    
-    // Test batch generation
-    printf("\n============================================================\n");
-    printf("Batch Generation Test\n");
-    printf("============================================================\n");
-    
-    int batch_size = 128;
-    float* batch_images = (float*)malloc(batch_size * IMAGE_SIZE * sizeof(float));
-    int* batch_labels = (int*)malloc(batch_size * sizeof(int));
-    
-    getBatch(dataset, batch_size, batch_images, batch_labels, true);
-    
-    printf("  Batch size: %d\n", batch_size);
-    printf("  Batch images shape: (%d, %d)\n", batch_size, IMAGE_SIZE);
-    printf("  Sample labels: ");
-    for (int i = 0; i < 10; i++) {
-        printf("%d ", batch_labels[i]);
-    }
-    printf("\n");
-    
-    // Calculate batch pixel range
-    float batch_min = batch_images[0];
-    float batch_max = batch_images[0];
-    for (int i = 0; i < batch_size * IMAGE_SIZE; i++) {
-        if (batch_images[i] < batch_min) batch_min = batch_images[i];
-        if (batch_images[i] > batch_max) batch_max = batch_images[i];
-    }
-    printf("  Batch pixel range: [%.2f, %.2f]\n", batch_min, batch_max);
-    
-    // Cleanup
-    free(batch_images);
-    free(batch_labels);
-    freeCIFAR10Dataset(dataset);
-    
-    return 0;
+// Getter functions for accessing dataset components
+float* getTrainImages(CIFAR10Dataset* dataset) {
+    return dataset ? dataset->train_images : NULL;
+}
+
+int* getTrainLabels(CIFAR10Dataset* dataset) {
+    return dataset ? dataset->train_labels : NULL;
+}
+
+float* getTestImages(CIFAR10Dataset* dataset) {
+    return dataset ? dataset->test_images : NULL;
+}
+
+int* getTestLabels(CIFAR10Dataset* dataset) {
+    return dataset ? dataset->test_labels : NULL;
+}
+
+int getNumTrainSamples(CIFAR10Dataset* dataset) {
+    return NUM_TRAIN_SAMPLES;
+}
+
+int getNumTestSamples(CIFAR10Dataset* dataset) {
+    return NUM_TEST_SAMPLES;
 }

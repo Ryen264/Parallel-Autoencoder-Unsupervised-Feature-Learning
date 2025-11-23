@@ -89,13 +89,23 @@ public:
    * @param verbose Whether to disable more or less information
    * @param checkpoint Save the model's parameter after a specific number of epochs (set
    * to 0 to disable)
+   * @param output_dir The file to save model's param
    */
   void fit(const Dataset &dataset,
            int            n_epoch,
            int            batch_size,
            float          learning_rate,
            bool           verbose,
-           int            checkpoint) override;
+           int            checkpoint,
+           const char    *output_dir = "./model") override;
+
+  /**
+   * @brief Evaluate the model
+   *
+   * @param dataset The dataset to be evaluated
+   * @return float The MSE between the actual and expected result
+   */
+  float eval(const Dataset &dataset) override;
 };
 
 #endif

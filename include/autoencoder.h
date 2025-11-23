@@ -81,6 +81,9 @@ protected:
   unique_ptr<float[]> _d_out;
   unique_ptr<float[]> _d_filter;
 
+  // Encode and decode by batches to use less memory
+  static constexpr int _ENCODE_BATCH_SIZE = 1024;
+
   /**
    * @brief Allocate memory for the parameters
    *
@@ -137,13 +140,23 @@ public:
    * @param verbose Whether to disable more or less information
    * @param checkpoint Save the model's parameter after a specific number of epochs (set
    * to 0 to disable)
+   * @param output_dir The file to save model's param
    */
   virtual void fit(const Dataset &dataset,
                    int            n_epoch,
                    int            batch_size,
                    float          learning_rate,
                    bool           verbose,
-                   int            checkpoint) = 0;
+                   int            checkpoint,
+                   const char    *output_dir = "./model") = 0;
+
+  /**
+   * @brief Evaluate the model
+   *
+   * @param dataset The dataset to be evaluated
+   * @return float The MSE between the actual and expected result
+   */
+  virtual float eval(const Dataset &dataset) = 0;
 };
 
 #endif

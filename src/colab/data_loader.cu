@@ -1,11 +1,11 @@
-#include "dataset.h"
-#include "constants.h"
 #include <algorithm>
 #include <cstring>
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda_runtime.h>
 #include <time.h>
+#include "data_loader.h"
+#include "constants.h"
 
 using std::memcpy;
 using std::random_shuffle;
@@ -192,7 +192,7 @@ Dataset load_dataset(const char *dataset_dir, bool is_train) {
     // Convert to Dataset object
     unique_ptr<float[]> data_ptr(images);
     unique_ptr<int[]> labels_ptr(labels);
-    return Dataset(data_ptr, labels_ptr, num_samples, IMAGE_WIDTH, IMAGE_DEPTH);
+    return Dataset(data_ptr, labels_ptr, num_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
 }
 
 void shuffle_dataset(Dataset &dataset) {

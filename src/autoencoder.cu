@@ -1,7 +1,7 @@
-#include "autoencoder.h"
-#include "constants.h"
 #include <cstdlib>
 #include <fstream>
+#include "autoencoder.h"
+#include "constants.h"
 
 using std::ifstream, std::ofstream;
 using std::make_unique;

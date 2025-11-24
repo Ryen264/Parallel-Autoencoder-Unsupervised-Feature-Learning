@@ -1,5 +1,5 @@
 #ifndef CONSTANTS_H
-#define CONSTATNS_H
+#define CONSTANTS_H
 
 constexpr int NUM_TRAIN_SAMPLES = 50000;
 constexpr int NUM_TEST_SAMPLES  = 10000;

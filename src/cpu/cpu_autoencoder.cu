@@ -1,10 +1,10 @@
-#include "constants.h"
-#include "cpu_autoencoder.h"
-#include "cpu_layers.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <sstream>
+#include "constants.h"
+#include "cpu_autoencoder.h"
+#include "cpu_layers.h"
 
 using std::max_element;
 using std::memcpy;

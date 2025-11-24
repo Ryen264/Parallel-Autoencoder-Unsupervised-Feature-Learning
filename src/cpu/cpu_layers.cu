@@ -41,9 +41,8 @@ void cpu_conv2D(float *in, float *filter, float *out,
               // Calculate start of input
               float *in_start = in + image * GET_1D_INDEX(row, col, 0, width, depth);
 
-              for (int d = 0; d < depth; ++d) {
+              for (int d = 0; d < depth; ++d)
                 sum += in_start[d] * cur_filter[d];
-              }
             }
           }
           cur[f] = sum;
@@ -135,9 +134,8 @@ void cpu_mse_grad(float *expected, float *actual, float *d_out,
 
 void cpu_relu_backward(float *in, float *d_out, float *d_in,
                   int n, int width, int height, int depth) {
-  for (int i = 0; i < n * width * height * depth; ++i) {
+  for (int i = 0; i < n * width * height * depth; ++i)
     d_in[i] = in[i] > 0 ? d_out[i] : 0;
-  }
 }
 
 void cpu_max_pooling_backward(float *in, float *d_out, float *d_in,
@@ -160,9 +158,8 @@ void cpu_max_pooling_backward(float *in, float *d_out, float *d_in,
           });
 
           // Set d_in at argmax be d_out, else 0
-          for (int neighbor_idx : neighbors_idx) {
+          for (int neighbor_idx : neighbors_idx)
             d_in[neighbor_idx + k] = (neighbor_idx == max_neighbor_idx) ? cur[k] : 0;
-          }
         }
       }
     }
@@ -203,7 +200,7 @@ void cpu_bias_grad(float *d_out, float *grad_bias,
   for (int d = 0; d < depth; ++d) {
     // Sum of all d_out in the corresponding depth
     float *d_out_offset = d_out + d;
-    float  sum          = 0;
+    float sum = 0;
     for (int i = 0; i < n * width * height * depth; i += depth)
       sum += d_out_offset[i];
     grad_bias[d] = sum;
@@ -235,12 +232,10 @@ void cpu_conv2D_grad(float *in, float *d_out, float *grad_filter,
                 continue;
 
               // Calculate start of filter
-              float *grad_filter_start =
-                  grad_filter + f * GET_1D_INDEX(f_i, f_j, 0, CONV_FILTER_WIDTH, depth);
+              float *grad_filter_start = grad_filter + f * GET_1D_INDEX(f_i, f_j, 0, CONV_FILTER_WIDTH, depth);
 
               // Calculate start of input
               float *in_start = in + image * GET_1D_INDEX(row, col, 0, width, depth);
-
               for (int d = 0; d < depth; ++d)
                 grad_filter_start[d] += in_start[d] * d_out_val;
             }

@@ -12,8 +12,6 @@ using std::memset;
 
 void cpu_conv2D(float *in, float *filter, float *out,
                 int n, int width, int height, int depth, int n_filter) {
-  const int FILTER_DEPTH = CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth * n_filter;
-
   for (int image = 0; image < n; ++image) {
     for (int i = 0; i < height; ++i) {
       for (int j = 0; j < width; ++j) {

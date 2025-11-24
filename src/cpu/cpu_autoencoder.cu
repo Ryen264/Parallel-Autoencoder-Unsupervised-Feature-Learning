@@ -185,6 +185,9 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
     float *d_in = _d_in.get(), *d_out = _d_out.get(), *d_filter = _d_filter.get();
     Dataset res = _decode_save_output(_encode_save_output(batch));
 
+    // Calculate loss before backprop
+    float loss = cpu_mse_loss(batch.get_data(), res.get_data(), n, width, height, depth);
+
     // Get loss gradient
     cpu_mse_grad(batch.get_data(), res.get_data(), d_out,
                     n, width, height, depth);
@@ -298,6 +301,8 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
 
     swap(d_out, d_in);
     cpu_update_weight(_encoder_filter_1.get(), d_filter, _ENCODER_FILTER_1_SIZE, learning_rate);
+    
+    return loss;
 }
 
 void Cpu_Autoencoder::fit(const Dataset &dataset, int n_epoch, int batch_size, float learning_rate,
@@ -314,11 +319,15 @@ void Cpu_Autoencoder::fit(const Dataset &dataset, int n_epoch, int batch_size, f
 
         float total_loss = 0;
         for (const Dataset &batch : batches) {
-        total_loss += _fit_batch(batch, learning_rate) * batch.n;
-        printf("Loss: %.4f\n", total_loss);
+            total_loss += _fit_batch(batch, learning_rate) * batch.n;
+        }
+        
+        // Print average loss for the epoch
+        float avg_loss = total_loss / dataset.n;
+        printf("  Loss: %.4f\n", avg_loss);
 
         // Save at checkpoints
-        if (epoch && epoch != checkpoint && epoch % checkpoint == 0) {
+        if (checkpoint > 0 && epoch % checkpoint == 0) {
             stringstream builder;
             builder << output_dir << '/' << "autoencoder_" << epoch << ".bin";
             _save_paramters(builder.str().c_str());

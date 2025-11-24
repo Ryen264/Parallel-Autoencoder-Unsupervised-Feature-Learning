@@ -13,7 +13,6 @@ LIBSVM_LIB = -L$(LIBSVM_DIR) -lsvm
 SRC_DIR = src
 CPU_SRC_DIR = $(SRC_DIR)/cpu
 SOURCES = $(SRC_DIR)/main.cu \
-          $(SRC_DIR)/data_loader.cu \
           $(SRC_DIR)/autoencoder.cu \
           $(SRC_DIR)/dataset.cu
 CPU_SOURCES = $(wildcard $(CPU_SRC_DIR)/*.cu)

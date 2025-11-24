@@ -18,7 +18,6 @@
 #include "cpu/cpu_autoencoder.h"
 #include "dataset.h"
 #include "constants.h"
-#include "data_loader.h"
 
 // For LIBSVM integration (uncomment when library is installed)
 // #include "svm.h"
@@ -30,21 +29,6 @@ struct SimpleSVM {
     int feature_dim;
     int num_classes;
 };
-
-/**
- * @brief Convert CIFAR10Dataset to Dataset object for autoencoder
- */
-Dataset convertToDataset(float* images, int* labels, int n, int width, int depth) {
-    // Allocate memory for Dataset
-    std::unique_ptr<float[]> data = std::make_unique<float[]>(n * width * width * depth);
-    std::unique_ptr<int[]> label_data = std::make_unique<int[]>(n);
-    
-    // Copy data
-    memcpy(data.get(), images, n * width * width * depth * sizeof(float));
-    memcpy(label_data.get(), labels, n * sizeof(int));
-    
-    return Dataset(data, label_data, n, width, depth);
-}
 
 /**
  * @brief Train SVM classifier (Placeholder implementation)
@@ -171,15 +155,15 @@ int main(int argc, char** argv) {
     printf("Step 1: Loading CIFAR-10 Dataset\n");
     printf("============================================================\n");
     
-    CIFAR10Dataset* cifar_data = initCIFAR10Dataset(data_dir, use_cuda);
-    printf("✓ Dataset loaded successfully!\n");
-    printDatasetInfo(cifar_data);
+    // Load training and test datasets
+    Dataset train_dataset = load_dataset(data_dir, true, use_cuda);
+    Dataset test_dataset = load_dataset(data_dir, false, use_cuda);
     
-    // Get training and test data
-    float* train_images = getTrainImages(cifar_data);
-    int* train_labels = getTrainLabels(cifar_data);
-    float* test_images = getTestImages(cifar_data);
-    int* test_labels = getTestLabels(cifar_data);
+    printf("\n✓ Dataset loaded successfully!\n");
+    printf("  Training samples: %d\n", train_dataset.n);
+    printf("  Test samples: %d\n", test_dataset.n);
+    printf("  Image dimensions: %dx%dx%d\n", 
+           train_dataset.width, train_dataset.width, train_dataset.depth);
     
     // ========================================================================
     // STEP 2: Train Autoencoder
@@ -196,14 +180,7 @@ int main(int argc, char** argv) {
     // Initialize autoencoder
     Cpu_Autoencoder autoencoder;
     
-    // Convert training data to Dataset
-    Dataset train_dataset = convertToDataset(
-        train_images, 
-        train_labels,
-        50000, 32, 3
-    );
-    
-    // Train autoencoder
+    // Train autoencoder with training dataset
     printf("Starting training...\n");
     autoencoder.fit(train_dataset, n_epochs, batch_size, 
                     learning_rate, verbose, checkpoint);
@@ -224,11 +201,6 @@ int main(int argc, char** argv) {
            train_features.width, train_features.depth);
     
     // Encode test data
-    Dataset test_dataset = convertToDataset(
-        test_images,
-        test_labels,
-        10000, 32, 3
-    );
     Dataset test_features = autoencoder.encode(test_dataset);
     printf("Test features shape: (%d, %d, %d, %d)\n",
            test_features.n, test_features.width,
@@ -270,7 +242,6 @@ int main(int argc, char** argv) {
     printf("============================================================\n");
     
     freeSVM(svm);
-    freeCIFAR10Dataset(cifar_data);
     
     printf("✓ All resources freed\n");
     printf("\n============================================================\n");
@@ -286,8 +257,8 @@ int main(int argc, char** argv) {
     printf("   - svm_train() for training\n");
     printf("   - svm_predict() for prediction\n");
     printf("   - Configure RBF kernel with C=10, gamma=auto\n");
-    printf("4. Compile with: nvcc -o pipeline main.cu data_loader.cu autoencoder.cu \\\n");
-    printf("   dataset.cu cpu/*.cu -I./include -lsvm\n");
+    printf("4. Compile with: nvcc -o pipeline main.cu dataset.cu autoencoder.cu \\\n");
+    printf("   cpu/*.cu -I./include -lsvm\n");
     
     return 0;
 }

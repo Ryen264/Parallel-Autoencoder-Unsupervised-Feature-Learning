@@ -1,29 +1,14 @@
-/*
- * CIFAR-10 Data Loader - CUDA Implementation
- * 
- * Data Loading and Preprocessing:
- * + Create a CIFAR10 Dataset structure to handle data loading 
- * + Read CIFAR-10 binary files (5 training batches + 1 test batch)
- * + Parse the binary format: 1 byte label + 3,072 bytes image per record 
- * + Convert uint8 pixel values [0, 255] to float [0, 1] for normalization
- * + Implement batch generation for training
- * + Add data shuffling capability 
- * + Organize train images (50,000), test images (10,000), and their labels in memory
- */
-
+#include "dataset.h"
+#include "constants.h"
+#include <algorithm>
+#include <cstring>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <cuda_runtime.h>
 #include <time.h>
 
-#define NUM_TRAIN_SAMPLES 50000
-#define NUM_TEST_SAMPLES 10000
-#define IMAGE_SIZE 3072  // 32 * 32 * 3
-#define NUM_CLASSES 10
-#define IMAGE_WIDTH 32
-#define IMAGE_HEIGHT 32
-#define IMAGE_CHANNELS 3
+using std::memcpy;
+using std::random_shuffle;
 
 // Error checking macro
 #define CUDA_CHECK(call) \
@@ -36,22 +21,6 @@
         } \
     } while(0)
 
-// CIFAR-10 Dataset structure
-typedef struct {
-    float* train_images;      // Host memory: 50000 x 3072
-    int* train_labels;        // Host memory: 50000
-    float* test_images;       // Host memory: 10000 x 3072
-    int* test_labels;         // Host memory: 10000
-    
-    float* d_train_images;    // Device memory
-    int* d_train_labels;      // Device memory
-    float* d_test_images;     // Device memory
-    int* d_test_labels;       // Device memory
-    
-    int* train_indices;       // For shuffling
-    int current_index;
-} CIFAR10Dataset;
-
 // CUDA kernel for normalization: convert uint8 [0, 255] to float [0, 1]
 __global__ void normalizeKernel(unsigned char* input, float* output, int size) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -61,7 +30,7 @@ __global__ void normalizeKernel(unsigned char* input, float* output, int size) {
 }
 
 // Read a single CIFAR-10 binary file
-void readBinaryFile(const char* filepath, unsigned char** raw_data, int num_samples) {
+static void readBinaryFile(const char* filepath, unsigned char** raw_data, int num_samples) {
     FILE* file = fopen(filepath, "rb");
     if (!file) {
         fprintf(stderr, "Error: Cannot open file %s\n", filepath);
@@ -85,13 +54,12 @@ void readBinaryFile(const char* filepath, unsigned char** raw_data, int num_samp
         fclose(file);
         exit(EXIT_FAILURE);
     }
-    
     fclose(file);
 }
 
 // Parse raw data and normalize using CUDA
-void parseAndNormalize(unsigned char* raw_data, float* images, int* labels, 
-                       int num_samples, bool use_cuda) {
+static void parseAndNormalize(unsigned char* raw_data, float* images, int* labels, 
+                              int num_samples, bool use_cuda) {
     int record_size = 1 + IMAGE_SIZE;
     
     // Extract labels
@@ -147,214 +115,143 @@ void parseAndNormalize(unsigned char* raw_data, float* images, int* labels,
     }
 }
 
-// Initialize CIFAR-10 dataset
-CIFAR10Dataset* initCIFAR10Dataset(const char* data_dir, bool use_cuda) {
-    CIFAR10Dataset* dataset = (CIFAR10Dataset*)malloc(sizeof(CIFAR10Dataset));
-    if (!dataset) {
-        fprintf(stderr, "Error: Memory allocation failed for dataset\n");
-        exit(EXIT_FAILURE);
-    }
+Dataset::Dataset(int n, int width, int height, int depth):
+    data(make_unique<float[]>(n * width * height * depth)), labels(make_unique<int[]>(n)),
+    n(n), width(width), height(height), depth(depth) {};
+
+Dataset::Dataset(unique_ptr<float[]> &data,
+                int n, int width, int height, int depth):
+    data(move(data)), labels(make_unique<int[]>(n)),
+    n(n), width(width), height(height), depth(depth) {};
+
+Dataset::Dataset(unique_ptr<float[]> &data, unique_ptr<int[]> &labels,
+                int n, int width, int height, int depth):
+    data(move(data)), labels(move(labels)),
+    n(n), width(width), height(height), depth(depth) {};
+
+float *Dataset::get_data() const { return data.get(); }
+int   *Dataset::get_labels() const { return labels.get(); }
+
+// Load CIFAR-10 dataset from binary files
+Dataset load_dataset(const char *dataset_dir, bool is_train = true) {
+    // Check if CUDA is available
+    int deviceCount;
+    bool use_cuda = (cudaGetDeviceCount(&deviceCount) == cudaSuccess && deviceCount > 0);
+
+    int num_samples = is_train ? NUM_TRAIN_SAMPLES : NUM_TEST_SAMPLES;
     
-    // Allocate host memory
-    dataset->train_images = (float*)malloc(NUM_TRAIN_SAMPLES * IMAGE_SIZE * sizeof(float));
-    dataset->train_labels = (int*)malloc(NUM_TRAIN_SAMPLES * sizeof(int));
-    dataset->test_images = (float*)malloc(NUM_TEST_SAMPLES * IMAGE_SIZE * sizeof(float));
-    dataset->test_labels = (int*)malloc(NUM_TEST_SAMPLES * sizeof(int));
-    dataset->train_indices = (int*)malloc(NUM_TRAIN_SAMPLES * sizeof(int));
+    // Allocate memory for images and labels
+    float* images = (float*)malloc(num_samples * IMAGE_SIZE * sizeof(float));
+    int* labels = (int*)malloc(num_samples * sizeof(int));
     
-    if (!dataset->train_images || !dataset->train_labels || 
-        !dataset->test_images || !dataset->test_labels || !dataset->train_indices) {
+    if (!images || !labels) {
         fprintf(stderr, "Error: Memory allocation failed\n");
         exit(EXIT_FAILURE);
     }
     
-    // Initialize train indices
-    for (int i = 0; i < NUM_TRAIN_SAMPLES; i++) {
-        dataset->train_indices[i] = i;
-    }
-    dataset->current_index = 0;
-    
-    // Load training data (5 batches)
-    printf("Loading training data...\n");
-    for (int batch = 1; batch <= 5; batch++) {
-        char filepath[256];
-        snprintf(filepath, sizeof(filepath), "%s/data_batch_%d.bin", data_dir, batch);
+    if (is_train) {
+        // Load training data (5 batches)
+        printf("Loading training data from %s...\n", dataset_dir);
+        for (int batch = 1; batch <= NUM_BATCHES; batch++) {
+            char filepath[512];
+            snprintf(filepath, sizeof(filepath), "%s/data_batch_%d.bin", dataset_dir, batch);
+            
+            unsigned char* raw_data;
+            readBinaryFile(filepath, &raw_data, NUM_TRAIN_SAMPLES / NUM_BATCHES);
+            
+            int offset = (batch - 1) * (NUM_TRAIN_SAMPLES / NUM_BATCHES);
+            parseAndNormalize(raw_data, images + offset * IMAGE_SIZE, labels + offset,
+                             NUM_TRAIN_SAMPLES / NUM_BATCHES, use_cuda);
+            
+            free(raw_data);
+            printf("  ✓ Loaded batch %d/5\n", batch);
+        }
+        printf("✓ Training data loaded: %d samples\n", num_samples);
+    } else {
+        // Load test data
+        printf("Loading test data from %s...\n", dataset_dir);
+        char filepath[512];
+        snprintf(filepath, sizeof(filepath), "%s/test_batch.bin", dataset_dir);
         
         unsigned char* raw_data;
-        readBinaryFile(filepath, &raw_data, 10000);
-        
-        int offset = (batch - 1) * 10000;
-        parseAndNormalize(raw_data, 
-                         dataset->train_images + offset * IMAGE_SIZE,
-                         dataset->train_labels + offset,
-                         10000, use_cuda);
-        
+        readBinaryFile(filepath, &raw_data, NUM_TEST_SAMPLES);
+        parseAndNormalize(raw_data, images, labels,
+                          NUM_TEST_SAMPLES, use_cuda);
         free(raw_data);
-        printf("  Loaded batch %d/5\n", batch);
+        printf("✓ Test data loaded: %d samples\n", num_samples);
     }
     
-    // Load test data
-    printf("Loading test data...\n");
-    char test_filepath[256];
-    snprintf(test_filepath, sizeof(test_filepath), "%s/test_batch.bin", data_dir);
-    
-    unsigned char* raw_data;
-    readBinaryFile(test_filepath, &raw_data, NUM_TEST_SAMPLES);
-    parseAndNormalize(raw_data, dataset->test_images, dataset->test_labels, 
-                     NUM_TEST_SAMPLES, use_cuda);
-    free(raw_data);
-    printf("  Test data loaded\n");
-    
-    // Allocate device memory if using CUDA
-    if (use_cuda) {
-        CUDA_CHECK(cudaMalloc(&dataset->d_train_images, 
-                             NUM_TRAIN_SAMPLES * IMAGE_SIZE * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&dataset->d_train_labels, 
-                             NUM_TRAIN_SAMPLES * sizeof(int)));
-        CUDA_CHECK(cudaMalloc(&dataset->d_test_images, 
-                             NUM_TEST_SAMPLES * IMAGE_SIZE * sizeof(float)));
-        CUDA_CHECK(cudaMalloc(&dataset->d_test_labels, 
-                             NUM_TEST_SAMPLES * sizeof(int)));
-        
-        // Copy data to device
-        CUDA_CHECK(cudaMemcpy(dataset->d_train_images, dataset->train_images,
-                             NUM_TRAIN_SAMPLES * IMAGE_SIZE * sizeof(float),
-                             cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(dataset->d_train_labels, dataset->train_labels,
-                             NUM_TRAIN_SAMPLES * sizeof(int),
-                             cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(dataset->d_test_images, dataset->test_images,
-                             NUM_TEST_SAMPLES * IMAGE_SIZE * sizeof(float),
-                             cudaMemcpyHostToDevice));
-        CUDA_CHECK(cudaMemcpy(dataset->d_test_labels, dataset->test_labels,
-                             NUM_TEST_SAMPLES * sizeof(int),
-                             cudaMemcpyHostToDevice));
-    } else {
-        dataset->d_train_images = NULL;
-        dataset->d_train_labels = NULL;
-        dataset->d_test_images = NULL;
-        dataset->d_test_labels = NULL;
+    // Verify normalization
+    float min_val = images[0], max_val = images[0];
+    for (int i = 0; i < num_samples * IMAGE_SIZE; i++) {
+        if (images[i] < min_val) min_val = images[i];
+        if (images[i] > max_val) max_val = images[i];
     }
+    printf("  Data range: [%.4f, %.4f]\n", min_val, max_val);
     
-    return dataset;
+    // Convert to Dataset object
+    unique_ptr<float[]> data_ptr(images);
+    unique_ptr<int[]> labels_ptr(labels);
+    return Dataset(data_ptr, labels_ptr, num_samples, IMAGE_WIDTH, IMAGE_DEPTH);
 }
 
-// Shuffle training data indices
-void shuffleTrainingData(CIFAR10Dataset* dataset) {
-    srand(time(NULL));
-    for (int i = NUM_TRAIN_SAMPLES - 1; i > 0; i--) {
-        int j = rand() % (i + 1);
-        int temp = dataset->train_indices[i];
-        dataset->train_indices[i] = dataset->train_indices[j];
-        dataset->train_indices[j] = temp;
-    }
-    dataset->current_index = 0;
+void shuffle_dataset(Dataset &dataset) {
+  int n = dataset.n;
+  int image_size = dataset.width * dataset.height * dataset.depth;
+  int image_bytes = image_size * sizeof(float);
+  float *data = dataset.get_data();
+  int *labels = dataset.get_labels();
+  unique_ptr<float[]> new_data = make_unique<float[]>(n * image_size);
+  unique_ptr<int[]> new_labels = make_unique<int[]>(n);
+
+  // Create list of indices
+  vector<int> indices(n);
+  for (int i = 0; i < n; ++i)
+    indices[i] = i;
+
+  // Shuffle the indices
+  random_shuffle(indices.begin(), indices.end());
+
+  // Copy data base on indices
+  for (int i = 0; i < n; ++i) {
+    memcpy(new_data.get() + i * image_bytes,
+          data + indices[i] * image_bytes, image_bytes);
+    memcpy(new_labels.get() + i * sizeof(int),
+          labels + indices[i] * sizeof(int), sizeof(int));
+  }
+
+  // Change the pointers of the original dataset
+  dataset.data = move(new_data);
+  dataset.labels = move(new_labels);
 }
 
-// Get a batch of training data
-void getBatch(CIFAR10Dataset* dataset, int batch_size, float* batch_images, 
-              int* batch_labels, bool shuffle) {
-    // Check if we need to start a new epoch
-    if (dataset->current_index + batch_size > NUM_TRAIN_SAMPLES) {
-        if (shuffle) {
-            shuffleTrainingData(dataset);
-        } else {
-            dataset->current_index = 0;
-        }
-    }
-    
-    // Copy batch data
-    for (int i = 0; i < batch_size; i++) {
-        int idx = dataset->train_indices[dataset->current_index + i];
-        memcpy(batch_images + i * IMAGE_SIZE,
-               dataset->train_images + idx * IMAGE_SIZE,
-               IMAGE_SIZE * sizeof(float));
-        batch_labels[i] = dataset->train_labels[idx];
-    }
-    
-    dataset->current_index += batch_size;
-}
+vector<Dataset> create_minibatches(const Dataset &dataset, int batch_size) {
+  int n_batches = (dataset.n + batch_size - 1) / batch_size;
+  float *data = dataset.get_data();
+  int *labels = dataset.get_labels();
+  int image_size = dataset.width * dataset.height * dataset.depth * sizeof(float);
+  int batch_image_bytes = batch_size * image_size;
+  int batch_labels_bytes = batch_size * sizeof(int);
+  vector<Dataset> batches(n_batches, Dataset(batch_size, dataset.width, dataset.height, dataset.depth));
 
-// Free dataset memory
-void freeCIFAR10Dataset(CIFAR10Dataset* dataset) {
-    if (dataset) {
-        free(dataset->train_images);
-        free(dataset->train_labels);
-        free(dataset->test_images);
-        free(dataset->test_labels);
-        free(dataset->train_indices);
-        
-        if (dataset->d_train_images) {
-            cudaFree(dataset->d_train_images);
-            cudaFree(dataset->d_train_labels);
-            cudaFree(dataset->d_test_images);
-            cudaFree(dataset->d_test_labels);
-        }
-        
-        free(dataset);
-    }
-}
+  // Copy data
+  for (int i = 0; i < n_batches; ++i) {
+    memcpy(batches[i].get_data(),
+          data + i * batch_image_bytes, batch_image_bytes);
+    memcpy(batches[i].get_labels(),
+          labels + i * batch_labels_bytes, batch_labels_bytes);
+  }
 
-// Print dataset information
-void printDatasetInfo(CIFAR10Dataset* dataset) {
-    printf("\n");
-    printf("============================================================\n");
-    printf("CIFAR-10 Dataset Information\n");
-    printf("============================================================\n");
-    printf("  Number of training samples: %d\n", NUM_TRAIN_SAMPLES);
-    printf("  Number of test samples: %d\n", NUM_TEST_SAMPLES);
-    printf("  Image dimensions: %dx%dx%d\n", IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_CHANNELS);
-    printf("  Number of classes: %d\n", NUM_CLASSES);
-    printf("  Total image size: %d bytes\n", IMAGE_SIZE);
-    
-    // Calculate min/max for verification
-    float train_min = dataset->train_images[0];
-    float train_max = dataset->train_images[0];
-    float test_min = dataset->test_images[0];
-    float test_max = dataset->test_images[0];
-    
-    for (int i = 0; i < NUM_TRAIN_SAMPLES * IMAGE_SIZE; i++) {
-        if (dataset->train_images[i] < train_min) train_min = dataset->train_images[i];
-        if (dataset->train_images[i] > train_max) train_max = dataset->train_images[i];
-    }
-    
-    for (int i = 0; i < NUM_TEST_SAMPLES * IMAGE_SIZE; i++) {
-        if (dataset->test_images[i] < test_min) test_min = dataset->test_images[i];
-        if (dataset->test_images[i] > test_max) test_max = dataset->test_images[i];
-    }
-    
-    printf("\n");
-    printf("============================================================\n");
-    printf("Verification Results\n");
-    printf("============================================================\n");
-    printf("✓ Training images: %d samples\n", NUM_TRAIN_SAMPLES);
-    printf("✓ Test images: %d samples\n", NUM_TEST_SAMPLES);
-    printf("✓ Preprocessing - Normalized to [0, 1]:\n");
-    printf("  - Training data range: [%.2f, %.2f]\n", train_min, train_max);
-    printf("  - Test data range: [%.2f, %.2f]\n", test_min, test_max);
-}
+  // Create last batch
+  int n_remaining = dataset.n - batch_size * n_batches;
+  Dataset last_batch(n_remaining, dataset.width, dataset.height, dataset.depth);
+  memcpy(last_batch.get_data(),
+         data + n_batches * batch_image_bytes, n_remaining * image_size);
+  memcpy(last_batch.get_labels(),
+         labels + n_batches * batch_labels_bytes, n_remaining * sizeof(int));
 
-// Getter functions for accessing dataset components
-float* getTrainImages(CIFAR10Dataset* dataset) {
-    return dataset ? dataset->train_images : NULL;
-}
-
-int* getTrainLabels(CIFAR10Dataset* dataset) {
-    return dataset ? dataset->train_labels : NULL;
-}
-
-float* getTestImages(CIFAR10Dataset* dataset) {
-    return dataset ? dataset->test_images : NULL;
-}
-
-int* getTestLabels(CIFAR10Dataset* dataset) {
-    return dataset ? dataset->test_labels : NULL;
-}
-
-int getNumTrainSamples(CIFAR10Dataset* dataset) {
-    return NUM_TRAIN_SAMPLES;
-}
-
-int getNumTestSamples(CIFAR10Dataset* dataset) {
-    return NUM_TEST_SAMPLES;
+  // Push into vector
+  batches.emplace_back(
+      last_batch.data, last_batch.labels, n_remaining, dataset.width, dataset.depth);
+  return batches;
 }

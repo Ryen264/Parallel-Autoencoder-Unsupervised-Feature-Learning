@@ -254,9 +254,8 @@ void check_cuda() {
         printf("  Capability: %d.%d\n", prop.major, prop.minor);
         printf("  Memory:     %.2f GB\n", prop.totalGlobalMem / (1024.0*1024.0*1024.0));
         printf("  Status:     CUDA Available\n\n");
-    } else {
+    } else
         printf("  Status:     CPU Mode (No CUDA device)\n\n");
-    }
 }
 
 // Load datasets without testing
@@ -270,7 +269,6 @@ void load_datasets(const char* data_dir, Dataset** train_out, Dataset** test_out
     // Load test dataset
     *test_out = new Dataset(load_dataset(data_dir, false));
     printf("✓ Test dataset loaded: %d samples\n", (*test_out)->n);
-    
     printf("✓ Total datasets loaded: %d samples\n", (*train_out)->n + (*test_out)->n);
 }
 
@@ -362,11 +360,10 @@ void run_tests(const Dataset& train_dataset, const Dataset& test_dataset) {
     printf("  %s Preprocessing: normalized to [0,1]\n", all_passed ? "[✓]" : "[✗]");
     printf("\n");
     
-    if (all_passed && stats.failed_tests == 0) {
+    if (all_passed && stats.failed_tests == 0)
         printf("Result: ALL TESTS PASSED! Data loader is working correctly.\n\n");
-    } else {
+    else
         printf("Result: SOME TESTS FAILED. Please check the output above.\n\n");
-    }
 }
 
 // Main function

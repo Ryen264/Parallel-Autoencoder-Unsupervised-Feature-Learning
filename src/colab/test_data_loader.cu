@@ -48,7 +48,7 @@ bool test_sample_count(const Dataset& dataset, int expected, const char* name) {
     bool passed = (dataset.n == expected);
     char msg[256];
     snprintf(msg, sizeof(msg), "%s sample count: %d (expected %d)", 
-             name, dataset.n, expected);
+            name, dataset.n, expected);
     print_test(msg, passed);
     return passed;
 }
@@ -58,8 +58,7 @@ bool test_dimensions(const Dataset& dataset, int exp_width, int exp_depth, const
     bool passed = (dataset.width == exp_width && dataset.depth == exp_depth);
     char msg[256];
     snprintf(msg, sizeof(msg), "%s dimensions: %dx%dx%d (expected %dx%dx%d)", 
-             name, dataset.width, dataset.width, dataset.depth,
-             exp_width, exp_width, exp_depth);
+            name, dataset.width, dataset.height, dataset.depth, exp_width, exp_width, exp_depth);
     print_test(msg, passed);
     return passed;
 }
@@ -67,10 +66,9 @@ bool test_dimensions(const Dataset& dataset, int exp_width, int exp_depth, const
 // Test: Verify normalization to [0,1]
 bool test_normalization(const Dataset& dataset, const char* name) {
     float* data = dataset.get_data();
-    int total_size = dataset.n * dataset.width * dataset.width * dataset.depth;
+    int total_size = dataset.n * dataset.width * dataset.height * dataset.depth;
     
-    float min_val = data[0];
-    float max_val = data[0];
+    float min_val = data[0], max_val = data[0];
     
     for (int i = 0; i < total_size; i++) {
         if (data[i] < min_val) min_val = data[i];
@@ -80,7 +78,7 @@ bool test_normalization(const Dataset& dataset, const char* name) {
     bool passed = (min_val >= 0.0f && min_val < 0.1f && max_val <= 1.0f && max_val > 0.9f);
     char msg[256];
     snprintf(msg, sizeof(msg), "%s normalized to [0,1]: range [%.4f, %.4f]", 
-             name, min_val, max_val);
+            name, min_val, max_val);
     print_test(msg, passed);
     
     printf("       Min: %.6f, Max: %.6f\n", min_val, max_val);
@@ -101,12 +99,13 @@ bool test_labels(const Dataset& dataset, const char* name) {
     }
     
     char msg[256];
-    if (passed) {
-        snprintf(msg, sizeof(msg), "%s labels valid [0-%d]", name, NUM_CLASSES-1);
-    } else {
+    if (passed)
+        snprintf(msg, sizeof(msg), "%s labels valid [0-%d]",
+                name, NUM_CLASSES-1);
+    else
         snprintf(msg, sizeof(msg), "%s labels valid [0-%d] (%d invalid found)", 
-                 name, NUM_CLASSES-1, invalid_count);
-    }
+                name, NUM_CLASSES-1, invalid_count);
+
     print_test(msg, passed);
     return passed;
 }
@@ -141,9 +140,8 @@ void print_statistics(const Dataset& dataset, const char* name) {
     
     // Calculate mean and std dev
     double sum = 0.0;
-    for (int i = 0; i < total_size; i++) {
+    for (int i = 0; i < total_size; i++)
         sum += data[i];
-    }
     float mean = sum / total_size;
     
     double var_sum = 0.0;
@@ -156,9 +154,8 @@ void print_statistics(const Dataset& dataset, const char* name) {
     // Count labels
     int label_counts[NUM_CLASSES] = {0};
     for (int i = 0; i < dataset.n; i++) {
-        if (labels[i] >= 0 && labels[i] < NUM_CLASSES) {
+        if (labels[i] >= 0 && labels[i] < NUM_CLASSES)
             label_counts[labels[i]]++;
-        }
     }
     
     printf("\n  === %s Statistics ===\n", name);
@@ -169,13 +166,11 @@ void print_statistics(const Dataset& dataset, const char* name) {
     printf("  Label Distribution:\n");
     
     const char* classes[] = {"airplane", "automobile", "bird", "cat", "deer",
-                             "dog", "frog", "horse", "ship", "truck"};
+                            "dog", "frog", "horse", "ship", "truck"};
     
-    for (int i = 0; i < NUM_CLASSES; i++) {
+    for (int i = 0; i < NUM_CLASSES; i++)
         printf("    %d (%-10s): %5d (%.1f%%)\n", 
-               i, classes[i], label_counts[i], 
-               100.0f * label_counts[i] / dataset.n);
-    }
+               i, classes[i], label_counts[i], 100.0f * label_counts[i] / dataset.n);
     printf("\n");
 }
 
@@ -184,11 +179,9 @@ bool test_class_balance(const Dataset& dataset, const char* name) {
     int* labels = dataset.get_labels();
     int counts[NUM_CLASSES] = {0};
     
-    for (int i = 0; i < dataset.n; i++) {
-        if (labels[i] >= 0 && labels[i] < NUM_CLASSES) {
+    for (int i = 0; i < dataset.n; i++)
+        if (labels[i] >= 0 && labels[i] < NUM_CLASSES)
             counts[labels[i]]++;
-        }
-    }
     
     bool balanced = true;
     for (int i = 0; i < NUM_CLASSES; i++) {
@@ -256,9 +249,8 @@ void check_cuda() {
         printf("  Capability: %d.%d\n", prop.major, prop.minor);
         printf("  Memory:     %.2f GB\n", prop.totalGlobalMem / (1024.0*1024.0*1024.0));
         printf("  Status:     CUDA Available\n\n");
-    } else {
+    } else
         printf("  Status:     CPU Mode (No CUDA device)\n\n");
-    }
 }
 
 // Load datasets without testing
@@ -364,11 +356,10 @@ void run_tests(const Dataset& train_dataset, const Dataset& test_dataset) {
     printf("  %s Preprocessing: normalized to [0,1]\n", all_passed ? "[✓]" : "[✗]");
     printf("\n");
     
-    if (all_passed && stats.failed_tests == 0) {
+    if (all_passed && stats.failed_tests == 0)
         printf("Result: ALL TESTS PASSED! Data loader is working correctly.\n\n");
-    } else {
+    else
         printf("Result: SOME TESTS FAILED. Please check the output above.\n\n");
-    }
 }
 
 // Main function

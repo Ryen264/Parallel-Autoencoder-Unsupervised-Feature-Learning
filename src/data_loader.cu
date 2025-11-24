@@ -186,6 +186,7 @@ void shuffle_dataset(Dataset &dataset) {
     int image_bytes = image_size * sizeof(float);
     float *data = dataset.get_data();
     int *labels = dataset.get_labels();
+    
     unique_ptr<float[]> new_data = make_unique<float[]>(n * image_size);
     unique_ptr<int[]> new_labels = make_unique<int[]>(n);
 

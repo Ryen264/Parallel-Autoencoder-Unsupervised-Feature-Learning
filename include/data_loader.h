@@ -1,56 +1,101 @@
-/*
- * CIFAR-10 Data Loader - Header File
+#ifndef DATA_H
+#define DATA_H
+
+// Use unique_ptr to prevent memory leak
+#include <memory>
+#include <vector>
+
+using std::move;
+using std::unique_ptr, std::make_unique;
+using std::vector;
+
+/**
+ * @brief Struct that represents a list of image (either encoded or decoded)
+ *
  */
+struct Dataset {
+  // The list of images (flattened)
+  unique_ptr<float[]> data;
+  // The list of the labels
+  unique_ptr<int[]> labels;
+  // The number of images in the list
+  int n;
+  // The width of the image
+  int width;
+  // The bit-depth of the image
+  int depth;
 
-#ifndef DATA_LOADER_H
-#define DATA_LOADER_H
+  /**
+   * @brief Create an unitialized dataset
+   *
+   * @param n The number of images
+   * @param width The width of the images
+   * @param depth The depth of the images
+   */
+  Dataset(int n, int width, int depth);
 
-#ifdef __cplusplus
-extern "C" {
+  /**
+   * @brief Initializes a dataset without labels
+   *
+   * @param data The flattened images
+   * @param n The number of images
+   * @param width The width of the images
+   * @param depth The depth of the images
+   */
+  Dataset(unique_ptr<float[]> &data, int n, int width, int depth);
+
+  /**
+   * @brief Initializes a full dataset
+   *
+   * @param data The flattened images
+   * @param labels The list of labels for the corresponding image
+   * @param n The number of images
+   * @param width The width of the images
+   * @param depth The depth of the images
+   */
+  Dataset(unique_ptr<float[]> &data,
+          unique_ptr<int[]>   &labels,
+          int                  n,
+          int                  width,
+          int                  depth);
+
+  /**
+   * @brief Get the images of the dataset
+   *
+   * @return float* The flatten images
+   */
+  float *get_data() const;
+  /**
+   * @brief Get the labels of the dataset
+   *
+   * @return int* The list of labels
+   */
+  int *get_labels() const;
+};
+
+/**
+ * @brief Load CIFAR-10 dataset from binary files with options
+ *
+ * @param dataset_dir The path to the CIFAR-10 dataset directory
+ * @param is_train True for training set, false for test set
+ * @return Dataset The loaded and normalized dataset
+ */
+Dataset load_dataset(const char *dataset_dir, bool is_train = true);
+
+/**
+ * @brief Shuffle the dataset
+ *
+ * @param dataset The dataset to be shuffle
+ */
+void shuffle_dataset(Dataset &dataset);
+
+/**
+ * @brief Create a mini batches from a dataset
+ *
+ * @param dataset The dataset
+ * @param batch_size The mini batch size
+ * @return vector<Dataset> The list of batches created
+ */
+vector<Dataset> create_minibatches(const Dataset &dataset, int batch_size);
+
 #endif
-
-#define NUM_TRAIN_SAMPLES 50000
-#define NUM_TEST_SAMPLES 10000
-#define IMAGE_SIZE 3072  // 32 * 32 * 3
-#define NUM_CLASSES 10
-#define IMAGE_WIDTH 32
-#define IMAGE_HEIGHT 32
-#define IMAGE_CHANNELS 3
-
-// CIFAR-10 Dataset structure
-typedef struct {
-    float* train_images;      // Host memory: 50000 x 3072
-    int* train_labels;        // Host memory: 50000
-    float* test_images;       // Host memory: 10000 x 3072
-    int* test_labels;         // Host memory: 10000
-    
-    float* d_train_images;    // Device memory
-    int* d_train_labels;      // Device memory
-    float* d_test_images;     // Device memory
-    int* d_test_labels;       // Device memory
-    
-    int* train_indices;       // For shuffling
-    int current_index;
-} CIFAR10Dataset;
-
-// Function declarations
-CIFAR10Dataset* initCIFAR10Dataset(const char* data_dir, bool use_cuda);
-void freeCIFAR10Dataset(CIFAR10Dataset* dataset);
-void printDatasetInfo(CIFAR10Dataset* dataset);
-void shuffleTrainingData(CIFAR10Dataset* dataset);
-void getBatch(CIFAR10Dataset* dataset, int batch_size, float* batch_images, 
-              int* batch_labels, bool shuffle);
-
-// Getter functions
-float* getTrainImages(CIFAR10Dataset* dataset);
-int* getTrainLabels(CIFAR10Dataset* dataset);
-float* getTestImages(CIFAR10Dataset* dataset);
-int* getTestLabels(CIFAR10Dataset* dataset);
-int getNumTrainSamples(CIFAR10Dataset* dataset);
-int getNumTestSamples(CIFAR10Dataset* dataset);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif // DATA_LOADER_H

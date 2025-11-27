@@ -332,7 +332,7 @@ void Cpu_Autoencoder::fit(const Dataset &dataset, int n_epoch, int batch_size, f
             builder << output_dir << '/' << "autoencoder_" << epoch << ".bin";
             _save_paramters(builder.str().c_str());
         }
-        }
+        
     }
     puts("========================TRAINING END========================");
 

@@ -20,13 +20,7 @@ using std::swap;
         }                                                        \
     }
 
-// Assuming these are implemented in IAutoencoder or are provided elsewhere
-// Gpu_Autoencoder::Gpu_Autoencoder(): IAutoencoder() {};
-// Gpu_Autoencoder::Gpu_Autoencoder(const char *filename): IAutoencoder(filename) {};
-
-// -----------------------------------------------------
-// FORWARD PASS HELPERS
-// -----------------------------------------------------
+Gpu_Autoencoder::Gpu_Autoencoder(): IAutoencoder() {}; Gpu_Autoencoder::Gpu_Autoencoder(const char *filename): IAutoencoder(filename) {};
 
 Dataset Gpu_Autoencoder::_encode_save_output(const Dataset &dataset)
 {

@@ -4,7 +4,7 @@
 #include <sstream>
 #include <cuda_runtime.h>
 #include "constants.h"
-#include "gpu_autoencoder.h" // Assuming this includes the definition of Gpu_Autoencoder
+#include "gpu_autoencoder.h" 
 #include "gpu_layers.h"
 
 using std::max_element;

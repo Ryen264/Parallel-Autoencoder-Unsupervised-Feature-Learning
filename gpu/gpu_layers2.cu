@@ -16,32 +16,33 @@ __global__ void conv2D_kernel(const float *in, const float *filter, float *out,
                               int width, int height, int depth, int n_filter) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
-    int f = blockIdx.z;
 
-    if (x >= width || y >= height || f >= n_filter) return;
+    if (x >= width || y >= height) return;
 
-    int half_k = 1;
-    float sum = 0.0f;
-    for (int c = 0; c < depth; ++c) {
-        for (int ky = -half_k; ky <= half_k; ++ky) {
-            for (int kx = -half_k; kx <= half_k; ++kx) {
-                int ix = x + kx;
-                int iy = y + ky;
-                if (ix >= 0 && ix < width && iy >= 0 && iy < height) {
-                    int in_idx = c * width * height + iy * width + ix;
-                    int filt_idx = f * depth * 3 * 3 + c * 3 * 3 + (ky + 1) * 3 + (kx + 1);
-                    sum += in[in_idx] * filter[filt_idx];
+    for (int f = 0; f < n_filter; ++f) {
+        int half_k = 1;
+        float sum = 0.0f;
+        for (int c = 0; c < depth; ++c) {
+            for (int ky = -half_k; ky <= half_k; ++ky) {
+                for (int kx = -half_k; kx <= half_k; ++kx) {
+                    int ix = x + kx;
+                    int iy = y + ky;
+                    if (ix >= 0 && ix < width && iy >= 0 && iy < height) {
+                        int in_idx = c * width * height + iy * width + ix;
+                        int filt_idx = f * depth * 3 * 3 + c * 3 * 3 + (ky + 1) * 3 + (kx + 1);
+                        sum += in[in_idx] * filter[filt_idx];
+                    }
                 }
             }
         }
+        out[f * width * height + y * width + x] = sum;
     }
-    out[f * width * height + y * width + x] = sum;
 }
 
 void gpu_conv2D(float *in, float *filter, float *out,
                 int n, int width, int height, int depth, int n_filter) {
     dim3 block(16, 16);
-    dim3 grid((width + 15) / 16, (height + 15) / 16, n_filter);
+    dim3 grid((width + 15) / 16, (height + 15) / 16);
 
     for (int i = 0; i < n; ++i) {
         conv2D_kernel<<<grid, block>>>(in + i * width * height * depth,
@@ -58,6 +59,7 @@ __global__ void add_bias_kernel(float *in, const float *bias, float *out,
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     int size = width * height * depth;
     if (idx >= size) return;
+
     int c = (idx / (width * height)) % depth;
     out[idx] = in[idx] + bias[c];
 }
@@ -68,7 +70,7 @@ void gpu_add_bias(float *in, float *bias, float *out,
     int block = 256;
     int grid = (size + block - 1) / block;
     for (int i = 0; i < n; ++i) {
-        add_bias_kernel<<<grid, block>>>(in + i*size, bias, out + i*size, width, height, depth);
+        add_bias_kernel<<<grid, block>>>(in + i * size, bias, out + i * size, width, height, depth);
         CUDA_CHECK(cudaGetLastError());
     }
 }
@@ -92,22 +94,22 @@ __global__ void max_pooling_kernel(const float *in, float *out,
                                    int width, int height, int depth) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
-    int c = blockIdx.z;
 
     if (x >= width/2 || y >= height/2) return;
 
-    int in_x = x*2, in_y = y*2;
-    float v0 = in[c*width*height + in_y*width + in_x];
-    float v1 = in[c*width*height + in_y*width + in_x+1];
-    float v2 = in[c*width*height + (in_y+1)*width + in_x];
-    float v3 = in[c*width*height + (in_y+1)*width + in_x+1];
-
-    out[c*(width/2)*(height/2) + y*(width/2) + x] = fmaxf(fmaxf(v0,v1), fmaxf(v2,v3));
+    for (int c = 0; c < depth; ++c) {
+        int in_x = x*2, in_y = y*2;
+        float v0 = in[c*width*height + in_y*width + in_x];
+        float v1 = in[c*width*height + in_y*width + in_x+1];
+        float v2 = in[c*width*height + (in_y+1)*width + in_x];
+        float v3 = in[c*width*height + (in_y+1)*width + in_x+1];
+        out[c*(width/2)*(height/2) + y*(width/2) + x] = fmaxf(fmaxf(v0,v1), fmaxf(v2,v3));
+    }
 }
 
 void gpu_max_pooling(float *in, float *out, int n, int width, int height, int depth) {
     dim3 block(16,16);
-    dim3 grid((width/2 + 15)/16, (height/2 + 15)/16, depth);
+    dim3 grid((width/2 + 15)/16, (height/2 + 15)/16);
     for(int i=0;i<n;i++){
         max_pooling_kernel<<<grid, block>>>(in+i*width*height*depth,
                                             out+i*(width/2)*(height/2)*depth,
@@ -121,16 +123,17 @@ __global__ void upsampling_kernel(const float *in, float *out,
                                   int width, int height, int depth) {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
-    int c = blockIdx.z;
 
     if (x >= width || y >= height) return;
 
-    out[c*width*height + y*width + x] = in[c*(width/2)*(height/2) + (y/2)*(width/2) + (x/2)];
+    for (int c = 0; c < depth; ++c) {
+        out[c*width*height + y*width + x] = in[c*(width/2)*(height/2) + (y/2)*(width/2) + (x/2)];
+    }
 }
 
 void gpu_upsampling(float *in, float *out, int n, int width, int height, int depth) {
     dim3 block(16,16);
-    dim3 grid((width+15)/16,(height+15)/16,depth);
+    dim3 grid((width+15)/16,(height+15)/16);
     for(int i=0;i<n;i++){
         upsampling_kernel<<<grid,block>>>(in+i*(width/2)*(height/2)*depth,
                                           out+i*width*height*depth,
@@ -139,17 +142,36 @@ void gpu_upsampling(float *in, float *out, int n, int width, int height, int dep
     }
 }
 
-// -------------------- MSE Loss --------------------
+// -------------------- Upsampling Backward --------------------
+__global__ void upsampling_backward_kernel(const float *d_in, float *d_out,int width,int height,int depth){
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if(x>=width || y>=height) return;
+
+    for(int c=0;c<depth;c++){
+        atomicAdd(&d_out[c*(width/2)*(height/2)+(y/2)*(width/2)+(x/2)], d_in[c*width*height+y*width+x]);
+    }
+}
+
+void gpu_upsampling_backward(float *d_in,float *d_out,int n,int width,int height,int depth){
+    dim3 block(16,16);
+    dim3 grid((width+15)/16,(height+15)/16);
+    for(int i=0;i<n;i++){
+        upsampling_backward_kernel<<<grid,block>>>(d_in+i*width*height*depth,
+                                                   d_out+i*(width/2)*(height/2)*depth,
+                                                   width,height,depth);
+        CUDA_CHECK(cudaGetLastError());
+    }
+}
+
+// -------------------- MSE Loss & Gradient --------------------
 __global__ void mse_loss_kernel(const float *expected, const float *actual, float *loss, int size){
     __shared__ float cache[256];
     int tid = threadIdx.x + blockIdx.x*blockDim.x;
     int cacheIndex = threadIdx.x;
-
     float temp = 0.0f;
-    if(tid < size){
-        float diff = expected[tid] - actual[tid];
-        temp = diff*diff;
-    }
+    if(tid < size) temp = (expected[tid] - actual[tid])*(expected[tid] - actual[tid]);
     cache[cacheIndex] = temp;
     __syncthreads();
 
@@ -159,7 +181,6 @@ __global__ void mse_loss_kernel(const float *expected, const float *actual, floa
         __syncthreads();
         i/=2;
     }
-
     if(cacheIndex==0) atomicAdd(loss,cache[0]);
 }
 
@@ -169,22 +190,17 @@ float gpu_mse_loss(float *expected, float *actual, int n, int width, int height,
     float h_loss = 0.0f;
     CUDA_CHECK(cudaMalloc(&d_loss,sizeof(float)));
     CUDA_CHECK(cudaMemset(d_loss,0,sizeof(float)));
-
     int block = 256;
     int grid = (size + block -1)/block;
     mse_loss_kernel<<<grid,block>>>(expected,actual,d_loss,size);
     CUDA_CHECK(cudaMemcpy(&h_loss,d_loss,sizeof(float),cudaMemcpyDeviceToHost));
     CUDA_CHECK(cudaFree(d_loss));
-
     return h_loss/size;
 }
 
-// -------------------- MSE Gradient --------------------
 __global__ void mse_grad_kernel(const float *expected, const float *actual, float *d_out, int size){
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
-    if(idx<size){
-        d_out[idx] = 2.0f*(actual[idx]-expected[idx])/size;
-    }
+    if(idx<size) d_out[idx] = 2.0f*(actual[idx]-expected[idx])/size;
 }
 
 void gpu_mse_grad(float *expected, float *actual, float *d_out,
@@ -199,9 +215,7 @@ void gpu_mse_grad(float *expected, float *actual, float *d_out,
 // -------------------- ReLU Backward --------------------
 __global__ void relu_backward_kernel(const float *in, const float *d_in, float *d_out, int size){
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
-    if(idx<size){
-        d_out[idx] = in[idx]>0 ? d_in[idx] : 0;
-    }
+    if(idx<size) d_out[idx] = in[idx]>0 ? d_in[idx] : 0;
 }
 
 void gpu_relu_backward(float *in, float *d_in, float *d_out,
@@ -213,76 +227,14 @@ void gpu_relu_backward(float *in, float *d_in, float *d_out,
     CUDA_CHECK(cudaGetLastError());
 }
 
-// -------------------- Max Pooling Backward --------------------
-__global__ void max_pooling_backward_kernel(const float *in, const float *d_in, float *d_out,
-                                            int width,int height,int depth){
-    int x = blockIdx.x*blockDim.x + threadIdx.x;
-    int y = blockIdx.y*blockDim.y + threadIdx.y;
-    int c = blockIdx.z;
-    if(x>=width/2 || y>=height/2) return;
-
-    int in_x = x*2, in_y = y*2;
-    int idx_out = c*width*height + in_y*width + in_x;
-    float val = in[idx_out];
-    int max_idx = 0;
-    float max_val = val;
-
-    float vals[4] = {in[idx_out], in[idx_out+1], in[idx_out+width], in[idx_out+width+1]};
-    for(int i=1;i<4;i++){
-        if(vals[i]>max_val){ max_val=vals[i]; max_idx=i;}
-    }
-
-    int dx[4]={0,1,0,1}, dy[4]={0,0,1,1};
-    for(int i=0;i<4;i++){
-        int idx = c*width*height + (in_y+dy[i])*width + (in_x+dx[i]);
-        d_out[idx] = (i==max_idx)? d_in[c*(width/2)*(height/2)+y*(width/2)+x]:0;
-    }
-}
-
-void gpu_max_pooling_backward(float *in,float *d_in,float *d_out,
-                              int n,int width,int height,int depth){
-    dim3 block(16,16);
-    dim3 grid((width/2 + 15)/16,(height/2 +15)/16,depth);
-    for(int i=0;i<n;i++){
-        max_pooling_backward_kernel<<<grid,block>>>(in+i*width*height*depth,
-                                                    d_in+i*(width/2)*(height/2)*depth,
-                                                    d_out+i*width*height*depth,
-                                                    width,height,depth);
-        CUDA_CHECK(cudaGetLastError());
-    }
-}
-
-// -------------------- Upsampling Backward --------------------
-__global__ void upsampling_backward_kernel(const float *d_in, float *d_out,int width,int height,int depth){
-    int x = blockIdx.x*blockDim.x + threadIdx.x;
-    int y = blockIdx.y*blockDim.y + threadIdx.y;
-    int c = blockIdx.z;
-    if(x>=width || y>=height) return;
-
-    atomicAdd(&d_out[c*(width/2)*(height/2)+(y/2)*(width/2)+(x/2)], d_in[c*width*height+y*width+x]);
-}
-
-void gpu_upsampling_backward(float *d_in,float *d_out,int n,int width,int height,int depth){
-    dim3 block(16,16);
-    dim3 grid((width+15)/16,(height+15)/16,depth);
-    for(int i=0;i<n;i++){
-        upsampling_backward_kernel<<<grid,block>>>(d_in+i*width*height*depth,
-                                                   d_out+i*(width/2)*(height/2)*depth,
-                                                   width,height,depth);
-        CUDA_CHECK(cudaGetLastError());
-    }
-}
-
 // -------------------- Bias Gradient --------------------
 __global__ void bias_grad_kernel(const float *d_in, float *d_bias,int width,int height,int depth){
     int c = blockIdx.x * blockDim.x + threadIdx.x;
     if(c<depth){
         float sum=0.0f;
-        for(int y=0;y<height;y++){
-            for(int x=0;x<width;x++){
+        for(int y=0;y<height;y++)
+            for(int x=0;x<width;x++)
                 sum += d_in[c*width*height + y*width + x];
-            }
-        }
         atomicAdd(&d_bias[c], sum);
     }
 }
@@ -308,5 +260,55 @@ void gpu_update_weight(float *weight, float *gradient,int size,float learning_ra
     update_weight_kernel<<<grid,block>>>(weight,gradient,size,learning_rate);
     CUDA_CHECK(cudaGetLastError());
 }
+// -------------------- Conv2D Backward: Filter Gradient only --------------------
+__global__ void conv2D_grad_filter_kernel(
+    const float *in, const float *d_out, float *d_filter,
+    int width, int height, int depth, int n_filter)
+{
+    // grid: (n_filter, depth)
+    int f = blockIdx.x; // [0..n_filter)
+    int c = blockIdx.y; // [0..depth)
+    int ky = threadIdx.y; // 0..2
+    int kx = threadIdx.x; // 0..2
 
-#endif
+    if (f >= n_filter || c >= depth || ky >= 3 || kx >= 3) return;
+
+    float sum = 0.0f;
+    int plane = width * height;
+
+    // accumulate over spatial positions
+    for (int y = 0; y < height; ++y) {
+        for (int x = 0; x < width; ++x) {
+            int out_idx = f * plane + y * width + x;
+            int iy = y + ky - 1;
+            int ix = x + kx - 1;
+            if (ix >= 0 && ix < width && iy >= 0 && iy < height) {
+                int in_idx = c * plane + iy * width + ix;
+                sum += in[in_idx] * d_out[out_idx];
+            }
+        }
+    }
+
+    int filt_idx = f * depth * 9 + c * 9 + ky * 3 + kx;
+    atomicAdd(&d_filter[filt_idx], sum);
+}
+
+void gpu_conv2D_grad(float *in, float *d_out, float *d_filter,
+                     int n, int width, int height, int depth, int n_filter) {
+    // zero d_filter
+    size_t filt_bytes = (size_t)n_filter * depth * 9 * sizeof(float);
+    CUDA_CHECK(cudaMemset(d_filter, 0, filt_bytes));
+
+    dim3 blockF(3, 3);
+    dim3 gridF(n_filter, depth);
+
+    size_t in_stride = (size_t)width * height * depth;
+    size_t dout_stride = (size_t)width * height * n_filter;
+
+    for (int i = 0; i < n; ++i) {
+        const float *in_i = in + i * in_stride;
+        const float *dout_i = d_out + i * dout_stride;
+        conv2D_grad_filter_kernel<<<gridF, blockF>>>(in_i, dout_i, d_filter, width, height, depth, n_filter);
+        CUDA_CHECK(cudaGetLastError());
+    }
+}

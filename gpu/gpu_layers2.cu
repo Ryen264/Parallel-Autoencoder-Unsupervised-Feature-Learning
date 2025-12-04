@@ -312,3 +312,61 @@ void gpu_conv2D_grad(float *in, float *d_out, float *d_filter,
         CUDA_CHECK(cudaGetLastError());
     }
 }
+// GPU Max Pooling Backward KERNEL AND WRAPPER
+__global__ void max_pooling_backward_kernel(
+    const float *in, const float *d_in, float *d_out,
+    int width, int height, int depth)
+{
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
+
+    int out_w = width / 2;
+    int out_h = height / 2;
+
+    if (x >= out_w || y >= out_h) return;
+
+    for (int c = 0; c < depth; ++c) {
+        int in_x = x * 2;
+        int in_y = y * 2;
+
+        int base = c * width * height;
+        float v0 = in[base + in_y * width + in_x];
+        float v1 = in[base + in_y * width + in_x + 1];
+        float v2 = in[base + (in_y + 1) * width + in_x];
+        float v3 = in[base + (in_y + 1) * width + in_x + 1];
+
+        float maxv = fmaxf(fmaxf(v0, v1), fmaxf(v2, v3));
+
+        float grad = d_in[c * out_w * out_h + y * out_w + x];
+
+        // truyền gradient vào đúng vị trí lớn nhất
+        d_out[base + in_y * width + in_x]         = (v0 == maxv) ? grad : 0.0f;
+        d_out[base + in_y * width + in_x + 1]     = (v1 == maxv) ? grad : 0.0f;
+        d_out[base + (in_y + 1) * width + in_x]   = (v2 == maxv) ? grad : 0.0f;
+        d_out[base + (in_y + 1) * width + in_x+1] = (v3 == maxv) ? grad : 0.0f;
+    }
+}
+
+void gpu_max_pooling_backward(float *in, float *d_in, float *d_out,
+                              int n, int width, int height, int depth)
+{
+    dim3 block(16, 16);
+    dim3 grid((width/2 + 15) / 16, (height/2 + 15) / 16);
+
+    // clear output gradient
+    CUDA_CHECK(cudaMemset(d_out, 0, n * width * height * depth * sizeof(float)));
+
+    int in_size = width * height * depth;
+    int dout_size = (width/2) * (height/2) * depth;
+
+    for (int i = 0; i < n; ++i)
+    {
+        max_pooling_backward_kernel<<<grid, block>>>(
+            in + i * in_size,
+            d_in + i * dout_size,
+            d_out + i * in_size,
+            width, height, depth
+        );
+        CUDA_CHECK(cudaGetLastError());
+    }
+}

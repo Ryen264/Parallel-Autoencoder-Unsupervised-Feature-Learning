@@ -16,7 +16,9 @@ using std::swap;
     {                                                            \
         if (err != cudaSuccess)                                  \
         {                                                        \
-            printf("CUDA Error: %s\n", cudaGetErrorString(err)); \
+            printf("CUDA Error in %s at line %d: %s\n", __FILE__, __LINE__, cudaGetErrorString(err)); \
+            /* Thêm exit để dừng chương trình ngay khi phát hiện lỗi CUDA */ \
+            exit(EXIT_FAILURE);                                  \
         }                                                        \
     }
 
@@ -24,49 +26,58 @@ Gpu_Autoencoder::Gpu_Autoencoder(): IAutoencoder() {};
 Gpu_Autoencoder::Gpu_Autoencoder(const char *filename): IAutoencoder(filename) {};
 
 // -----------------------------------------------------
-// FORWARD PASS HELPERS
+// FORWARD PASS HELPERS (Fixed Dimensions)
 // -----------------------------------------------------
 
 Dataset Gpu_Autoencoder::_encode_save_output(const Dataset &dataset)
 {
-    int n = dataset.n, width = dataset.width, height = dataset.height, depth = dataset.depth;
+    int n = dataset.n, depth = dataset.depth;
+    int w_curr = dataset.width;
+    int h_curr = dataset.height;
 
-    // First conv2D layer
+    // First conv2D layer (Dim: n * W * H * F1)
     gpu_conv2D(dataset.get_data(), _encoder_filter_1.get(), _out_encoder_filter_1.get(),
-               n, width, height, depth, _ENCODER_FILTER_1_DEPTH);
+               n, w_curr, h_curr, depth, _ENCODER_FILTER_1_DEPTH);
 
-    // Dim: n * w * h * F1
+    // Dim: n * W * H * F1
     gpu_add_bias(_out_encoder_filter_1.get(), _encoder_bias_1.get(), _out_encoder_bias_1.get(),
-                 n, width, height, _ENCODER_FILTER_1_DEPTH);
+                 n, w_curr, h_curr, _ENCODER_FILTER_1_DEPTH);
 
     // ReLU layer
     gpu_relu(_out_encoder_bias_1.get(), _out_encoder_relu_1.get(),
-             n, width, height, _ENCODER_FILTER_1_DEPTH);
+             n, w_curr, h_curr, _ENCODER_FILTER_1_DEPTH);
 
-    // First max pooling layer
+    // First max pooling layer (Output Dim: n * W/2 * H/2 * F1)
+    int w_half = w_curr / 2;
+    int h_half = h_curr / 2;
     gpu_max_pooling(_out_encoder_relu_1.get(), _out_max_pooling_1.get(),
-                    n, width, height, _ENCODER_FILTER_1_DEPTH);
+                    n, w_curr, h_curr, _ENCODER_FILTER_1_DEPTH);
+    w_curr = w_half;
+    h_curr = h_half; // Update dimensions
 
-    // Dim: n * w/2 * h/2 * F1
-    // Second conv2D layer
+    // Second conv2D layer (Dim: n * W/2 * H/2 * F2)
     gpu_conv2D(_out_max_pooling_1.get(), _encoder_filter_2.get(), _out_encoder_filter_2.get(),
-               n, width / 2, height / 2, _ENCODER_FILTER_1_DEPTH, _ENCODER_FILTER_2_DEPTH);
+               n, w_curr, h_curr, _ENCODER_FILTER_1_DEPTH, _ENCODER_FILTER_2_DEPTH);
 
-    // Dim: n * w/2 * h/2 * F2
+    // Dim: n * W/2 * H/2 * F2
     gpu_add_bias(_out_encoder_filter_2.get(), _encoder_bias_2.get(), _out_encoder_bias_2.get(),
-                 n, width / 2, height / 2, _ENCODER_FILTER_2_DEPTH);
+                 n, w_curr, h_curr, _ENCODER_FILTER_2_DEPTH);
 
     // ReLU layer
     gpu_relu(_out_encoder_bias_2.get(), _out_encoder_relu_2.get(),
-             n, width / 2, height / 2, _ENCODER_FILTER_2_DEPTH);
+             n, w_curr, h_curr, _ENCODER_FILTER_2_DEPTH);
 
-    // Second max pooling layer
+    // Second max pooling layer (Output Dim: n * W/4 * H/4 * F2)
+    int w_quarter = w_curr / 2;
+    int h_quarter = h_curr / 2;
     gpu_max_pooling(_out_encoder_relu_2.get(), _out_max_pooling_2.get(),
-                    n, width / 2, height / 2, _ENCODER_FILTER_2_DEPTH);
+                    n, w_curr, h_curr, _ENCODER_FILTER_2_DEPTH);
+    w_curr = w_quarter;
+    h_curr = h_quarter; // Update dimensions
 
-    // Return the result (Dim: n * w/4 * h/4 * F2)
-    int n_elements = n * width / 4 * height / 4 * _ENCODER_FILTER_2_DEPTH;
-    Dataset res(n, width / 4, height / 4, _ENCODER_FILTER_2_DEPTH);
+    // Return the result (Dim: n * W/4 * H/4 * F2)
+    int n_elements = n * w_curr * h_curr * _ENCODER_FILTER_2_DEPTH;
+    Dataset res(n, w_curr, h_curr, _ENCODER_FILTER_2_DEPTH);
     cudaError_t err = cudaMemcpy(res.get_data(), _out_max_pooling_2.get(),
                                  n_elements * sizeof(float),
                                  cudaMemcpyDeviceToHost);
@@ -77,63 +88,57 @@ Dataset Gpu_Autoencoder::_encode_save_output(const Dataset &dataset)
 
 Dataset Gpu_Autoencoder::_decode_save_output(const Dataset &dataset)
 {
-    int n = dataset.n, width = dataset.width, height = dataset.height, depth = dataset.depth;
-    
-    // Input is Latent Space: n * w/4 * h/4 * F2 (width, height = W/4, H/4)
+    int n = dataset.n, depth = dataset.depth;
+    int w_curr = dataset.width; // W/4
+    int h_curr = dataset.height; // H/4
 
-    // First conv2D layer (Output Dim: n * w/4 * h/4 * D1)
+    // First conv2D layer (Output Dim: n * W/4 * H/4 * D1)
     gpu_conv2D(dataset.get_data(), _decoder_filter_1.get(), _out_decoder_filter_1.get(),
-               n, width, height, depth, _DECODER_FILTER_1_DEPTH);
+               n, w_curr, h_curr, depth, _DECODER_FILTER_1_DEPTH);
 
-    // Dim: n * w * h * D1
+    // Dim: n * W/4 * H/4 * D1
     gpu_add_bias(_out_decoder_filter_1.get(), _decoder_bias_1.get(), _out_decoder_bias_1.get(),
-                 n, width, height, _DECODER_FILTER_1_DEPTH);
+                 n, w_curr, h_curr, _DECODER_FILTER_1_DEPTH);
 
     // ReLU layer
     gpu_relu(_out_decoder_bias_1.get(), _out_decoder_relu_1.get(),
-             n, width, height, _DECODER_FILTER_1_DEPTH);
+             n, w_curr, h_curr, _DECODER_FILTER_1_DEPTH);
 
-    // First upsampling layer (Output Dim: n * 2w * 2h * D1)
-    // Note: If input width/height is W/4, output is W/2 * H/2
-    int w_half = width * 2; // W/2
-    int h_half = height * 2; // H/2
+    // First upsampling layer (Output Dim: n * W/2 * H/2 * D1)
+    w_curr *= 2; // W/2
+    h_curr *= 2; // H/2
     gpu_upsampling(_out_decoder_relu_1.get(), _out_upsampling_1.get(),
-                   n, w_half, h_half, _DECODER_FILTER_1_DEPTH);
+                   n, w_curr, h_curr, _DECODER_FILTER_1_DEPTH);
 
-    // Second conv2D layer (Output Dim: n * 2w * 2h * D2)
+    // Second conv2D layer (Output Dim: n * W/2 * H/2 * D2)
     gpu_conv2D(_out_upsampling_1.get(), _decoder_filter_2.get(), _out_decoder_filter_2.get(),
-               n, w_half, h_half, _DECODER_FILTER_1_DEPTH, _DECODER_FILTER_2_DEPTH);
+               n, w_curr, h_curr, _DECODER_FILTER_1_DEPTH, _DECODER_FILTER_2_DEPTH);
 
-    // Dim: n * 2w * 2h * D2
+    // Dim: n * W/2 * H/2 * D2
     gpu_add_bias(_out_decoder_filter_2.get(), _decoder_bias_2.get(), _out_decoder_bias_2.get(),
-                 n, w_half, h_half, _DECODER_FILTER_2_DEPTH);
+                 n, w_curr, h_curr, _DECODER_FILTER_2_DEPTH);
 
     // ReLU layer
     gpu_relu(_out_decoder_bias_2.get(), _out_decoder_relu_2.get(),
-             n, w_half, h_half, _DECODER_FILTER_2_DEPTH);
+             n, w_curr, h_curr, _DECODER_FILTER_2_DEPTH);
 
-    // Second upsampling layer (Output Dim: n * 4w * 4h * D2)
-    // Note: If input width/height is W/2, output is W * H
-    int w_full = w_half * 2; // W
-    int h_full = h_half * 2; // H
+    // Second upsampling layer (Output Dim: n * W * H * D2)
+    w_curr *= 2; // W
+    h_curr *= 2; // H
     gpu_upsampling(_out_decoder_relu_2.get(), _out_upsampling_2.get(),
-                   n, w_full, h_full, _DECODER_FILTER_2_DEPTH);
+                   n, w_curr, h_curr, _DECODER_FILTER_2_DEPTH);
 
-    // Third conv2D layer (Final Output Dim: n * 4w * 4h * D3)
-    // Note: This output is W * H * D3
+    // Third conv2D layer (Final Output Dim: n * W * H * D3)
     gpu_conv2D(_out_upsampling_2.get(), _decoder_filter_3.get(), _out_decoder_filter_3.get(),
-               n, w_full, h_full, _DECODER_FILTER_2_DEPTH, _DECODER_FILTER_3_DEPTH);
+               n, w_curr, h_curr, _DECODER_FILTER_2_DEPTH, _DECODER_FILTER_3_DEPTH);
 
-    // Dim: n * 4w * 4h * D3
+    // Dim: n * W * H * D3
     gpu_add_bias(_out_decoder_filter_3.get(), _decoder_bias_3.get(), _out_decoder_bias_3.get(),
-                 n, w_full, h_full, _DECODER_FILTER_3_DEPTH);
+                 n, w_curr, h_curr, _DECODER_FILTER_3_DEPTH);
 
     // Return the result (Dim: n * W * H * D3)
-    Dataset res(n, w_full, h_full, _DECODER_FILTER_3_DEPTH);
-
-    // FIX Bug 2: Corrected size calculation. Total elements = n * (4*width) * (4*height) * depth
-    // The sizes w_full and h_full are now W and H (original image dimensions).
-    int total_output_elements = n * w_full * h_full * _DECODER_FILTER_3_DEPTH;
+    Dataset res(n, w_curr, h_curr, _DECODER_FILTER_3_DEPTH);
+    int total_output_elements = n * w_curr * h_curr * _DECODER_FILTER_3_DEPTH;
 
     cudaError_t err = cudaMemcpy(res.get_data(), _out_decoder_bias_3.get(),
                                  total_output_elements * sizeof(float),
@@ -144,7 +149,7 @@ Dataset Gpu_Autoencoder::_decode_save_output(const Dataset &dataset)
 }
 
 // -----------------------------------------------------
-// MEMORY MANAGEMENT
+// MEMORY MANAGEMENT (No changes needed, fixed logic above ensures n_pixel_max_tensor is correct)
 // -----------------------------------------------------
 
 void Gpu_Autoencoder::_allocate_output_mem(int n, int width, int height)
@@ -155,13 +160,12 @@ void Gpu_Autoencoder::_allocate_output_mem(int n, int width, int height)
     int n_pixel_quarter = n * (width / 4) * (height / 4); // After 2nd pool: n * w/4 * h/4 (8x8)
 
     // Max dimension for temporary buffers (d_in, d_out) is the output of the decoder (n * w * h * D3)
-    // Since the fixed logic outputs W*H, the max pixel count is n_pixel.
     int n_pixel_max_tensor = n_pixel; 
     int max_depth_intermediate = std::max({_DECODER_FILTER_3_DEPTH, _DECODER_FILTER_2_DEPTH, _ENCODER_FILTER_1_DEPTH});
 
     float *d_ptr = nullptr;
 
-    // --- Encoder output allocations (UNCHANGED/ASSUMED CORRECT) ---
+    // --- Encoder output allocations ---
     CUDA_CHECK(cudaMalloc(&d_ptr, n_pixel * _ENCODER_FILTER_1_DEPTH * sizeof(float)));
     _out_encoder_filter_1 = std::shared_ptr<float>(d_ptr, [](float *p)
                                                    { cudaFree(p); });
@@ -187,7 +191,7 @@ void Gpu_Autoencoder::_allocate_output_mem(int n, int width, int height)
     _out_max_pooling_2 = std::shared_ptr<float>(d_ptr, [](float *p)
                                                 { cudaFree(p); });
 
-    // --- Decoder output allocations (UNCHANGED/ASSUMED CORRECT) ---
+    // --- Decoder output allocations ---
     CUDA_CHECK(cudaMalloc(&d_ptr, n_pixel_quarter * _DECODER_FILTER_1_DEPTH * sizeof(float)));
     _out_decoder_filter_1 = std::shared_ptr<float>(d_ptr, [](float *p)
                                                    { cudaFree(p); });
@@ -219,7 +223,7 @@ void Gpu_Autoencoder::_allocate_output_mem(int n, int width, int height)
     _out_decoder_bias_3 = std::shared_ptr<float>(d_ptr, [](float *p)
                                                  { cudaFree(p); });
 
-    // --- Allocate temporary buffers (FIX Bug 4: Critical Memory Allocation Issue) ---
+    // --- Allocate temporary buffers ---
     static constexpr int FILTER_SIZES[] = {_ENCODER_FILTER_1_SIZE,
                                            _ENCODER_FILTER_2_SIZE,
                                            _DECODER_FILTER_1_SIZE,
@@ -272,162 +276,202 @@ void Gpu_Autoencoder::_deallocate_output_mem()
 }
 
 // -----------------------------------------------------
-// TRAINING AND EVALUATION
+// TRAINING AND EVALUATION (Fixed Dimensions)
 // -----------------------------------------------------
 
 float Gpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate)
 {
-    // Get the result after autoencoding
-    int n = batch.n, width = batch.width, height = batch.height; // width, height = 32, 32
-    // Use depth of the decoded output for comparison (depth_out = 3)
-    int depth_out = _DECODER_FILTER_3_DEPTH;
+    // Get dimensions of the input batch (W=32, H=32, D=3)
+    int n = batch.n, width = batch.width, height = batch.height; 
+    int depth_out = _DECODER_FILTER_3_DEPTH; // D3 = 3 (output depth)
 
     float *d_in = _d_in.get(), *d_out = _d_out.get(), *d_filter = _d_filter.get();
-    Dataset encoded = _encode_save_output(batch); // Output: n * 8 * 8 * F2
-    Dataset res = _decode_save_output(encoded);   // Output: n * 32 * 32 * D3
+    Dataset encoded = _encode_save_output(batch); // Output: n * W/4 * H/4 * F2
+    Dataset res = _decode_save_output(encoded);   // Output: n * W * H * D3
 
-    // Calculate loss before backprop
-    // FIX Bug 1: Use correct output dimensions (W x H) for comparison with input batch.
+    // --------------------------------------------------------------------------------
+    // FORWARD LOSS CALCULATION
+    // --------------------------------------------------------------------------------
     float loss = gpu_mse_loss(batch.get_data(), res.get_data(),
-                              n, width, height, depth_out); // Use W, H of the input batch (32x32)
+                              n, width, height, depth_out);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Get loss gradient
-    // FIX Bug 1: Use correct output dimensions (W x H)
+    // Get gradient of Loss w.r.t final output (d_out is W x H x D3 gradient)
     gpu_mse_grad(batch.get_data(), res.get_data(), d_out,
-                 n, width, height, depth_out); // Use W, H of the input batch (32x32)
+                 n, width, height, depth_out);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Update weight for the last conv2D layer (size W x H x D3)
-    // Update bias
+    // --------------------------------------------------------------------------------
+    // DECODER BACKWARD PASS (from W x H to W/4 x H/4)
+    // --------------------------------------------------------------------------------
+
+    // Bias 3 Grad (W x H x D3)
     gpu_bias_grad(d_out, d_in, n, width, height, depth_out);
+    CUDA_CHECK(cudaGetLastError());
 
     gpu_update_weight(_decoder_bias_3.get(), d_in, depth_out, learning_rate);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Update filter (Input to layer: n * W * H * D2)
+    // Conv 3 Grad (W x H) - Input to layer: _out_upsampling_2 (W x H x D2)
     // d_out size: n * W * H * D3
-    // W, H are 32, 32
     gpu_conv2D_grad(_out_upsampling_2.get(), d_out, d_filter,
                     n, width, height, _DECODER_FILTER_2_DEPTH, depth_out);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Pass delta backwards (gpu_conv2D is convolution with swapped inputs/outputs for backprop)
-    // Output d_in: n * W * H * D2
+    // Conv 3 Backprop-to-Input (d_in is W x H x D2 gradient)
     gpu_conv2D(d_out, _decoder_filter_3.get(), d_in,
                n, width, height, _DECODER_FILTER_2_DEPTH, depth_out);
+    CUDA_CHECK(cudaGetLastError());
+    swap(d_out, d_in); // d_out is now W x H x D2 gradient
 
-    // Swap d_out and d_in
-    swap(d_out, d_in);
-
-    // Update weight
     gpu_update_weight(_decoder_filter_3.get(), d_filter, _DECODER_FILTER_3_SIZE, learning_rate);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Pass through upsampling (dim: n * W/2 * H/2 * D2)
-    // d_out size: n * W * H * D2
+    // Upsampling 2 Backward (W x H -> W/2 x H/2)
     int w_half = width / 2; // 16
     int h_half = height / 2; // 16
-    gpu_upsampling_backward(d_out, d_in, n, w_half * 2, h_half * 2, _DECODER_FILTER_2_DEPTH);
+    // d_out (W x H x D2) is the gradient, we pass original W, H
+    gpu_upsampling_backward(d_out, d_in, n, width, height, _DECODER_FILTER_2_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
+    swap(d_out, d_in); // d_out is now W/2 x H/2 x D2 gradient
 
-    // Pass through ReLU (d_in and d_out swapped) (size W/2 x H/2 x D2)
+    // ReLU 2 Backward (W/2 x H/2 x D2)
     gpu_relu_backward(_out_decoder_bias_2.get(), d_in, d_out,
                       n, w_half, h_half, _DECODER_FILTER_2_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
+    swap(d_out, d_in); // d_out is now W/2 x H/2 x D2 gradient
 
-    // Second conv2D layer (size W/2 x H/2 x D2)
+    // Bias 2 Grad (W/2 x H/2 x D2)
     gpu_bias_grad(d_out, d_in, n, w_half, h_half, _DECODER_FILTER_2_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
 
     gpu_update_weight(_decoder_bias_2.get(), d_in, _DECODER_FILTER_2_DEPTH, learning_rate);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Update filter (Input to layer: n * W/2 * H/2 * D1)
+    // Conv 2 Grad (W/2 x H/2) - Input to layer: _out_upsampling_1 (W/2 x H/2 x D1)
     // d_out size: n * W/2 * H/2 * D2
     gpu_conv2D_grad(_out_upsampling_1.get(), d_out, d_filter,
                     n, w_half, h_half, _DECODER_FILTER_1_DEPTH, _DECODER_FILTER_2_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Output d_in: n * W/2 * H/2 * D1
+    // Conv 2 Backprop-to-Input (d_in is W/2 x H/2 x D1 gradient)
     gpu_conv2D(d_out, _decoder_filter_2.get(), d_in,
                n, w_half, h_half, _DECODER_FILTER_1_DEPTH, _DECODER_FILTER_2_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
+    swap(d_out, d_in); // d_out is now W/2 x H/2 x D1 gradient
 
-    swap(d_out, d_in);
     gpu_update_weight(_decoder_filter_2.get(), d_filter, _DECODER_FILTER_2_SIZE, learning_rate);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Upsampling (dim: n * W/4 * H/4 * D1)
-    // d_out size: n * W/2 * H/2 * D1
+    // Upsampling 1 Backward (W/2 x H/2 -> W/4 x H/4)
     int w_quarter = width / 4; // 8
     int h_quarter = height / 4; // 8
-    gpu_upsampling_backward(d_out, d_in, n, w_quarter * 2, h_quarter * 2, _DECODER_FILTER_1_DEPTH);
+    // d_out (W/2 x H/2 x D1) is the gradient, pass original W/2, H/2
+    gpu_upsampling_backward(d_out, d_in, n, w_half, h_half, _DECODER_FILTER_1_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
+    swap(d_out, d_in); // d_out is now W/4 x H/4 x D1 gradient
 
-    // ReLU (size W/4 x H/4 x D1)
+    // ReLU 1 Backward (W/4 x H/4 x D1)
     gpu_relu_backward(_out_decoder_bias_1.get(), d_in, d_out,
                       n, w_quarter, h_quarter, _DECODER_FILTER_1_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
+    swap(d_out, d_in); // d_out is now W/4 x H/4 x D1 gradient
 
-    // Third Conv2D (first decoder layer) (size W/4 x H/4 x D1)
+    // Bias 1 Grad (W/4 x H/4 x D1)
     gpu_bias_grad(d_out, d_in, n, w_quarter, h_quarter, _DECODER_FILTER_1_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
 
     gpu_update_weight(_decoder_bias_1.get(), d_in, _DECODER_FILTER_1_DEPTH, learning_rate);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Update filter (Input to layer: n * W/4 * H/4 * F2)
+    // Conv 1 Grad (W/4 x H/4) - Input to layer: _out_max_pooling_2 (W/4 x H/4 x F2 - Latent Space)
     // d_out size: n * W/4 * H/4 * D1
     gpu_conv2D_grad(_out_max_pooling_2.get(), d_out, d_filter,
                     n, w_quarter, h_quarter, _ENCODER_FILTER_2_DEPTH, _DECODER_FILTER_1_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Output d_in: n * W/4 * H/4 * F2 (Latent space gradient)
+    // Conv 1 Backprop-to-Input (d_in is W/4 x H/4 x F2 gradient - Latent Space)
     gpu_conv2D(d_out, _decoder_filter_1.get(), d_in,
                n, w_quarter, h_quarter, _ENCODER_FILTER_2_DEPTH, _DECODER_FILTER_1_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
+    swap(d_out, d_in); // d_out is now W/4 x H/4 x F2 gradient (Latent Space Delta)
 
-    swap(d_out, d_in);
     gpu_update_weight(_decoder_filter_1.get(), d_filter, _DECODER_FILTER_1_SIZE, learning_rate);
+    CUDA_CHECK(cudaGetLastError());
 
     // --------------------------------------------------------------------------------
-    // ENCODER BACKWARD PASS
+    // ENCODER BACKWARD PASS (from W/4 x H/4 to W x H)
     // --------------------------------------------------------------------------------
     
-    // Max pooling backwards (dim: n * W/2 * H/2 * F2)
-    // d_out size: n * W/4 * H/4 * F2
+    // Max pooling 2 Backward (W/4 x H/4 -> W/2 x H/2)
+    // d_out (W/4 x H/4 x F2) is the gradient, pass original W/2, H/2
     gpu_max_pooling_backward(_out_encoder_relu_2.get(), d_out, d_in,
                              n, w_half, h_half, _ENCODER_FILTER_2_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
+    swap(d_out, d_in); // d_out is now W/2 x H/2 x F2 gradient
 
-    // ReLU (size W/2 x H/2 x F2)
+    // ReLU 2 Backward (W/2 x H/2 x F2)
     gpu_relu_backward(_out_encoder_bias_2.get(), d_in, d_out,
                       n, w_half, h_half, _ENCODER_FILTER_2_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
+    swap(d_out, d_in); // d_out is now W/2 x H/2 x F2 gradient
 
-    // Fourth conv2D (second encoder layer) (size W/2 x H/2 x F2)
+    // Bias 2 Grad (W/2 x H/2 x F2)
     gpu_bias_grad(d_out, d_in, n, w_half, h_half, _ENCODER_FILTER_2_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
 
     gpu_update_weight(_encoder_bias_2.get(), d_in, _ENCODER_FILTER_2_DEPTH, learning_rate);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Update filter (Input to layer: n * W/2 * H/2 * F1)
+    // Conv 2 Grad (W/2 x H/2) - Input to layer: _out_max_pooling_1 (W/2 x H/2 x F1)
     // d_out size: n * W/2 * H/2 * F2
     gpu_conv2D_grad(_out_max_pooling_1.get(), d_out, d_filter,
                     n, w_half, h_half, _ENCODER_FILTER_1_DEPTH, _ENCODER_FILTER_2_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Output d_in: n * W/2 * H/2 * F1
+    // Conv 2 Backprop-to-Input (d_in is W/2 x H/2 x F1 gradient)
     gpu_conv2D(d_out, _encoder_filter_2.get(), d_in,
                n, w_half, h_half, _ENCODER_FILTER_1_DEPTH, _ENCODER_FILTER_2_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
+    swap(d_out, d_in); // d_out is now W/2 x H/2 x F1 gradient
 
-    swap(d_out, d_in);
     gpu_update_weight(_encoder_filter_2.get(), d_filter, _ENCODER_FILTER_2_SIZE, learning_rate);
+    CUDA_CHECK(cudaGetLastError());
 
-    // First max pooling backwards (dim: n * W * H * F1)
-    // d_out size: n * W/2 * H/2 * F1
+    // Max pooling 1 Backward (W/2 x H/2 -> W x H)
+    // d_out (W/2 x H/2 x F1) is the gradient, pass original W, H
     gpu_max_pooling_backward(_out_encoder_relu_1.get(), d_out, d_in,
                              n, width, height, _ENCODER_FILTER_1_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
+    swap(d_out, d_in); // d_out is now W x H x F1 gradient
 
-    // ReLU (size W x H x F1)
+    // ReLU 1 Backward (W x H x F1)
     gpu_relu_backward(_out_encoder_bias_1.get(), d_in, d_out,
                       n, width, height, _ENCODER_FILTER_1_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
+    swap(d_out, d_in); // d_out is now W x H x F1 gradient
 
-    // Fifth conv2D (first encoder layer) (size W x H x F1)
+    // Bias 1 Grad (W x H x F1)
     gpu_bias_grad(d_out, d_in, n, width, height, _ENCODER_FILTER_1_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
 
     gpu_update_weight(_encoder_bias_1.get(), d_in, _ENCODER_FILTER_1_DEPTH, learning_rate);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Update filter (Input to layer: n * W * H * D_input)
+    // Conv 1 Grad (W x H) - Input to layer: batch.get_data() (W x H x D_input)
     // d_out size: n * W * H * F1
     gpu_conv2D_grad(batch.get_data(), d_out, d_filter,
                     n, width, height, batch.depth, _ENCODER_FILTER_1_DEPTH);
+    CUDA_CHECK(cudaGetLastError());
 
-    // Final output d_in: n * W * H * D_input (gradient to input, typically discarded)
+    // Final output d_in: n * W * H * D_input (gradient to input, not used)
     gpu_conv2D(d_out, _encoder_filter_1.get(), d_in,
                n, width, height, batch.depth, _ENCODER_FILTER_1_DEPTH);
-
+    CUDA_CHECK(cudaGetLastError());
     swap(d_out, d_in);
+
     gpu_update_weight(_encoder_filter_1.get(), d_filter, _ENCODER_FILTER_1_SIZE, learning_rate);
+    CUDA_CHECK(cudaGetLastError());
 
     return loss;
 }
@@ -476,57 +520,67 @@ void Gpu_Autoencoder::fit(const Dataset &dataset, int n_epoch, int batch_size, f
 }
 
 // -----------------------------------------------------
-// ENCODE/DECODE (Batch Processing)
+// ENCODE/DECODE (Batch Processing) (Fixed Dimensions)
 // -----------------------------------------------------
 
 Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const
 {
     // Encode by batches to use less memory
     int width = dataset.width, height = dataset.height, depth = dataset.depth;
-    // Total elements in the encoded image
-    int encoded_image_elements = width / 4 * height / 4 * _ENCODER_FILTER_2_DEPTH;
+    int w_curr = width;
+    int h_curr = height;
+    
+    // Calculate final output dimensions
+    int w_quarter = width / 4;
+    int h_quarter = height / 4;
+    int encoded_image_elements = w_quarter * h_quarter * _ENCODER_FILTER_2_DEPTH;
     int offset = 0; // Offset tính bằng số float (phần tử)
 
     vector<Dataset> batches = create_minibatches(dataset, _ENCODE_BATCH_SIZE);
-    Dataset res(dataset.n, width / 4, height / 4, _ENCODER_FILTER_2_DEPTH);
+    Dataset res(dataset.n, w_quarter, h_quarter, _ENCODER_FILTER_2_DEPTH);
 
     // Placeholder, alternating
     float *a, *b;
-    // Max image size for intermediates at W/2 x H/2 resolution * MAX_FILTER_DEPTH
-    int n_pixel_max = _ENCODE_BATCH_SIZE * width * height / 4; 
+    // Max intermediate size is W x H (original size)
+    int n_pixel_max = _ENCODE_BATCH_SIZE * width * height; 
     CUDA_CHECK(cudaMalloc(&a, n_pixel_max * MAX_FILTER_DEPTH * sizeof(float)));
     CUDA_CHECK(cudaMalloc(&b, n_pixel_max * MAX_FILTER_DEPTH * sizeof(float)));
 
     for (size_t i = 0; i < batches.size(); ++i)
     {
         int n_batch = batches[i].n;
+        w_curr = width;
+        h_curr = height;
 
         // First conv2D (size W x H)
         gpu_conv2D(batches[i].get_data(), _encoder_filter_1.get(), a,
-                   n_batch, width, height, depth, _ENCODER_FILTER_1_DEPTH);
+                   n_batch, w_curr, h_curr, depth, _ENCODER_FILTER_1_DEPTH);
 
         // Add bias
         gpu_add_bias(a, _encoder_bias_1.get(), b,
-                     n_batch, width, height, _ENCODER_FILTER_1_DEPTH);
+                     n_batch, w_curr, h_curr, _ENCODER_FILTER_1_DEPTH);
 
         // ReLU
-        gpu_relu(b, a, n_batch, width, height, _ENCODER_FILTER_1_DEPTH);
+        gpu_relu(b, a, n_batch, w_curr, h_curr, _ENCODER_FILTER_1_DEPTH);
 
-        // Max pooling (size W/2 x H/2)
-        gpu_max_pooling(a, b, n_batch, width, height, _ENCODER_FILTER_1_DEPTH);
+        // Max pooling 1 (size W/2 x H/2)
+        gpu_max_pooling(a, b, n_batch, w_curr, h_curr, _ENCODER_FILTER_1_DEPTH);
+        w_curr = width / 2;
+        h_curr = height / 2;
 
         // Second conv2D (size W/2 x H/2)
         gpu_conv2D(b, _encoder_filter_2.get(), a,
-                   n_batch, width / 2, height / 2, _ENCODER_FILTER_1_DEPTH, _ENCODER_FILTER_2_DEPTH);
+                   n_batch, w_curr, h_curr, _ENCODER_FILTER_1_DEPTH, _ENCODER_FILTER_2_DEPTH);
 
         gpu_add_bias(a, _encoder_bias_2.get(), b,
-                     n_batch, width / 2, height / 2, _ENCODER_FILTER_2_DEPTH);
+                     n_batch, w_curr, h_curr, _ENCODER_FILTER_2_DEPTH);
 
         // Second ReLU
-        gpu_relu(b, a, n_batch, width / 2, height / 2, _ENCODER_FILTER_2_DEPTH);
+        gpu_relu(b, a, n_batch, w_curr, h_curr, _ENCODER_FILTER_2_DEPTH);
 
         // Second max pooling (size W/4 x H/4)
-        gpu_max_pooling(a, b, n_batch, width / 2, height / 2, _ENCODER_FILTER_2_DEPTH);
+        gpu_max_pooling(a, b, n_batch, w_curr, h_curr, _ENCODER_FILTER_2_DEPTH);
+        // Final result in b (w_curr/h_curr is not needed further here)
 
         // Copy batch
         int n_floats_batch = n_batch * encoded_image_elements;
@@ -543,7 +597,7 @@ Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const
     return res;
 }
 Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
-    int width = dataset.width, height = dataset.height, depth = dataset.depth;
+    int width = dataset.width, height = dataset.height, depth = dataset.depth; // width, height là W/4, H/4
     
     // Decoded output is W x H (original size). Input latent is W/4 x H/4.
     int W_orig = IMAGE_WIDTH; // 32
@@ -551,7 +605,7 @@ Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
 
     // Total elements in the decoded image (W * H * D3)
     int decoded_image_elements = W_orig * H_orig * _DECODER_FILTER_3_DEPTH;
-    int offset  = 0;
+    int offset = 0;
 
     vector<Dataset> batches = create_minibatches(dataset, _ENCODE_BATCH_SIZE);
     Dataset res(dataset.n, W_orig, H_orig, _DECODER_FILTER_3_DEPTH);
@@ -565,48 +619,46 @@ Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
 
     for (size_t i = 0; i < batches.size(); ++i) {
         int n_batch = batches[i].n;
-
-        // Input is width * height (W/4 x H/4)
-        int w_q = width;
-        int h_q = height;
+        int w_curr = width;  // W/4
+        int h_curr = height; // H/4
         
         // First conv2D (Output: W/4 x H/4 x D1)
         gpu_conv2D(batches[i].get_data(), _decoder_filter_1.get(), a,
-                    n_batch, w_q, h_q, depth, _DECODER_FILTER_1_DEPTH);
+                    n_batch, w_curr, h_curr, depth, _DECODER_FILTER_1_DEPTH);
 
         // Add bias
         gpu_add_bias(a, _decoder_bias_1.get(), b,
-                    n_batch, w_q, h_q, _DECODER_FILTER_1_DEPTH);
+                    n_batch, w_curr, h_curr, _DECODER_FILTER_1_DEPTH);
 
         // ReLU
-        gpu_relu(b, a, n_batch, w_q, h_q, _DECODER_FILTER_1_DEPTH);
+        gpu_relu(b, a, n_batch, w_curr, h_curr, _DECODER_FILTER_1_DEPTH);
 
-        // Upsampling (Output: W/2 x H/2 x D1)
-        int w_h = w_q * 2;
-        int h_h = h_q * 2;
-        gpu_upsampling(a, b, n_batch, w_h, h_h, _DECODER_FILTER_1_DEPTH);
+        // Upsampling 1 (Output: W/2 x H/2 x D1)
+        w_curr *= 2; // W/2
+        h_curr *= 2; // H/2
+        gpu_upsampling(a, b, n_batch, w_curr, h_curr, _DECODER_FILTER_1_DEPTH);
 
         // Second conv2D (Output: W/2 x H/2 x D2)
         gpu_conv2D(b, _decoder_filter_2.get(), a,
-                    n_batch, w_h, h_h, _DECODER_FILTER_1_DEPTH, _DECODER_FILTER_2_DEPTH);
+                    n_batch, w_curr, h_curr, _DECODER_FILTER_1_DEPTH, _DECODER_FILTER_2_DEPTH);
 
         gpu_add_bias(a, _decoder_bias_2.get(), b,
-                    n_batch, w_h, h_h, _DECODER_FILTER_2_DEPTH);
+                    n_batch, w_curr, h_curr, _DECODER_FILTER_2_DEPTH);
 
         // Second ReLU
-        gpu_relu(b, a, n_batch, w_h, h_h, _DECODER_FILTER_2_DEPTH);
+        gpu_relu(b, a, n_batch, w_curr, h_curr, _DECODER_FILTER_2_DEPTH);
 
         // Second upsampling (Output: W x H x D2)
-        int w_f = w_h * 2;
-        int h_f = h_h * 2;
-        gpu_upsampling(a, b, n_batch, w_f, h_f, _DECODER_FILTER_2_DEPTH);
+        w_curr *= 2; // W
+        h_curr *= 2; // H
+        gpu_upsampling(a, b, n_batch, w_curr, h_curr, _DECODER_FILTER_2_DEPTH);
 
         // Third conv2D (Final Output: W x H x D3)
         gpu_conv2D(b, _decoder_filter_3.get(), a,
-                    n_batch, w_f, h_f, _DECODER_FILTER_2_DEPTH, _DECODER_FILTER_3_DEPTH);
+                    n_batch, w_curr, h_curr, _DECODER_FILTER_2_DEPTH, _DECODER_FILTER_3_DEPTH);
 
         gpu_add_bias(a, _decoder_bias_3.get(), b,
-                    n_batch, w_f, h_f, _DECODER_FILTER_3_DEPTH);
+                    n_batch, w_curr, h_curr, _DECODER_FILTER_3_DEPTH);
 
         // Copy batch
         int n_floats_batch = n_batch * decoded_image_elements;
@@ -626,5 +678,5 @@ Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
 float Gpu_Autoencoder::eval(const Dataset &dataset) {
     int depth_out = _DECODER_FILTER_3_DEPTH;
     return gpu_mse_loss(dataset.get_data(), decode(encode(dataset)).get_data(),
-                        dataset.n, dataset.width, dataset.height, depth_out); // Use W, H of the input batch (32x32)
+                        dataset.n, dataset.width, dataset.height, depth_out); 
 }

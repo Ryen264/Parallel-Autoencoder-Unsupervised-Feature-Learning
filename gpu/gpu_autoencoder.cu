@@ -16,7 +16,8 @@ using std::swap;
     {                                                            \
         if (err != cudaSuccess)                                  \
         {                                                        \
-            printf("CUDA Error in %s at line %d: %s\n", __FILE__, __LINE__, cudaGetErrorString(err)); \
+            printf("\n\n!!! CRITICAL CUDA ERROR (File: %s, Line: %d) !!!\n", __FILE__, __LINE__); \
+            printf("Code: %d, Message: %s\n", err, cudaGetErrorString(err)); \
             /* Thêm exit để dừng chương trình ngay khi phát hiện lỗi CUDA */ \
             exit(EXIT_FAILURE);                                  \
         }                                                        \
@@ -318,9 +319,9 @@ float Gpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate)
                     n, width, height, _DECODER_FILTER_2_DEPTH, depth_out);
     CUDA_CHECK(cudaGetLastError());
 
-    // Conv 3 Backprop-to-Input (d_in is W x H x D2 gradient)
-    gpu_conv2D(d_out, _decoder_filter_3.get(), d_in,
-               n, width, height, _DECODER_FILTER_2_DEPTH, depth_out);
+    // Conv 3 Backprop-to-Input (d_in is W x H x D2 gradient) - Sửa lỗi cấu trúc
+    gpu_conv2D_backward_data(d_out, _decoder_filter_3.get(), d_in,
+               n, width, height, depth_out, _DECODER_FILTER_2_DEPTH);
     CUDA_CHECK(cudaGetLastError());
     swap(d_out, d_in); // d_out is now W x H x D2 gradient
 
@@ -354,9 +355,9 @@ float Gpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate)
                     n, w_half, h_half, _DECODER_FILTER_1_DEPTH, _DECODER_FILTER_2_DEPTH);
     CUDA_CHECK(cudaGetLastError());
 
-    // Conv 2 Backprop-to-Input (d_in is W/2 x H/2 x D1 gradient)
-    gpu_conv2D(d_out, _decoder_filter_2.get(), d_in,
-               n, w_half, h_half, _DECODER_FILTER_1_DEPTH, _DECODER_FILTER_2_DEPTH);
+    // Conv 2 Backprop-to-Input (d_in is W/2 x H/2 x D1 gradient) - Sửa lỗi cấu trúc
+    gpu_conv2D_backward_data(d_out, _decoder_filter_2.get(), d_in,
+               n, w_half, h_half, _DECODER_FILTER_2_DEPTH, _DECODER_FILTER_1_DEPTH);
     CUDA_CHECK(cudaGetLastError());
     swap(d_out, d_in); // d_out is now W/2 x H/2 x D1 gradient
 
@@ -390,9 +391,9 @@ float Gpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate)
                     n, w_quarter, h_quarter, _ENCODER_FILTER_2_DEPTH, _DECODER_FILTER_1_DEPTH);
     CUDA_CHECK(cudaGetLastError());
 
-    // Conv 1 Backprop-to-Input (d_in is W/4 x H/4 x F2 gradient - Latent Space)
-    gpu_conv2D(d_out, _decoder_filter_1.get(), d_in,
-               n, w_quarter, h_quarter, _ENCODER_FILTER_2_DEPTH, _DECODER_FILTER_1_DEPTH);
+    // Conv 1 Backprop-to-Input (d_in is W/4 x H/4 x F2 gradient - Latent Space) - Sửa lỗi cấu trúc
+    gpu_conv2D_backward_data(d_out, _decoder_filter_1.get(), d_in,
+               n, w_quarter, h_quarter, _DECODER_FILTER_1_DEPTH, _ENCODER_FILTER_2_DEPTH);
     CUDA_CHECK(cudaGetLastError());
     swap(d_out, d_in); // d_out is now W/4 x H/4 x F2 gradient (Latent Space Delta)
 
@@ -429,9 +430,9 @@ float Gpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate)
                     n, w_half, h_half, _ENCODER_FILTER_1_DEPTH, _ENCODER_FILTER_2_DEPTH);
     CUDA_CHECK(cudaGetLastError());
 
-    // Conv 2 Backprop-to-Input (d_in is W/2 x H/2 x F1 gradient)
-    gpu_conv2D(d_out, _encoder_filter_2.get(), d_in,
-               n, w_half, h_half, _ENCODER_FILTER_1_DEPTH, _ENCODER_FILTER_2_DEPTH);
+    // Conv 2 Backprop-to-Input (d_in is W/2 x H/2 x F1 gradient) - Sửa lỗi cấu trúc
+    gpu_conv2D_backward_data(d_out, _encoder_filter_2.get(), d_in,
+               n, w_half, h_half, _ENCODER_FILTER_2_DEPTH, _ENCODER_FILTER_1_DEPTH);
     CUDA_CHECK(cudaGetLastError());
     swap(d_out, d_in); // d_out is now W/2 x H/2 x F1 gradient
 
@@ -464,9 +465,9 @@ float Gpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate)
                     n, width, height, batch.depth, _ENCODER_FILTER_1_DEPTH);
     CUDA_CHECK(cudaGetLastError());
 
-    // Final output d_in: n * W * H * D_input (gradient to input, not used)
-    gpu_conv2D(d_out, _encoder_filter_1.get(), d_in,
-               n, width, height, batch.depth, _ENCODER_FILTER_1_DEPTH);
+    // Final output d_in: n * W * H * D_input (gradient to input, not used) - Sửa lỗi cấu trúc
+    gpu_conv2D_backward_data(d_out, _encoder_filter_1.get(), d_in,
+               n, width, height, _ENCODER_FILTER_1_DEPTH, batch.depth);
     CUDA_CHECK(cudaGetLastError());
     swap(d_out, d_in);
 
@@ -677,6 +678,7 @@ Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
 
 float Gpu_Autoencoder::eval(const Dataset &dataset) {
     int depth_out = _DECODER_FILTER_3_DEPTH;
-    return gpu_mse_loss(dataset.get_data(), decode(encode(dataset)).get_data(),
+    Dataset decoded = decode(encode(dataset));
+    return gpu_mse_loss(dataset.get_data(), decoded.get_data(),
                         dataset.n, dataset.width, dataset.height, depth_out); 
 }

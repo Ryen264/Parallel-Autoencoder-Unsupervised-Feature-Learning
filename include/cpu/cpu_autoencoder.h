@@ -1,13 +1,13 @@
 #ifndef CPU_AUTOENCODER_H
 #define CPU_AUTOENCODER_H
 
-#include "autoencoder.h"
+#include "data_loader.h"
 
 /**
  * @brief The class that encapsulates the network using CPU
  *
  */
-class Cpu_Autoencoder : IAutoencoder {
+class Cpu_Autoencoder {
 
   unique_ptr<float[]> _encoder_filter_1;
   unique_ptr<float[]> _encoder_bias_1;
@@ -118,7 +118,7 @@ public:
    * @brief Destroy the Autoencoder object
    *
    */
-  ~Cpu_Autoencoder() override = default;
+  ~Cpu_Autoencoder() = default;
 
   /**
    * @brief Encodes a dataset
@@ -126,7 +126,7 @@ public:
    * @param dataset The dataset to be encoded
    * @return Dataset The encoded dataset
    */
-  Dataset encode(const Dataset &dataset) const override;
+  Dataset encode(const Dataset &dataset) const;
 
   /**
    * @brief Decodes a dataset
@@ -134,7 +134,7 @@ public:
    * @param dataset The dataset to be decoded
    * @return Dataset The decoded dataset
    */
-  Dataset decode(const Dataset &dataset) const override;
+  Dataset decode(const Dataset &dataset) const;
 
   /**
    * @brief Trains the model using a dataset
@@ -154,7 +154,7 @@ public:
            float          learning_rate,
            bool           verbose,
            int            checkpoint,
-           const char    *output_dir = "./model") override;
+           const char    *output_dir = "./model");
 
   /**
    * @brief Evaluate the model
@@ -162,14 +162,14 @@ public:
    * @param dataset The dataset to be evaluated
    * @return float The MSE between the actual and expected result
    */
-  float eval(const Dataset &dataset) override;
+  float eval(const Dataset &dataset);
 
   /**
    * @brief Write the model's parameters to a file
    *
    * @param filename The file to write the model's parameter
    */
-  void save_paramters(const char *filename) const override;
+  void save_paramters(const char *filename) const;
 };
 
 #endif

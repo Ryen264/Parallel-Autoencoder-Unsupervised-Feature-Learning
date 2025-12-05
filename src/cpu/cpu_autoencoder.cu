@@ -44,20 +44,20 @@ Cpu_Autoencoder::Cpu_Autoencoder() {
   // Random init
   srand(time(0));
 
-  generate_array(_encoder_filter_1, _ENCODER_FILTER_1_SIZE);
-  generate_array(_encoder_bias_1, _ENCODER_FILTER_1_DEPTH);
+  generate_array(_encoder_filter_1, ENCODER_FILTER_1_SIZE);
+  generate_array(_encoder_bias_1, ENCODER_FILTER_1_DEPTH);
 
-  generate_array(_encoder_filter_2, _ENCODER_FILTER_2_SIZE);
-  generate_array(_encoder_bias_2, _ENCODER_FILTER_2_DEPTH);
+  generate_array(_encoder_filter_2, ENCODER_FILTER_2_SIZE);
+  generate_array(_encoder_bias_2, ENCODER_FILTER_2_DEPTH);
 
-  generate_array(_decoder_filter_1, _DECODER_FILTER_1_SIZE);
-  generate_array(_decoder_bias_1, _DECODER_FILTER_1_DEPTH);
+  generate_array(_decoder_filter_1, DECODER_FILTER_1_SIZE);
+  generate_array(_decoder_bias_1, DECODER_FILTER_1_DEPTH);
 
-  generate_array(_decoder_filter_2, _DECODER_FILTER_2_SIZE);
-  generate_array(_decoder_bias_2, _DECODER_FILTER_2_DEPTH);
+  generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE);
+  generate_array(_decoder_bias_2, DECODER_FILTER_2_DEPTH);
 
-  generate_array(_decoder_filter_2, _DECODER_FILTER_2_SIZE);
-  generate_array(_decoder_bias_2, _DECODER_FILTER_2_DEPTH);
+  generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE);
+  generate_array(_decoder_bias_2, DECODER_FILTER_2_DEPTH);
 };
 
 Cpu_Autoencoder::Cpu_Autoencoder(const char *filename) {
@@ -67,41 +67,41 @@ Cpu_Autoencoder::Cpu_Autoencoder(const char *filename) {
   ifstream buffer(filename, std::ios::in | std::ios::binary);
 
   // Read first encoder conv2D layer
-  read_data(buffer, _encoder_filter_1, _ENCODER_FILTER_1_SIZE * sizeof(float));
-  read_data(buffer, _encoder_bias_1, _ENCODER_FILTER_1_DEPTH * sizeof(float));
+  read_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
+  read_data(buffer, _encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float));
 
   // Read second encoder conv2D layer
-  read_data(buffer, _encoder_filter_2, _ENCODER_FILTER_2_SIZE * sizeof(float));
-  read_data(buffer, _encoder_bias_2, _ENCODER_FILTER_2_DEPTH * sizeof(float));
+  read_data(buffer, _encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float));
+  read_data(buffer, _encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float));
 
   // Read first decoder conv2D layer
-  read_data(buffer, _decoder_filter_1, _DECODER_FILTER_1_SIZE * sizeof(float));
-  read_data(buffer, _decoder_bias_1, _DECODER_FILTER_1_DEPTH * sizeof(float));
+  read_data(buffer, _decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float));
 
   // Read second decoder conv2D layer
-  read_data(buffer, _decoder_filter_2, _DECODER_FILTER_2_SIZE * sizeof(float));
-  read_data(buffer, _decoder_bias_2, _DECODER_FILTER_2_DEPTH * sizeof(float));
+  read_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
 
   // Read third encoder conv2D layer
-  read_data(buffer, _decoder_filter_3, _DECODER_FILTER_3_SIZE * sizeof(float));
-  read_data(buffer, _decoder_bias_3, _DECODER_FILTER_3_DEPTH * sizeof(float));
+  read_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
 };
 
 void Cpu_Autoencoder::_allocate_mem() {
-  _encoder_filter_1 = make_unique<float[]>(_ENCODER_FILTER_1_SIZE);
-  _encoder_bias_1   = make_unique<float[]>(_ENCODER_FILTER_1_DEPTH);
+  _encoder_filter_1 = make_unique<float[]>(ENCODER_FILTER_1_SIZE);
+  _encoder_bias_1   = make_unique<float[]>(ENCODER_FILTER_1_DEPTH);
 
-  _encoder_filter_2 = make_unique<float[]>(_ENCODER_FILTER_2_SIZE);
-  _encoder_bias_2   = make_unique<float[]>(_ENCODER_FILTER_2_DEPTH);
+  _encoder_filter_2 = make_unique<float[]>(ENCODER_FILTER_2_SIZE);
+  _encoder_bias_2   = make_unique<float[]>(ENCODER_FILTER_2_DEPTH);
 
-  _decoder_filter_1 = make_unique<float[]>(_DECODER_FILTER_1_SIZE);
-  _decoder_bias_1   = make_unique<float[]>(_DECODER_FILTER_1_DEPTH);
+  _decoder_filter_1 = make_unique<float[]>(DECODER_FILTER_1_SIZE);
+  _decoder_bias_1   = make_unique<float[]>(DECODER_FILTER_1_DEPTH);
 
-  _decoder_filter_2 = make_unique<float[]>(_DECODER_FILTER_2_SIZE);
-  _decoder_bias_2   = make_unique<float[]>(_DECODER_FILTER_2_DEPTH);
+  _decoder_filter_2 = make_unique<float[]>(DECODER_FILTER_2_SIZE);
+  _decoder_bias_2   = make_unique<float[]>(DECODER_FILTER_2_DEPTH);
 
-  _decoder_filter_3 = make_unique<float[]>(_DECODER_FILTER_3_SIZE);
-  _decoder_bias_3   = make_unique<float[]>(_DECODER_FILTER_3_DEPTH);
+  _decoder_filter_3 = make_unique<float[]>(DECODER_FILTER_3_SIZE);
+  _decoder_bias_3   = make_unique<float[]>(DECODER_FILTER_3_DEPTH);
 }
 
 Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
@@ -116,7 +116,7 @@ Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
              width,
              height,
              depth,
-             _ENCODER_FILTER_1_DEPTH);
+             ENCODER_FILTER_1_DEPTH);
 
   // Dim: n * w * w * 256
   cpu_add_bias(_out_encoder_filter_1.get(),
@@ -125,7 +125,7 @@ Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
                n,
                width,
                height,
-               _ENCODER_FILTER_1_DEPTH);
+               ENCODER_FILTER_1_DEPTH);
 
   // ReLU layer
   cpu_relu(_out_encoder_bias_1.get(),
@@ -133,7 +133,7 @@ Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
            n,
            width,
            height,
-           _ENCODER_FILTER_1_DEPTH);
+           ENCODER_FILTER_1_DEPTH);
 
   // First max pooling layer
   cpu_max_pooling(_out_encoder_relu_1.get(),
@@ -141,7 +141,7 @@ Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
                   n,
                   width,
                   height,
-                  _ENCODER_FILTER_1_DEPTH);
+                  ENCODER_FILTER_1_DEPTH);
 
   // Dim: n * w/2 * w/2 * 256
   // Second conv2D layer
@@ -151,8 +151,8 @@ Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
              n,
              width / 2,
              height / 2,
-             _ENCODER_FILTER_1_DEPTH,
-             _ENCODER_FILTER_2_DEPTH);
+             ENCODER_FILTER_1_DEPTH,
+             ENCODER_FILTER_2_DEPTH);
 
   // Dim: n * w/2 * w/2 * 128
   cpu_add_bias(_out_encoder_filter_2.get(),
@@ -161,7 +161,7 @@ Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
                n,
                width / 2,
                height / 2,
-               _ENCODER_FILTER_2_DEPTH);
+               ENCODER_FILTER_2_DEPTH);
 
   // ReLU layer
   cpu_relu(_out_encoder_bias_2.get(),
@@ -169,7 +169,7 @@ Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
            n,
            width / 2,
            height / 2,
-           _ENCODER_FILTER_2_DEPTH);
+           ENCODER_FILTER_2_DEPTH);
 
   // Second max pooling layer
   cpu_max_pooling(_out_encoder_relu_2.get(),
@@ -177,13 +177,13 @@ Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
                   n,
                   width / 2,
                   height / 2,
-                  _ENCODER_FILTER_2_DEPTH);
+                  ENCODER_FILTER_2_DEPTH);
 
   // Return the result (Dim: n * w/4 * w/4 * 128)
-  Dataset res(n, width / 4, height / 4, _ENCODER_FILTER_2_DEPTH);
+  Dataset res(n, width / 4, height / 4, ENCODER_FILTER_2_DEPTH);
   memcpy(res.get_data(),
          _out_max_pooling_2.get(),
-         n * width / 4 * height / 4 * _ENCODER_FILTER_2_DEPTH * sizeof(float));
+         n * width / 4 * height / 4 * ENCODER_FILTER_2_DEPTH * sizeof(float));
 
   return res;
 }
@@ -200,7 +200,7 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
              width,
              height,
              depth,
-             _DECODER_FILTER_1_DEPTH);
+             DECODER_FILTER_1_DEPTH);
 
   // Dim: n * w * w * 128
   cpu_add_bias(_out_decoder_filter_1.get(),
@@ -209,7 +209,7 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
                n,
                width,
                height,
-               _DECODER_FILTER_1_DEPTH);
+               DECODER_FILTER_1_DEPTH);
 
   // ReLU layer
   cpu_relu(_out_decoder_bias_1.get(),
@@ -217,7 +217,7 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
            n,
            width,
            height,
-           _DECODER_FILTER_1_DEPTH);
+           DECODER_FILTER_1_DEPTH);
 
   // First upsampling layer
   cpu_upsampling(_out_decoder_relu_1.get(),
@@ -225,7 +225,7 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
                  n,
                  width,
                  height,
-                 _DECODER_FILTER_1_DEPTH);
+                 DECODER_FILTER_1_DEPTH);
 
   // Dim: n * 2w * 2w * 256
   // Second conv2D layer
@@ -235,8 +235,8 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
              n,
              2 * width,
              2 * height,
-             _DECODER_FILTER_1_DEPTH,
-             _DECODER_FILTER_2_DEPTH);
+             DECODER_FILTER_1_DEPTH,
+             DECODER_FILTER_2_DEPTH);
 
   // Dim: n * 2w * 2w * 256
   cpu_add_bias(_out_decoder_filter_2.get(),
@@ -245,7 +245,7 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
                n,
                2 * width,
                2 * height,
-               _DECODER_FILTER_2_DEPTH);
+               DECODER_FILTER_2_DEPTH);
 
   // ReLU layer
   cpu_relu(_out_decoder_bias_2.get(),
@@ -253,7 +253,7 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
            n,
            2 * width,
            2 * height,
-           _DECODER_FILTER_2_DEPTH);
+           DECODER_FILTER_2_DEPTH);
 
   // Second upsampling layer
   cpu_upsampling(_out_decoder_relu_2.get(),
@@ -261,7 +261,7 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
                  n,
                  2 * width,
                  2 * height,
-                 _DECODER_FILTER_2_DEPTH);
+                 DECODER_FILTER_2_DEPTH);
 
   // Dim: n * 4w * 4w * 256
   // Third conv2D layer
@@ -271,8 +271,8 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
              n,
              4 * width,
              4 * height,
-             _DECODER_FILTER_2_DEPTH,
-             _DECODER_FILTER_3_DEPTH);
+             DECODER_FILTER_2_DEPTH,
+             DECODER_FILTER_3_DEPTH);
 
   // Dim: n * 4w * 4w * 3
   cpu_add_bias(_out_decoder_filter_3.get(),
@@ -281,13 +281,13 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
                n,
                4 * width,
                4 * height,
-               _DECODER_FILTER_3_DEPTH);
+               DECODER_FILTER_3_DEPTH);
 
   // Return the result (Dim: n * w/4 * w/4 * 128)
-  Dataset res(n, width / 4, height / 4, _ENCODER_FILTER_2_DEPTH);
+  Dataset res(n, width / 4, height / 4, ENCODER_FILTER_2_DEPTH);
   memcpy(res.get_data(),
          _out_decoder_bias_3.get(),
-         n * 4 * width * 4 * height * _DECODER_FILTER_3_DEPTH * sizeof(float));
+         n * 4 * width * 4 * height * DECODER_FILTER_3_DEPTH * sizeof(float));
 
   return res;
 }
@@ -295,34 +295,34 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
 void Cpu_Autoencoder::_allocate_output_mem(int n, int width, int height) {
   int n_pixel = n * width * height;
 
-  _out_encoder_filter_1 = make_unique<float[]>(n_pixel * _ENCODER_FILTER_1_DEPTH);
-  _out_encoder_bias_1   = make_unique<float[]>(n_pixel * _ENCODER_FILTER_1_DEPTH);
-  _out_encoder_relu_1   = make_unique<float[]>(n_pixel * _ENCODER_FILTER_1_DEPTH);
-  _out_max_pooling_1    = make_unique<float[]>(n_pixel * _ENCODER_FILTER_1_DEPTH / 4);
+  _out_encoder_filter_1 = make_unique<float[]>(n_pixel * ENCODER_FILTER_1_DEPTH);
+  _out_encoder_bias_1   = make_unique<float[]>(n_pixel * ENCODER_FILTER_1_DEPTH);
+  _out_encoder_relu_1   = make_unique<float[]>(n_pixel * ENCODER_FILTER_1_DEPTH);
+  _out_max_pooling_1    = make_unique<float[]>(n_pixel * ENCODER_FILTER_1_DEPTH / 4);
 
-  _out_encoder_filter_2 = make_unique<float[]>(n_pixel * _ENCODER_FILTER_2_DEPTH);
-  _out_encoder_bias_2   = make_unique<float[]>(n_pixel * _ENCODER_FILTER_2_DEPTH);
-  _out_encoder_relu_2   = make_unique<float[]>(n_pixel * _ENCODER_FILTER_2_DEPTH);
-  _out_max_pooling_2    = make_unique<float[]>(n_pixel * _ENCODER_FILTER_2_DEPTH / 16);
+  _out_encoder_filter_2 = make_unique<float[]>(n_pixel * ENCODER_FILTER_2_DEPTH);
+  _out_encoder_bias_2   = make_unique<float[]>(n_pixel * ENCODER_FILTER_2_DEPTH);
+  _out_encoder_relu_2   = make_unique<float[]>(n_pixel * ENCODER_FILTER_2_DEPTH);
+  _out_max_pooling_2    = make_unique<float[]>(n_pixel * ENCODER_FILTER_2_DEPTH / 16);
 
-  _out_decoder_filter_1 = make_unique<float[]>(n_pixel * _DECODER_FILTER_1_DEPTH / 16);
-  _out_decoder_bias_1   = make_unique<float[]>(n_pixel * _DECODER_FILTER_1_DEPTH / 16);
-  _out_decoder_relu_1   = make_unique<float[]>(n_pixel * _DECODER_FILTER_1_DEPTH / 16);
-  _out_upsampling_1     = make_unique<float[]>(n_pixel * _DECODER_FILTER_1_DEPTH / 4);
+  _out_decoder_filter_1 = make_unique<float[]>(n_pixel * DECODER_FILTER_1_DEPTH / 16);
+  _out_decoder_bias_1   = make_unique<float[]>(n_pixel * DECODER_FILTER_1_DEPTH / 16);
+  _out_decoder_relu_1   = make_unique<float[]>(n_pixel * DECODER_FILTER_1_DEPTH / 16);
+  _out_upsampling_1     = make_unique<float[]>(n_pixel * DECODER_FILTER_1_DEPTH / 4);
 
-  _out_decoder_filter_2 = make_unique<float[]>(n_pixel * _DECODER_FILTER_2_DEPTH / 4);
-  _out_decoder_bias_2   = make_unique<float[]>(n_pixel * _DECODER_FILTER_2_DEPTH / 4);
-  _out_decoder_relu_2   = make_unique<float[]>(n_pixel * _DECODER_FILTER_2_DEPTH / 4);
-  _out_upsampling_2     = make_unique<float[]>(n_pixel * _DECODER_FILTER_2_DEPTH);
+  _out_decoder_filter_2 = make_unique<float[]>(n_pixel * DECODER_FILTER_2_DEPTH / 4);
+  _out_decoder_bias_2   = make_unique<float[]>(n_pixel * DECODER_FILTER_2_DEPTH / 4);
+  _out_decoder_relu_2   = make_unique<float[]>(n_pixel * DECODER_FILTER_2_DEPTH / 4);
+  _out_upsampling_2     = make_unique<float[]>(n_pixel * DECODER_FILTER_2_DEPTH);
 
-  _out_decoder_filter_3 = make_unique<float[]>(n_pixel * _DECODER_FILTER_3_DEPTH);
-  _out_decoder_bias_3   = make_unique<float[]>(n_pixel * _DECODER_FILTER_3_DEPTH);
+  _out_decoder_filter_3 = make_unique<float[]>(n_pixel * DECODER_FILTER_3_DEPTH);
+  _out_decoder_bias_3   = make_unique<float[]>(n_pixel * DECODER_FILTER_3_DEPTH);
 
-  static constexpr int FILTER_SIZES[]  = { _ENCODER_FILTER_1_SIZE,
-                                           _ENCODER_FILTER_2_SIZE,
-                                           _DECODER_FILTER_1_SIZE,
-                                           _DECODER_FILTER_2_SIZE,
-                                           _DECODER_FILTER_3_SIZE };
+  static constexpr int FILTER_SIZES[]  = { ENCODER_FILTER_1_SIZE,
+                                           ENCODER_FILTER_2_SIZE,
+                                           DECODER_FILTER_1_SIZE,
+                                           DECODER_FILTER_2_SIZE,
+                                           DECODER_FILTER_3_SIZE };
   constexpr int        MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
 
   _d_in     = make_unique<float[]>(MAX_FILTER_DEPTH);
@@ -373,10 +373,9 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
 
   // Update weight for the last conv2D layer
   // Update bias
-  cpu_bias_grad(d_out, d_in, n, width, height, _DECODER_FILTER_3_DEPTH);
+  cpu_bias_grad(d_out, d_in, n, width, height, DECODER_FILTER_3_DEPTH);
 
-  cpu_update_weight(
-      _decoder_bias_3.get(), d_in, _DECODER_FILTER_3_DEPTH, learning_rate);
+  cpu_update_weight(_decoder_bias_3.get(), d_in, DECODER_FILTER_3_DEPTH, learning_rate);
 
   // Update filter
   cpu_conv2D_grad(_out_upsampling_2.get(),
@@ -385,8 +384,8 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
                   n,
                   width,
                   height,
-                  _DECODER_FILTER_2_DEPTH,
-                  _DECODER_FILTER_3_DEPTH);
+                  DECODER_FILTER_2_DEPTH,
+                  DECODER_FILTER_3_DEPTH);
 
   // Pass delta backwards
   cpu_conv2D(d_out,
@@ -395,19 +394,19 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
              n,
              width,
              height,
-             _DECODER_FILTER_2_DEPTH,
-             _DECODER_FILTER_3_DEPTH);
+             DECODER_FILTER_2_DEPTH,
+             DECODER_FILTER_3_DEPTH);
 
   // Swap d_out and d_in
   swap(d_out, d_in);
 
   // Update weight
   cpu_update_weight(
-      _decoder_filter_3.get(), d_filter, _DECODER_FILTER_3_SIZE, learning_rate);
+      _decoder_filter_3.get(), d_filter, DECODER_FILTER_3_SIZE, learning_rate);
 
   // Pass through upsampling (dim: n * w/2 * w/2 * 256)
   cpu_upsampling_backward(
-      d_out, d_in, n, width / 2, height / 2, _DECODER_FILTER_2_DEPTH);
+      d_out, d_in, n, width / 2, height / 2, DECODER_FILTER_2_DEPTH);
 
   // Pass through ReLU (d_in and d_out swapped)
   cpu_relu_backward(_out_decoder_bias_2.get(),
@@ -416,13 +415,12 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
                     n,
                     width / 2,
                     height / 2,
-                    _DECODER_FILTER_2_DEPTH);
+                    DECODER_FILTER_2_DEPTH);
 
   // Second conv2D layer
-  cpu_bias_grad(d_out, d_in, n, width / 2, height / 2, _DECODER_FILTER_2_DEPTH);
+  cpu_bias_grad(d_out, d_in, n, width / 2, height / 2, DECODER_FILTER_2_DEPTH);
 
-  cpu_update_weight(
-      _decoder_bias_2.get(), d_in, _DECODER_FILTER_2_DEPTH, learning_rate);
+  cpu_update_weight(_decoder_bias_2.get(), d_in, DECODER_FILTER_2_DEPTH, learning_rate);
 
   cpu_conv2D_grad(_out_upsampling_1.get(),
                   d_out,
@@ -430,8 +428,8 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
                   n,
                   width / 2,
                   height / 2,
-                  _DECODER_FILTER_1_DEPTH,
-                  _DECODER_FILTER_2_DEPTH);
+                  DECODER_FILTER_1_DEPTH,
+                  DECODER_FILTER_2_DEPTH);
 
   cpu_conv2D(d_out,
              _decoder_filter_2.get(),
@@ -439,16 +437,16 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
              n,
              width / 2,
              height / 2,
-             _DECODER_FILTER_1_DEPTH,
-             _DECODER_FILTER_2_DEPTH);
+             DECODER_FILTER_1_DEPTH,
+             DECODER_FILTER_2_DEPTH);
 
   swap(d_out, d_in);
   cpu_update_weight(
-      _decoder_filter_2.get(), d_filter, _DECODER_FILTER_2_SIZE, learning_rate);
+      _decoder_filter_2.get(), d_filter, DECODER_FILTER_2_SIZE, learning_rate);
 
   // Upsampling (dim: n * w/4 * w/4 * 128)
   cpu_upsampling_backward(
-      d_out, d_in, n, width / 4, height / 4, _DECODER_FILTER_1_DEPTH);
+      d_out, d_in, n, width / 4, height / 4, DECODER_FILTER_1_DEPTH);
 
   // ReLU
   cpu_relu_backward(_out_decoder_bias_1.get(),
@@ -457,13 +455,12 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
                     n,
                     width / 4,
                     height / 4,
-                    _DECODER_FILTER_1_DEPTH);
+                    DECODER_FILTER_1_DEPTH);
 
   // Third Conv2D
-  cpu_bias_grad(d_out, d_in, n, width / 4, height / 4, _DECODER_FILTER_1_DEPTH);
+  cpu_bias_grad(d_out, d_in, n, width / 4, height / 4, DECODER_FILTER_1_DEPTH);
 
-  cpu_update_weight(
-      _decoder_bias_1.get(), d_in, _DECODER_FILTER_1_DEPTH, learning_rate);
+  cpu_update_weight(_decoder_bias_1.get(), d_in, DECODER_FILTER_1_DEPTH, learning_rate);
 
   cpu_conv2D_grad(_out_max_pooling_2.get(),
                   d_out,
@@ -471,8 +468,8 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
                   n,
                   width / 4,
                   height / 4,
-                  _ENCODER_FILTER_2_DEPTH,
-                  _DECODER_FILTER_1_DEPTH);
+                  ENCODER_FILTER_2_DEPTH,
+                  DECODER_FILTER_1_DEPTH);
 
   cpu_conv2D(d_out,
              _decoder_filter_1.get(),
@@ -480,12 +477,12 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
              n,
              width / 4,
              height / 4,
-             _ENCODER_FILTER_2_DEPTH,
-             _DECODER_FILTER_1_DEPTH);
+             ENCODER_FILTER_2_DEPTH,
+             DECODER_FILTER_1_DEPTH);
 
   swap(d_out, d_in);
   cpu_update_weight(
-      _decoder_filter_1.get(), d_filter, _DECODER_FILTER_1_SIZE, learning_rate);
+      _decoder_filter_1.get(), d_filter, DECODER_FILTER_1_SIZE, learning_rate);
 
   // Max pooling backwards (dim: n * w/2 * w/2 * 128)
   cpu_max_pooling_backward(_out_encoder_relu_2.get(),
@@ -494,7 +491,7 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
                            n,
                            width / 2,
                            height / 2,
-                           _ENCODER_FILTER_2_DEPTH);
+                           ENCODER_FILTER_2_DEPTH);
 
   cpu_relu_backward(_out_encoder_bias_2.get(),
                     d_in,
@@ -502,13 +499,12 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
                     n,
                     width / 2,
                     height / 2,
-                    _ENCODER_FILTER_2_DEPTH);
+                    ENCODER_FILTER_2_DEPTH);
 
   // Forth conv2D
-  cpu_bias_grad(d_out, d_in, n, width / 2, height / 2, _ENCODER_FILTER_2_DEPTH);
+  cpu_bias_grad(d_out, d_in, n, width / 2, height / 2, ENCODER_FILTER_2_DEPTH);
 
-  cpu_update_weight(
-      _encoder_bias_2.get(), d_in, _ENCODER_FILTER_2_DEPTH, learning_rate);
+  cpu_update_weight(_encoder_bias_2.get(), d_in, ENCODER_FILTER_2_DEPTH, learning_rate);
 
   cpu_conv2D_grad(_out_max_pooling_1.get(),
                   d_out,
@@ -516,8 +512,8 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
                   n,
                   width / 2,
                   height / 2,
-                  _ENCODER_FILTER_1_DEPTH,
-                  _ENCODER_FILTER_2_DEPTH);
+                  ENCODER_FILTER_1_DEPTH,
+                  ENCODER_FILTER_2_DEPTH);
 
   cpu_conv2D(d_out,
              _encoder_filter_2.get(),
@@ -525,34 +521,23 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
              n,
              width / 2,
              height / 2,
-             _ENCODER_FILTER_1_DEPTH,
-             _ENCODER_FILTER_2_DEPTH);
+             ENCODER_FILTER_1_DEPTH,
+             ENCODER_FILTER_2_DEPTH);
 
   swap(d_out, d_in);
   cpu_update_weight(
-      _encoder_filter_2.get(), d_filter, _ENCODER_FILTER_2_SIZE, learning_rate);
+      _encoder_filter_2.get(), d_filter, ENCODER_FILTER_2_SIZE, learning_rate);
 
-  cpu_max_pooling_backward(_out_encoder_relu_1.get(),
-                           d_out,
-                           d_in,
-                           n,
-                           width,
-                           height,
-                           _ENCODER_FILTER_1_DEPTH);
+  cpu_max_pooling_backward(
+      _out_encoder_relu_1.get(), d_out, d_in, n, width, height, ENCODER_FILTER_1_DEPTH);
 
-  cpu_relu_backward(_out_encoder_bias_1.get(),
-                    d_in,
-                    d_out,
-                    n,
-                    width,
-                    height,
-                    _ENCODER_FILTER_1_DEPTH);
+  cpu_relu_backward(
+      _out_encoder_bias_1.get(), d_in, d_out, n, width, height, ENCODER_FILTER_1_DEPTH);
 
   // Fifth conv2D
-  cpu_bias_grad(d_out, d_in, n, width, height, _ENCODER_FILTER_1_DEPTH);
+  cpu_bias_grad(d_out, d_in, n, width, height, ENCODER_FILTER_1_DEPTH);
 
-  cpu_update_weight(
-      _encoder_bias_1.get(), d_in, _ENCODER_FILTER_1_DEPTH, learning_rate);
+  cpu_update_weight(_encoder_bias_1.get(), d_in, ENCODER_FILTER_1_DEPTH, learning_rate);
 
   cpu_conv2D_grad(batch.get_data(),
                   d_out,
@@ -561,7 +546,7 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
                   width,
                   height,
                   depth,
-                  _ENCODER_FILTER_1_DEPTH);
+                  ENCODER_FILTER_1_DEPTH);
 
   cpu_conv2D(d_out,
              _encoder_filter_1.get(),
@@ -570,11 +555,11 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
              width,
              height,
              depth,
-             _ENCODER_FILTER_1_DEPTH);
+             ENCODER_FILTER_1_DEPTH);
 
   swap(d_out, d_in);
   cpu_update_weight(
-      _encoder_filter_1.get(), d_filter, _ENCODER_FILTER_1_SIZE, learning_rate);
+      _encoder_filter_1.get(), d_filter, ENCODER_FILTER_1_SIZE, learning_rate);
 
   return loss;
 }
@@ -628,17 +613,17 @@ Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
   // Encode by batches to use less memory
   int width = dataset.width, height = dataset.height, depth = dataset.depth;
   int encoded_image_bytes =
-      width / 4 * height / 4 * _ENCODER_FILTER_2_DEPTH * sizeof(float);
+      width / 4 * height / 4 * ENCODER_FILTER_2_DEPTH * sizeof(float);
   int offset = 0;
 
-  vector<Dataset> batches = create_minibatches(dataset, _ENCODE_BATCH_SIZE);
-  Dataset         res(dataset.n, width / 4, height / 4, _ENCODER_FILTER_2_DEPTH);
+  vector<Dataset> batches = create_minibatches(dataset, ENCODE_BATCH_SIZE);
+  Dataset         res(dataset.n, width / 4, height / 4, ENCODER_FILTER_2_DEPTH);
 
   // Placeholder, alternating
   unique_ptr<float[]> a =
-      make_unique<float[]>(_ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
+      make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
   unique_ptr<float[]> b =
-      make_unique<float[]>(_ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
+      make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
 
   for (int i = 0; i < batches.size(); ++i) {
     int n = batches[i].n;
@@ -651,7 +636,7 @@ Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
                width,
                height,
                depth,
-               _ENCODER_FILTER_1_DEPTH);
+               ENCODER_FILTER_1_DEPTH);
 
     // Add bias
     cpu_add_bias(a.get(),
@@ -660,13 +645,13 @@ Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
                  n,
                  width,
                  height,
-                 _ENCODER_FILTER_1_DEPTH);
+                 ENCODER_FILTER_1_DEPTH);
 
     // ReLU
-    cpu_relu(b.get(), a.get(), n, width, height, _ENCODER_FILTER_1_DEPTH);
+    cpu_relu(b.get(), a.get(), n, width, height, ENCODER_FILTER_1_DEPTH);
 
     // Max pooling
-    cpu_max_pooling(a.get(), b.get(), n, width, height, _ENCODER_FILTER_1_DEPTH);
+    cpu_max_pooling(a.get(), b.get(), n, width, height, ENCODER_FILTER_1_DEPTH);
 
     // Second conv2D
     cpu_conv2D(b.get(),
@@ -675,8 +660,8 @@ Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
                n,
                width / 2,
                height / 2,
-               _ENCODER_FILTER_1_DEPTH,
-               _ENCODER_FILTER_2_DEPTH);
+               ENCODER_FILTER_1_DEPTH,
+               ENCODER_FILTER_2_DEPTH);
 
     cpu_add_bias(a.get(),
                  _encoder_bias_2.get(),
@@ -684,14 +669,13 @@ Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
                  n,
                  width / 2,
                  height / 2,
-                 _ENCODER_FILTER_2_DEPTH);
+                 ENCODER_FILTER_2_DEPTH);
 
     // Second ReLU
-    cpu_relu(b.get(), a.get(), n, width / 2, height / 2, _ENCODER_FILTER_2_DEPTH);
+    cpu_relu(b.get(), a.get(), n, width / 2, height / 2, ENCODER_FILTER_2_DEPTH);
 
     // Second max pooling
-    cpu_max_pooling(
-        a.get(), b.get(), n, width / 2, height / 2, _ENCODER_FILTER_2_DEPTH);
+    cpu_max_pooling(a.get(), b.get(), n, width / 2, height / 2, ENCODER_FILTER_2_DEPTH);
 
     // Copy batch
     memcpy(res.get_data() + offset, b.get(), n * encoded_image_bytes);
@@ -709,14 +693,14 @@ Dataset Cpu_Autoencoder::decode(const Dataset &dataset) const {
       4 * width * 4 * height * _DECODER_FILTER_3_DEPTH * sizeof(float);
   int offset = 0;
 
-  vector<Dataset> batches = create_minibatches(dataset, _ENCODE_BATCH_SIZE);
-  Dataset         res(dataset.n, width * 4, height * 4, _DECODER_FILTER_3_DEPTH);
+  vector<Dataset> batches = create_minibatches(dataset, ENCODE_BATCH_SIZE);
+  Dataset         res(dataset.n, width * 4, height * 4, DECODER_FILTER_3_DEPTH);
 
   // Placeholder, alternating
   unique_ptr<float[]> a =
-      make_unique<float[]>(_ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
+      make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
   unique_ptr<float[]> b =
-      make_unique<float[]>(_ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
+      make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
 
   for (int i = 0; i < batches.size(); ++i) {
     int n = batches[i].n;
@@ -729,7 +713,7 @@ Dataset Cpu_Autoencoder::decode(const Dataset &dataset) const {
                width,
                height,
                depth,
-               _DECODER_FILTER_1_DEPTH);
+               DECODER_FILTER_1_DEPTH);
 
     // Add bias
     cpu_add_bias(a.get(),
@@ -738,13 +722,13 @@ Dataset Cpu_Autoencoder::decode(const Dataset &dataset) const {
                  n,
                  width,
                  height,
-                 _DECODER_FILTER_1_DEPTH);
+                 DECODER_FILTER_1_DEPTH);
 
     // ReLU
-    cpu_relu(b.get(), a.get(), n, width, height, _DECODER_FILTER_1_DEPTH);
+    cpu_relu(b.get(), a.get(), n, width, height, DECODER_FILTER_1_DEPTH);
 
     // Upsampling
-    cpu_upsampling(a.get(), b.get(), n, width, height, _DECODER_FILTER_1_DEPTH);
+    cpu_upsampling(a.get(), b.get(), n, width, height, DECODER_FILTER_1_DEPTH);
 
     // Second conv2D
     cpu_conv2D(b.get(),
@@ -753,8 +737,8 @@ Dataset Cpu_Autoencoder::decode(const Dataset &dataset) const {
                n,
                width * 2,
                height * 2,
-               _DECODER_FILTER_1_DEPTH,
-               _DECODER_FILTER_2_DEPTH);
+               DECODER_FILTER_1_DEPTH,
+               DECODER_FILTER_2_DEPTH);
 
     cpu_add_bias(a.get(),
                  _decoder_bias_2.get(),
@@ -762,13 +746,13 @@ Dataset Cpu_Autoencoder::decode(const Dataset &dataset) const {
                  n,
                  width * 2,
                  height * 2,
-                 _DECODER_FILTER_2_DEPTH);
+                 DECODER_FILTER_2_DEPTH);
 
     // Second ReLU
-    cpu_relu(b.get(), a.get(), n, width * 2, height * 2, _DECODER_FILTER_2_DEPTH);
+    cpu_relu(b.get(), a.get(), n, width * 2, height * 2, DECODER_FILTER_2_DEPTH);
 
     // Second upsampling
-    cpu_upsampling(a.get(), b.get(), n, width * 2, height * 2, _DECODER_FILTER_2_DEPTH);
+    cpu_upsampling(a.get(), b.get(), n, width * 2, height * 2, DECODER_FILTER_2_DEPTH);
 
     // Third conv2D
     cpu_conv2D(b.get(),
@@ -777,8 +761,8 @@ Dataset Cpu_Autoencoder::decode(const Dataset &dataset) const {
                n,
                width * 4,
                height * 4,
-               _DECODER_FILTER_2_DEPTH,
-               _DECODER_FILTER_3_DEPTH);
+               DECODER_FILTER_2_DEPTH,
+               DECODER_FILTER_3_DEPTH);
 
     cpu_add_bias(a.get(),
                  _decoder_bias_3.get(),
@@ -786,7 +770,7 @@ Dataset Cpu_Autoencoder::decode(const Dataset &dataset) const {
                  n,
                  width * 4,
                  height * 4,
-                 _DECODER_FILTER_3_DEPTH);
+                 DECODER_FILTER_3_DEPTH);
 
     // Copy batch
     memcpy(res.get_data() + offset, b.get(), n * encoded_image_bytes);

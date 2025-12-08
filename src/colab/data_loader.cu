@@ -4,11 +4,12 @@
 #include <stdlib.h>
 #include <cuda_runtime.h>
 #include <time.h>
+#include <random>
 #include "data_loader.h"
 #include "constants.h"
 
 using std::memcpy;
-using std::random_shuffle;
+using std::shuffle;
 
 // Error checking macro
 #define CUDA_CHECK(call) \
@@ -103,6 +104,10 @@ static void parseAndNormalize(unsigned char* raw_data, float* images, int* label
     }
 }
 
+Dataset::Dataset():
+    data(nullptr), labels(nullptr),
+    n(0), width(0), height(0), depth(0) {};
+
 Dataset::Dataset(int n, int width, int height, int depth):
     data(make_unique<float[]>(n * width * height * depth)), labels(make_unique<int[]>(n)),
     n(n), width(width), height(height), depth(depth) {};
@@ -196,7 +201,8 @@ void shuffle_dataset(Dataset &dataset) {
         indices[i] = i;
 
     // Shuffle the indices
-    random_shuffle(indices.begin(), indices.end());
+    std::mt19937 rng(time(nullptr));
+    shuffle(indices.begin(), indices.end(), rng);
 
     // Copy data base on indices
     for (int i = 0; i < n; ++i) {
@@ -229,7 +235,7 @@ vector<Dataset> create_minibatches(const Dataset &dataset, int batch_size) {
         memcpy(batch.get_data(), data + i * batch_size * image_size, current_batch_image_bytes);
         memcpy(batch.get_labels(), labels + i * batch_size, current_batch_labels_bytes);
         
-        batches.push_back(std::move(batch));
+        batches.push_back(move(batch));
     }
     return batches;
 }

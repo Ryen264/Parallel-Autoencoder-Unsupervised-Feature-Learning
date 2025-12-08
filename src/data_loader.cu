@@ -1,11 +1,11 @@
-#include "data_loader.h"
-#include "constants.h"
 #include <algorithm>
 #include <cstring>
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda_runtime.h>
 #include <time.h>
+#include "data_loader.h"
+#include "constants.h"
 
 using std::memcpy;
 using std::random_shuffle;
@@ -102,6 +102,10 @@ static void parseAndNormalize(unsigned char* raw_data, float* images, int* label
                 images[i * IMAGE_SIZE + j] = raw_data[i * record_size + 1 + j] / 255.0f;
     }
 }
+
+Dataset::Dataset():
+    data(nullptr), labels(nullptr),
+    n(0), width(0), height(0), depth(0) {};
 
 Dataset::Dataset(int n, int width, int height, int depth):
     data(make_unique<float[]>(n * width * height * depth)), labels(make_unique<int[]>(n)),
@@ -229,7 +233,7 @@ vector<Dataset> create_minibatches(const Dataset &dataset, int batch_size) {
         memcpy(batch.get_data(), data + i * batch_size * image_size, current_batch_image_bytes);
         memcpy(batch.get_labels(), labels + i * batch_size, current_batch_labels_bytes);
         
-        batches.push_back(std::move(batch));
+        batches.push_back(move(batch));
     }
     return batches;
 }

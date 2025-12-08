@@ -101,24 +101,12 @@ void save_speedup_graph(const vector<string>& labels, const vector<double>& spee
 
 int main(int argc, char *argv[]) {
     //Override default parameters from command line if provided
-    // Usage: ./program [RUN_MODE] [N] [WIDTH] [HEIGHT] [DEPTH] [USE_DUMMY_DATA]
+    // Usage: ./program [RUN_MODE] [USE_DUMMY_DATA]
     if (argc > 1) {
         RUN_MODE = argv[1];
     }
     if (argc > 2) {
-        NUM_TRAIN_SAMPLES = stoi(argv[2]);
-    }
-    if (argc > 3) {
-        IMAGE_WIDTH = stoi(argv[3]);
-    }
-    if (argc > 4) {
-        IMAGE_HEIGHT = stoi(argv[4]);
-    }
-    if (argc > 5) {
-        IMAGE_DEPTH = stoi(argv[5]);
-    }
-    if (argc > 6) {
-        USE_DUMMY_DATA = string(argv[6]) == "true";
+        USE_DUMMY_DATA = string(argv[2]) == "true";
     }
 
     // Timing variables
@@ -177,17 +165,18 @@ int main(int argc, char *argv[]) {
                 return -1;
             }
             
-            unique_ptr<float[]> encoded_data(new float[NUM_TRAIN_SAMPLES * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH]);
-            size_t bytes_read = fread(encoded_data.get(), sizeof(float), NUM_TRAIN_SAMPLES * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH, f);
+            int num_samples = NUM_TRAIN_SAMPLES;  // Local variable for actual data size
+            unique_ptr<float[]> encoded_data(new float[num_samples * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH]);
+            size_t bytes_read = fread(encoded_data.get(), sizeof(float), num_samples * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH, f);
             fclose(f);
             
-            if (bytes_read != NUM_TRAIN_SAMPLES * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH) {
-                cerr << "Warning: Expected " << (NUM_TRAIN_SAMPLES * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH) 
+            if (bytes_read != num_samples * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH) {
+                cerr << "Warning: Expected " << (num_samples * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH) 
                          << " elements, but read " << bytes_read << endl;
-                NUM_TRAIN_SAMPLES = bytes_read / (IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH);
+                num_samples = bytes_read / (IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH);
             }
             
-            encoded_dataset = Dataset(encoded_data, NUM_TRAIN_SAMPLES, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
+            encoded_dataset = Dataset(encoded_data, num_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
 
             // Load labels from phase 1
             labels.resize(NUM_TRAIN_SAMPLES);

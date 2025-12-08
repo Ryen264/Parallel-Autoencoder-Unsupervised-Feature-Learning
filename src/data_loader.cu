@@ -4,11 +4,12 @@
 #include <stdlib.h>
 #include <cuda_runtime.h>
 #include <time.h>
+#include <random>
 #include "data_loader.h"
 #include "constants.h"
 
 using std::memcpy;
-using std::random_shuffle;
+using std::shuffle;
 
 // Error checking macro
 #define CUDA_CHECK(call) \
@@ -121,7 +122,7 @@ Dataset::Dataset(unique_ptr<float[]> &data, unique_ptr<int[]> &labels, int n, in
 
 float *Dataset::get_data() const { return data.get(); }
 
-int *Dataset::get_labels() const { return labels.get(); }
+int   *Dataset::get_labels() const { return labels.get(); }
 
 // Load CIFAR-10 dataset from binary files
 Dataset load_dataset(const char *dataset_dir, bool is_train) {
@@ -190,7 +191,7 @@ void shuffle_dataset(Dataset &dataset) {
     int image_bytes = image_size * sizeof(float);
     float *data = dataset.get_data();
     int *labels = dataset.get_labels();
-    
+
     unique_ptr<float[]> new_data = make_unique<float[]>(n * image_size);
     unique_ptr<int[]> new_labels = make_unique<int[]>(n);
 
@@ -200,7 +201,8 @@ void shuffle_dataset(Dataset &dataset) {
         indices[i] = i;
 
     // Shuffle the indices
-    random_shuffle(indices.begin(), indices.end());
+    std::mt19937 rng(time(nullptr));
+    shuffle(indices.begin(), indices.end(), rng);
 
     // Copy data base on indices
     for (int i = 0; i < n; ++i) {
@@ -227,7 +229,6 @@ vector<Dataset> create_minibatches(const Dataset &dataset, int batch_size) {
         int current_batch_size = (i < n_batches - 1) ? batch_size : (dataset.n - i * batch_size);
         int current_batch_image_bytes = current_batch_size * image_size * sizeof(float);
         int current_batch_labels_bytes = current_batch_size * sizeof(int);
-        
         Dataset batch(current_batch_size, dataset.width, dataset.height, dataset.depth);
         
         memcpy(batch.get_data(), data + i * batch_size * image_size, current_batch_image_bytes);

@@ -690,7 +690,7 @@ Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
 Dataset Cpu_Autoencoder::decode(const Dataset &dataset) const {
   int width = dataset.width, height = dataset.height, depth = dataset.depth;
   int encoded_image_bytes =
-      4 * width * 4 * height * _DECODER_FILTER_3_DEPTH * sizeof(float);
+      4 * width * 4 * height * DECODER_FILTER_3_DEPTH * sizeof(float);
   int offset = 0;
 
   vector<Dataset> batches = create_minibatches(dataset, ENCODE_BATCH_SIZE);

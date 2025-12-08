@@ -5,6 +5,8 @@
 #include <memory>
 #include <vector>
 
+using namespace std;
+
 using std::move;
 using std::unique_ptr, std::make_unique;
 using std::vector;
@@ -26,6 +28,11 @@ struct Dataset {
     int height;
     // The bit-depth of the image
     int depth;
+
+    /**
+     * @brief Default constructor - creates an empty dataset
+     */
+    Dataset();
 
     /**
      * @brief Create an unitialized dataset

@@ -4,6 +4,8 @@
 #include <chrono>
 #include <fstream>
 #include <iomanip>
+#include "constants.h"
+
 #include "cpu_autoencoder.h"
 #include "data_loader.h"
 #include "model.h"
@@ -13,11 +15,6 @@ using namespace std;
 
 string RUN_MODE = "both"; // "phase_1", "phase_2", "both"
 bool USE_DUMMY_DATA = false; // only for phase 2
-
-int N = 50000; // Number of samples
-int WIDTH = 8; // Feature width
-int HEIGHT = 8; // Feature height
-int DEPTH = 16; // Feature depth
 
 Dataset dummy_dataset(int n, int width, int height, int depth) {
     unique_ptr<float[]> data(new float[n * width * height * depth]);
@@ -109,16 +106,16 @@ int main(int argc, char *argv[]) {
         RUN_MODE = argv[1];
     }
     if (argc > 2) {
-        N = stoi(argv[2]);
+        NUM_TRAIN_SAMPLES = stoi(argv[2]);
     }
     if (argc > 3) {
-        WIDTH = stoi(argv[3]);
+        IMAGE_WIDTH = stoi(argv[3]);
     }
     if (argc > 4) {
-        HEIGHT = stoi(argv[4]);
+        IMAGE_HEIGHT = stoi(argv[4]);
     }
     if (argc > 5) {
-        DEPTH = stoi(argv[4]);
+        IMAGE_DEPTH = stoi(argv[5]);
     }
     if (argc > 6) {
         USE_DUMMY_DATA = string(argv[6]) == "true";
@@ -163,11 +160,11 @@ int main(int argc, char *argv[]) {
         if (USE_DUMMY_DATA) {
             // Use dummy data for phase 2
             cout << "Using dummy data for Phase 2" << endl;
-            encoded_dataset = dummy_dataset(N, WIDTH, HEIGHT, DEPTH);
+            encoded_dataset = dummy_dataset(NUM_TRAIN_SAMPLES, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
             
             // Create dummy labels
-            labels.resize(N);
-            for (int i = 0; i < N; ++i) {
+            labels.resize(NUM_TRAIN_SAMPLES);
+            for (int i = 0; i < NUM_TRAIN_SAMPLES; ++i) {
                 labels[i] = rand() % 10; // 10 classes
             }
         } else {
@@ -180,23 +177,23 @@ int main(int argc, char *argv[]) {
                 return -1;
             }
             
-            unique_ptr<float[]> encoded_data(new float[N * WIDTH * HEIGHT * DEPTH]);
-            size_t bytes_read = fread(encoded_data.get(), sizeof(float), N * WIDTH * HEIGHT * DEPTH, f);
+            unique_ptr<float[]> encoded_data(new float[NUM_TRAIN_SAMPLES * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH]);
+            size_t bytes_read = fread(encoded_data.get(), sizeof(float), NUM_TRAIN_SAMPLES * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH, f);
             fclose(f);
             
-            if (bytes_read != N * WIDTH * HEIGHT * DEPTH) {
-                cerr << "Warning: Expected " << (N * WIDTH * HEIGHT * DEPTH) 
+            if (bytes_read != NUM_TRAIN_SAMPLES * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH) {
+                cerr << "Warning: Expected " << (NUM_TRAIN_SAMPLES * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH) 
                          << " elements, but read " << bytes_read << endl;
-                N = bytes_read / (WIDTH * HEIGHT * DEPTH);
+                NUM_TRAIN_SAMPLES = bytes_read / (IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH);
             }
             
-            encoded_dataset = Dataset(encoded_data, N, WIDTH, HEIGHT, DEPTH);
+            encoded_dataset = Dataset(encoded_data, NUM_TRAIN_SAMPLES, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
 
             // Load labels from phase 1
-            labels.resize(N);
+            labels.resize(NUM_TRAIN_SAMPLES);
             FILE *lf = fopen("./data/cifar-10-batches-bin/labels.bin", "rb");
             if (lf) {
-                fread(labels.data(), sizeof(int), N, lf);
+                fread(labels.data(), sizeof(int), NUM_TRAIN_SAMPLES, lf);
                 fclose(lf);
             } else {
                 cerr << "Warning: Labels file not found, using random labels" << endl;

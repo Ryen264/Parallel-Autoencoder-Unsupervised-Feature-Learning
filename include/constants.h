@@ -53,4 +53,7 @@ constexpr int DECODER_FILTER_3_SIZE  = CONV_FILTER_WIDTH *
 // Encode and decode by batches to use less memory
 constexpr int ENCODE_BATCH_SIZE = 1024;
 
+// Max block size
+constexpr int MAX_BLOCK_SIZE = 1024;
+
 #endif

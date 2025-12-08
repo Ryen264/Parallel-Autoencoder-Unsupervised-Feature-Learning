@@ -38,6 +38,18 @@ void read_data(std::ifstream &buffer, const std::unique_ptr<float[]> &data, int 
   buffer.read(ptr, size);
 }
 
+/**
+ * @brief Write data to a buffer
+ *
+ * @param buffer The buffer
+ * @param data The data
+ * @param size Number of bytes to write
+ */
+void write_data(std::ostream &buffer, const std::unique_ptr<float[]> &data, int size) {
+  const char *ptr = reinterpret_cast<const char *>(data.get());
+  buffer.write(ptr, size);
+}
+
 Cpu_Autoencoder::Cpu_Autoencoder() {
   _allocate_mem();
 
@@ -594,7 +606,7 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
     if (checkpoint > 0 && epoch % checkpoint == 0) {
       stringstream builder;
       builder << output_dir << '/' << "autoencoder_" << epoch << ".bin";
-      save_paramters(builder.str().c_str());
+      save_parameters(builder.str().c_str());
     }
   }
 
@@ -606,7 +618,7 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
   // Save models param
   stringstream builder;
   builder << output_dir << '/' << "autoencoder_.bin";
-  save_paramters(builder.str().c_str());
+  save_parameters(builder.str().c_str());
 }
 
 Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
@@ -789,4 +801,28 @@ float Cpu_Autoencoder::eval(const Dataset &dataset) {
                       dataset.width,
                       dataset.height,
                       dataset.depth);
+}
+
+void Cpu_Autoencoder::save_parameters(const char *filename) const {
+  ofstream buffer(filename, std::ios::out | std::ios::binary);
+
+  // Write first encoder conv2D layer
+  write_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
+  write_data(buffer, _encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float));
+
+  // Write second encoder conv2D layer
+  write_data(buffer, _encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float));
+  write_data(buffer, _encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float));
+
+  // Write first decoder conv2D layer
+  write_data(buffer, _decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float));
+  write_data(buffer, _decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float));
+
+  // Write second decoder conv2D layer
+  write_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
+  write_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
+
+  // Write third encoder conv2D layer
+  write_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
+  write_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
 }

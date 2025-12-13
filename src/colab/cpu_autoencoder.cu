@@ -14,6 +14,8 @@ using std::printf, std::puts;
 using std::stringstream;
 using std::swap;
 
+string AUTOENCODER_FILENAME = "autoencoder_.bin";
+
 /**
  * @brief Generate a random array with elements between 0 and 1
  *
@@ -117,8 +119,7 @@ void Cpu_Autoencoder::_allocate_mem() {
 }
 
 Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
-  int n = dataset.n, width = dataset.width, height = dataset.height,
-      depth = dataset.depth;
+  int n = dataset.n, width = dataset.width, height = dataset.height, depth = dataset.depth;
 
   // First conv2D layer
   cpu_conv2D(dataset.get_data(),
@@ -201,8 +202,7 @@ Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
 }
 
 Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
-  int n = dataset.n, width = dataset.width, height = dataset.height,
-      depth = dataset.depth;
+  int n = dataset.n, width = dataset.width, height = dataset.height, depth = dataset.depth;
 
   // First conv2D layer
   cpu_conv2D(dataset.get_data(),
@@ -300,7 +300,6 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
   memcpy(res.get_data(),
          _out_decoder_bias_3.get(),
          n * 4 * width * 4 * height * DECODER_FILTER_3_DEPTH * sizeof(float));
-
   return res;
 }
 
@@ -335,7 +334,7 @@ void Cpu_Autoencoder::_allocate_output_mem(int n, int width, int height) {
                                            DECODER_FILTER_1_SIZE,
                                            DECODER_FILTER_2_SIZE,
                                            DECODER_FILTER_3_SIZE };
-  constexpr int        MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
+  constexpr int MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
 
   _d_in     = make_unique<float[]>(MAX_FILTER_DEPTH);
   _d_out    = make_unique<float[]>(n * width * height * MAX_FILTER_DEPTH);
@@ -373,8 +372,8 @@ void Cpu_Autoencoder::_deallocate_output_mem() {
 
 float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
   // Get the result after autoencoding
-  int     n = batch.n, width = batch.width, height = batch.height, depth = batch.depth;
-  float  *d_in = _d_in.get(), *d_out = _d_out.get(), *d_filter = _d_filter.get();
+  int n = batch.n, width = batch.width, height = batch.height, depth = batch.depth;
+  float *d_in = _d_in.get(), *d_out = _d_out.get(), *d_filter = _d_filter.get();
   Dataset res = _decode_save_output(_encode_save_output(batch));
 
   // Calculate loss before backprop
@@ -413,12 +412,10 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
   swap(d_out, d_in);
 
   // Update weight
-  cpu_update_weight(
-      _decoder_filter_3.get(), d_filter, DECODER_FILTER_3_SIZE, learning_rate);
+  cpu_update_weight(_decoder_filter_3.get(), d_filter, DECODER_FILTER_3_SIZE, learning_rate);
 
   // Pass through upsampling (dim: n * w/2 * w/2 * 256)
-  cpu_upsampling_backward(
-      d_out, d_in, n, width / 2, height / 2, DECODER_FILTER_2_DEPTH);
+  cpu_upsampling_backward(d_out, d_in, n, width / 2, height / 2, DECODER_FILTER_2_DEPTH);
 
   // Pass through ReLU (d_in and d_out swapped)
   cpu_relu_backward(_out_decoder_bias_2.get(),
@@ -453,12 +450,10 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
              DECODER_FILTER_2_DEPTH);
 
   swap(d_out, d_in);
-  cpu_update_weight(
-      _decoder_filter_2.get(), d_filter, DECODER_FILTER_2_SIZE, learning_rate);
+  cpu_update_weight(_decoder_filter_2.get(), d_filter, DECODER_FILTER_2_SIZE, learning_rate);
 
   // Upsampling (dim: n * w/4 * w/4 * 128)
-  cpu_upsampling_backward(
-      d_out, d_in, n, width / 4, height / 4, DECODER_FILTER_1_DEPTH);
+  cpu_upsampling_backward(d_out, d_in, n, width / 4, height / 4, DECODER_FILTER_1_DEPTH);
 
   // ReLU
   cpu_relu_backward(_out_decoder_bias_1.get(),
@@ -493,8 +488,7 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
              DECODER_FILTER_1_DEPTH);
 
   swap(d_out, d_in);
-  cpu_update_weight(
-      _decoder_filter_1.get(), d_filter, DECODER_FILTER_1_SIZE, learning_rate);
+  cpu_update_weight(_decoder_filter_1.get(), d_filter, DECODER_FILTER_1_SIZE, learning_rate);
 
   // Max pooling backwards (dim: n * w/2 * w/2 * 128)
   cpu_max_pooling_backward(_out_encoder_relu_2.get(),
@@ -537,14 +531,11 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
              ENCODER_FILTER_2_DEPTH);
 
   swap(d_out, d_in);
-  cpu_update_weight(
-      _encoder_filter_2.get(), d_filter, ENCODER_FILTER_2_SIZE, learning_rate);
+  cpu_update_weight(_encoder_filter_2.get(), d_filter, ENCODER_FILTER_2_SIZE, learning_rate);
 
-  cpu_max_pooling_backward(
-      _out_encoder_relu_1.get(), d_out, d_in, n, width, height, ENCODER_FILTER_1_DEPTH);
+  cpu_max_pooling_backward(_out_encoder_relu_1.get(), d_out, d_in, n, width, height, ENCODER_FILTER_1_DEPTH);
 
-  cpu_relu_backward(
-      _out_encoder_bias_1.get(), d_in, d_out, n, width, height, ENCODER_FILTER_1_DEPTH);
+  cpu_relu_backward(_out_encoder_bias_1.get(), d_in, d_out, n, width, height, ENCODER_FILTER_1_DEPTH);
 
   // Fifth conv2D
   cpu_bias_grad(d_out, d_in, n, width, height, ENCODER_FILTER_1_DEPTH);
@@ -570,8 +561,7 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
              ENCODER_FILTER_1_DEPTH);
 
   swap(d_out, d_in);
-  cpu_update_weight(
-      _encoder_filter_1.get(), d_filter, ENCODER_FILTER_1_SIZE, learning_rate);
+  cpu_update_weight(_encoder_filter_1.get(), d_filter, ENCODER_FILTER_1_SIZE, learning_rate);
 
   return loss;
 }
@@ -589,7 +579,7 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
   // Allocate memory for training
   _allocate_output_mem(batch_size, dataset.width, dataset.height);
 
-  puts("=======================TRAINING START=======================");
+  printf("=======================TRAINING START=======================\n");
   for (int epoch = 1; epoch <= n_epoch; ++epoch) {
     printf("Epoch %d:\n", epoch);
 
@@ -610,32 +600,29 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
     }
   }
 
-  puts("========================TRAINING END========================");
+  printf("========================TRAINING END========================\n");
 
   // Deallocate memory to remove unused memory
   _deallocate_output_mem();
 
   // Save models param
   stringstream builder;
-  builder << output_dir << '/' << "autoencoder_.bin";
+  builder << output_dir << '/' << AUTOENCODER_FILENAME;
   save_parameters(builder.str().c_str());
 }
 
 Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
   // Encode by batches to use less memory
   int width = dataset.width, height = dataset.height, depth = dataset.depth;
-  int encoded_image_bytes =
-      width / 4 * height / 4 * ENCODER_FILTER_2_DEPTH * sizeof(float);
+  int encoded_image_bytes = width / 4 * height / 4 * ENCODER_FILTER_2_DEPTH * sizeof(float);
   int offset = 0;
 
   vector<Dataset> batches = create_minibatches(dataset, ENCODE_BATCH_SIZE);
-  Dataset         res(dataset.n, width / 4, height / 4, ENCODER_FILTER_2_DEPTH);
+  Dataset res(dataset.n, width / 4, height / 4, ENCODER_FILTER_2_DEPTH);
 
   // Placeholder, alternating
-  unique_ptr<float[]> a =
-      make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
-  unique_ptr<float[]> b =
-      make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
+  unique_ptr<float[]> a = make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
+  unique_ptr<float[]> b = make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
 
   for (int i = 0; i < batches.size(); ++i) {
     int n = batches[i].n;
@@ -701,18 +688,15 @@ Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
 
 Dataset Cpu_Autoencoder::decode(const Dataset &dataset) const {
   int width = dataset.width, height = dataset.height, depth = dataset.depth;
-  int encoded_image_bytes =
-      4 * width * 4 * height * DECODER_FILTER_3_DEPTH * sizeof(float);
+  int encoded_image_bytes = 4 * width * 4 * height * DECODER_FILTER_3_DEPTH * sizeof(float);
   int offset = 0;
 
   vector<Dataset> batches = create_minibatches(dataset, ENCODE_BATCH_SIZE);
-  Dataset         res(dataset.n, width * 4, height * 4, DECODER_FILTER_3_DEPTH);
+  Dataset res(dataset.n, width * 4, height * 4, DECODER_FILTER_3_DEPTH);
 
   // Placeholder, alternating
-  unique_ptr<float[]> a =
-      make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
-  unique_ptr<float[]> b =
-      make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
+  unique_ptr<float[]> a = make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
+  unique_ptr<float[]> b = make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
 
   for (int i = 0; i < batches.size(); ++i) {
     int n = batches[i].n;

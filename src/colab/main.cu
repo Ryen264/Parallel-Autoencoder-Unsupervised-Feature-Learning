@@ -4,8 +4,9 @@
 #include <chrono>
 #include <fstream>
 #include <iomanip>
-#include "constants.h"
+#include <string>
 
+#include "constants.h"
 #include "cpu_autoencoder.h"
 #include "data_loader.h"
 #include "model.h"
@@ -13,7 +14,22 @@
 
 using namespace std;
 
-string RUN_MODE = "both"; // "phase_1", "phase_2", "both"
+// string DATASET_DIR = "./data/cifar-10-batches-bin";
+string DATASET_DIR = "/content/drive/MyDrive/@fithcmú/LapTrinhSongSong/data/cifar-10-batches-bin";
+// string MODEL_OUTPUT_DIR = "./model";
+string MODEL_OUTPUT_DIR = "/content/model";
+
+string ENCODED_DATASET_FILE = "encoded_dataset.bin";
+string LABELS_FILE = "labels.bin";
+string SVM_MODEL_FILE = "svm_model.bin";
+
+string VISUALIZATION_TRAINING_TIMES_SVG = "training_times.svg";
+string VISUALIZATION_TRAINING_TIMES_CSV = "training_times.csv";
+string VISUALIZATION_SPEEDUP_GRAPH_SVG = "speedup_graph.svg";
+string VISUALIZATION_SPEEDUP_GRAPH_CSV = "speedup_data.csv";
+string VISUALIZATION_HTML_DASHBOARD = "performance_analysis.html";
+
+string RUN_MODE = "all"; // "phase_1", "phase_2", "all"
 bool USE_DUMMY_DATA = false; // only for phase 2
 
 Dataset dummy_dataset(int n, int width, int height, int depth) {
@@ -24,9 +40,8 @@ Dataset dummy_dataset(int n, int width, int height, int depth) {
     return Dataset(data, n, width, height, depth);
 }
 
-Dataset phase_1_cpu(const char *dataset_dir = "./data/cifar-10-batches-bin", bool is_train = true,
-                   int n_epoch = 20, int batch_size = 32, float learning_rate = 0.001f,
-                   bool verbose = false, int checkpoint = 0, const char *output_dir = "./model") {
+Dataset phase_1_cpu(const char *dataset_dir, const char *output_dir,
+                    bool is_train = true, int n_epoch = 20, int batch_size = 32, float learning_rate = 0.001f, bool verbose = false, int checkpoint = 0) {
     // Read dataset
     Dataset dataset = load_dataset(dataset_dir, is_train);
 
@@ -100,8 +115,8 @@ void save_speedup_graph(const vector<string>& labels, const vector<double>& spee
 }
 
 int main(int argc, char *argv[]) {
-    //Override default parameters from command line if provided
-    // Usage: ./program [RUN_MODE] [USE_DUMMY_DATA]
+    // Override default parameters from command line if provided
+    // Usage: ./main [RUN_MODE] [USE_DUMMY_DATA]
     if (argc > 1) {
         RUN_MODE = argv[1];
     }
@@ -115,13 +130,14 @@ int main(int argc, char *argv[]) {
     double baseline_time = 0.0;
     vector<double> speedups;
 
-    bool RUN_PHASE_1 = (string(RUN_MODE) == "phase_1" || string(RUN_MODE) == "both");
-    bool RUN_PHASE_2 = (string(RUN_MODE) == "phase_2" || string(RUN_MODE) == "both");
+    bool RUN_PHASE_1 = (string(RUN_MODE) == "phase_1" || string(RUN_MODE) == "all");
+    bool RUN_PHASE_2 = (string(RUN_MODE) == "phase_2" || string(RUN_MODE) == "all");
     if (RUN_PHASE_1) {
         cout << "Phase 1: Training Autoencoder" << endl;
         
         auto start_time = chrono::high_resolution_clock::now();
-        Dataset encoded_dataset = phase_1_cpu("./data/cifar-10-batches-bin", true);
+        Dataset encoded_dataset = phase_1_cpu(DATASET_DIR.c_str(), MODEL_OUTPUT_DIR.c_str(),
+                                                N_EPOCH, BATCH_SIZE, LEARNING_RATE, VERBOSE, CHECKPOINT);
         auto end_time = chrono::high_resolution_clock::now();
         
         double phase1_time = chrono::duration<double>(end_time - start_time).count();
@@ -134,7 +150,7 @@ int main(int argc, char *argv[]) {
                   << phase1_time << " seconds" << endl;
         
         // Save encoded dataset for phase 2
-        FILE *f = fopen("encoded_dataset.bin", "wb");
+        FILE *f = fopen(ENCODED_DATASET_FILE.c_str(), "wb");
         fwrite(encoded_dataset.data.get(), sizeof(float), encoded_dataset.n * encoded_dataset.width * encoded_dataset.height * encoded_dataset.depth, f);
         fclose(f);
     }
@@ -153,12 +169,12 @@ int main(int argc, char *argv[]) {
             // Create dummy labels
             labels.resize(NUM_TRAIN_SAMPLES);
             for (int i = 0; i < NUM_TRAIN_SAMPLES; ++i) {
-                labels[i] = rand() % 10; // 10 classes
+                labels[i] = rand() % NUM_CLASSES; // 10 classes
             }
         } else {
             // Load encoded dataset from phase 1
             cout << "Loading encoded dataset from phase 1" << endl;
-            FILE *f = fopen("encoded_dataset.bin", "rb");
+            FILE *f = fopen(ENCODED_DATASET_FILE.c_str(), "rb");
             if (!f) {
                 cerr << "Error: Encoded dataset file not found!" << endl;
                 cerr << "To use real data, make sure to run Phase 1 first or set USE_DUMMY_DATA = true" << endl;
@@ -180,7 +196,8 @@ int main(int argc, char *argv[]) {
 
             // Load labels from phase 1
             labels.resize(NUM_TRAIN_SAMPLES);
-            FILE *lf = fopen("./data/cifar-10-batches-bin/labels.bin", "rb");
+            string labels_path = DATASET_DIR + "/" + LABELS_FILE;
+            FILE *lf = fopen(labels_path.c_str(), "rb");
             if (lf) {
                 fread(labels.data(), sizeof(int), NUM_TRAIN_SAMPLES, lf);
                 fclose(lf);
@@ -192,7 +209,7 @@ int main(int argc, char *argv[]) {
 
         // Train SVM on encoded data
         auto start_time = chrono::high_resolution_clock::now();
-        double accuracy = phase_2(encoded_dataset, labels);
+        double accuracy = phase_2(encoded_dataset, labels, TRAIN_RATIO);
         auto end_time = chrono::high_resolution_clock::now();
         
         double phase2_time = chrono::duration<double>(end_time - start_time).count();
@@ -212,7 +229,8 @@ int main(int argc, char *argv[]) {
         
         // Save the trained SVM model
         SVMmodel svm_model;
-        svm_model.save("model/svm_model.bin");
+        string svm_model_path = MODEL_OUTPUT_DIR + "/" + SVM_MODEL_FILE;
+        svm_model.save(svm_model_path);
     }
 
     // Generate visualizations if any phase was run
@@ -231,28 +249,28 @@ int main(int argc, char *argv[]) {
         
         // Generate SVG visualizations
         cout << "\nGenerating visualizations..." << endl;
-        generate_bar_chart_svg(phase_labels, phase_times, "training_times.svg");
-        save_bar_chart(phase_labels, phase_times, "training_times.csv");
+        generate_bar_chart_svg(phase_labels, phase_times, VISUALIZATION_TRAINING_TIMES_SVG);
+        save_bar_chart(phase_labels, phase_times, VISUALIZATION_TRAINING_TIMES_CSV);
         
         // Line graph showing cumulative speedup
         if (phase_labels.size() > 1) {
-            generate_speedup_graph_svg(phase_labels, speedups, "speedup_graph.svg");
-            save_speedup_graph(phase_labels, speedups, "speedup_data.csv");
+            generate_speedup_graph_svg(phase_labels, speedups, VISUALIZATION_SPEEDUP_GRAPH_SVG);
+            save_speedup_graph(phase_labels, speedups, VISUALIZATION_SPEEDUP_GRAPH_CSV);
             
             // Generate HTML dashboard
-            generate_visualization_html("training_times.svg", "speedup_graph.svg", "performance_analysis.html");
+            generate_visualization_html(VISUALIZATION_TRAINING_TIMES_SVG, VISUALIZATION_SPEEDUP_GRAPH_SVG, VISUALIZATION_HTML_DASHBOARD);
         } else {
             // Generate HTML with only bar chart
-            generate_visualization_html("training_times.svg", "", "performance_analysis.html");
+            generate_visualization_html(VISUALIZATION_TRAINING_TIMES_SVG, "", VISUALIZATION_HTML_DASHBOARD);
         }
         
         cout << "\n✓ Visualizations generated successfully!" << endl;
-        cout << "  - training_times.svg (Bar chart)" << endl;
+        cout << "  - " << VISUALIZATION_TRAINING_TIMES_SVG << " (Bar chart)" << endl;
         if (phase_labels.size() > 1) {
-            cout << "  - speedup_graph.svg (Line graph)" << endl;
+            cout << "  - " << VISUALIZATION_SPEEDUP_GRAPH_SVG << " (Line graph)" << endl;
         }
-        cout << "  - performance_analysis.html (Interactive dashboard)" << endl;
-        cout << "\nOpen performance_analysis.html in your browser to view the charts." << endl;
+        cout << "  - " << VISUALIZATION_HTML_DASHBOARD << " (Interactive dashboard)" << endl;
+        cout << "\nOpen " << VISUALIZATION_HTML_DASHBOARD << " in your browser to view the charts." << endl;
     }
 
     return 0;

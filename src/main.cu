@@ -4,6 +4,7 @@
 #include <chrono>
 #include <fstream>
 #include <iomanip>
+
 #include "cpu_autoencoder.h"
 #include "data_loader.h"
 #include "model.h"

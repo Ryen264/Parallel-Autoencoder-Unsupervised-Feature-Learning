@@ -9,12 +9,12 @@ Gpu_Unique_Ptr::Gpu_Unique_Ptr(unsigned int n) {
 }
 
 Gpu_Unique_Ptr::Gpu_Unique_Ptr(Gpu_Unique_Ptr &&other) {
-  this->~Gpu_Unique_Ptr();
+  reset();
   _ptr = other._ptr;
 }
 
 Gpu_Unique_Ptr &Gpu_Unique_Ptr::operator=(Gpu_Unique_Ptr &&other) {
-  this->~Gpu_Unique_Ptr();
+  reset();
   _ptr = other._ptr;
 
   return *this;
@@ -39,12 +39,12 @@ Pinned_Unique_Ptr::Pinned_Unique_Ptr(unsigned int n) {
 }
 
 Pinned_Unique_Ptr::Pinned_Unique_Ptr(Pinned_Unique_Ptr &&other) {
-  this->~Pinned_Unique_Ptr();
+  reset();
   _ptr = other._ptr;
 }
 
 Pinned_Unique_Ptr &Pinned_Unique_Ptr::operator=(Pinned_Unique_Ptr &&other) {
-  this->~Pinned_Unique_Ptr();
+  reset();
   _ptr = other._ptr;
 
   return *this;

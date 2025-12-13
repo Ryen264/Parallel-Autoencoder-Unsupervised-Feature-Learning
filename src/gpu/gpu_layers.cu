@@ -1,7 +1,10 @@
 #include "constants.h"
 #include "gpu_layers.h"
+#include "gpu_unique_ptr.h"
 #include "macro.h"
 #include <algorithm>
+
+using std::max_element;
 
 // -------------------- Conv2D Forward --------------------
 __global__ void gpu_conv2D_kernel(float *in,
@@ -94,7 +97,7 @@ gpu_upsampling_kernel(float *in, float *out, int width, int height, int depth) {
   int new_width  = width * 2;
   int new_height = height * 2;
 
-  if (x >= new_width || y >= new_height || d >= depth)
+  if (x >= width || y >= height || d >= depth)
     return;
 
   int   out_x = 2 * x;
@@ -379,19 +382,23 @@ void gpu_upsampling(
   }
 }
 
-void gpu_mse_loss(float *expected,
-                  float *actual,
-                  float *mse,
-                  int    n,
-                  int    width,
-                  int    height,
-                  int    depth,
-                  dim3   block_size) {
-  int  size = n * width * height * depth;
-  dim3 grid_size((block_size.x + size - 1) / block_size.x + 1);
+float gpu_mse_loss(float *expected,
+                   float *actual,
+                   int    n,
+                   int    width,
+                   int    height,
+                   int    depth,
+                   dim3   block_size) {
+  int            size = n * width * height * depth;
+  dim3           grid_size((block_size.x + size - 1) / block_size.x + 1);
+  float          loss;
+  Gpu_Unique_Ptr d_loss(1);
 
-  gpu_mse_loss_kernel<<<grid_size, block_size>>>(expected, actual, mse, size);
+  gpu_mse_loss_kernel<<<grid_size, block_size>>>(expected, actual, d_loss, size);
   CUDA_CHECK(cudaGetLastError());
+  CUDA_CHECK(cudaMemcpy(&loss, d_loss.get(), sizeof(float), cudaMemcpyDeviceToHost));
+
+  return loss;
 }
 
 void gpu_mse_grad(float *expected,

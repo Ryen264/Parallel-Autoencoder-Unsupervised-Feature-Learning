@@ -169,7 +169,7 @@ public:
    *
    * @param filename The file to write the model's parameter
    */
-  void save_paramters(const char *filename) const;
+  void save_parameters(const char *filename) const;
 };
 
 #endif

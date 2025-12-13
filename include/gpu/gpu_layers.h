@@ -92,7 +92,6 @@ void gpu_upsampling(
  *
  * @param expected The expected result
  * @param actual The actual result
- * @param mse Pointer to the output value
  * @param n The number of images
  * @param width The width of the images
  * @param height The height of the images
@@ -100,14 +99,13 @@ void gpu_upsampling(
  * @param block_size The block size to call the kernel functions
  * @return float The MSE loss
  */
-void gpu_mse_loss(float *expected,
-                  float *actual,
-                  float *mse,
-                  int    n,
-                  int    width,
-                  int    height,
-                  int    depth,
-                  dim3   block_size);
+float gpu_mse_loss(float *expected,
+                   float *actual,
+                   int    n,
+                   int    width,
+                   int    height,
+                   int    depth,
+                   dim3   block_size);
 
 /**
  * @brief Mean squared error gradient

@@ -2,6 +2,8 @@
 #include "gpu_autoencoder.h"
 #include "gpu_layers.h"
 #include "macro.h"
+#include "progress_bar.h"
+#include "timer.h"
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
@@ -690,18 +692,27 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
   // Allocate memory for training
   _allocate_output_mem(batch_size, dataset.width, dataset.height);
 
+  Timer        timer;
+  Progress_Bar bar(batches.size(), "Batch");
+  float        total_time = 0;
+
   puts("=======================TRAINING START=======================");
   for (int epoch = 1; epoch <= n_epoch; ++epoch) {
-    printf("Epoch %d:\n", epoch);
+    bar.update();
+    timer.start();
 
     float total_loss = 0;
     for (const Dataset &batch : batches) {
       total_loss += _fit_batch(batch, learning_rate) * batch.n;
     }
 
+    timer.stop();
+    float epoch_time  = timer.get();
+    total_time       += epoch_time;
+
     // Print average loss for the epoch
     float avg_loss = total_loss / dataset.n;
-    printf("  Loss: %.4f\n", avg_loss);
+    printf("Time: %.2f (ms), Loss: %.4f\n", epoch_time, avg_loss);
 
     // Save at checkpoints
     if (checkpoint > 0 && epoch % checkpoint == 0) {
@@ -720,6 +731,8 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
   stringstream builder;
   builder << output_dir << '/' << "gpu_autoencoder_.bin";
   save_parameters(builder.str().c_str());
+
+  printf("\nTotal time: %.2f (ms)", total_time);
 }
 
 Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const {

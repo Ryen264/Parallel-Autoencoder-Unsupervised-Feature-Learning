@@ -13,11 +13,12 @@ Progress_Bar::Progress_Bar(int step, const string &text, int size)
 
 void Progress_Bar::update() {
   if (_cur_step == _step) {
-    printf("%d/%d: [%s] (100%%)\n", _text.c_str(), _cur_step, _step, _progress.c_str());
+    printf(
+        "%s %d/%d: [%s] (100%%)\n", _text.c_str(), _cur_step, _step, _progress.c_str());
   } else {
     int percentage = round(100.0f * _cur_step / _step);
     int progress   = _cur_step * _size / _step;
-    printf("%0*d/%d: [%.*s%c%.*s] (%02d%%)\n",
+    printf("%s %0*d/%d: [%.*s%c%.*s] (%02d%%)\n",
            _text.c_str(),
            _number_padding,
            _cur_step,

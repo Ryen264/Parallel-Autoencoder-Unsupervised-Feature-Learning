@@ -10,8 +10,8 @@ class Timer {
   cudaEvent_t _stop;
 
 public:
-  GpuTimer();
-  ~GpuTimer();
+  Timer();
+  ~Timer();
 
   void  start();
   void  stop();

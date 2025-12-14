@@ -22,23 +22,14 @@ using std::swap;
  *
  * @param arr The array
  * @param n The number of elements
- */
-__global__ void generate_array_kernel(float *arr, int n) {
-  for (int i = 0; i < n; ++i)
-    ptr[i] = 1.0f * rand() / RAND_MAX;
-}
-
-/**
- * @brief Generate a random array with elements between 0 and 1
- *
- * @param arr The array
- * @param n The number of elements
  * @param block_size The block size to perform the operation
  */
 void generate_array(const Gpu_Unique_Ptr &arr, int n, dim3 block_size) {
-  dim3 grid_size((n + block_size.x - 1) / block_size.x + 1);
-  generate_array_kernel<<<grid_size, block_size>>>(arr.get(), n);
-  CUDA_CHECK(cudaGetLastError());
+  vector<float> tmp(n);
+  for (int i = 0; i < n; ++i)
+    tmp[i] = 1.0f * rand() / RAND_MAX;
+  CUDA_CHECK(
+      cudaMemcpy(arr.get(), tmp.data(), n * sizeof(float), cudaMemcpyHostToDevice));
 }
 
 /**
@@ -410,7 +401,7 @@ float Gpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
 
   // Calculate loss before backprop
   float loss = gpu_mse_loss(
-      _batch_data.get(), _res_data.get_data(), n, width, height, depth, _block_size_1D);
+      _batch_data.get(), _res_data.get(), n, width, height, depth, _block_size_1D);
 
   // Get loss gradient
   gpu_mse_grad(_batch_data.get(),
@@ -732,7 +723,7 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
   builder << output_dir << '/' << "gpu_autoencoder_.bin";
   save_parameters(builder.str().c_str());
 
-  printf("\nTotal time: %.2f (ms)", total_time);
+  printf("\nTotal time: %.2f (ms), Loss: %.4f\n", total_time, eval(dataset));
 }
 
 Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const {
@@ -962,9 +953,10 @@ float Gpu_Autoencoder::eval(const Dataset &dataset) const {
 
   Gpu_Unique_Ptr a(size);
   Gpu_Unique_Ptr b(size);
-  CUDA_CHECK(
-      cudaMemcpy(a.get(), dataset.get_data(), size * sizeof(float), cudaMemcpyHost));
-  CUDA_CHECK(cudaMemcpy(b.get(), res.get_data(), size * sizeof(float), cudaMemcpyHost));
+  CUDA_CHECK(cudaMemcpy(
+      a.get(), dataset.get_data(), size * sizeof(float), cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(
+      b.get(), res.get_data(), size * sizeof(float), cudaMemcpyHostToDevice));
   return gpu_mse_loss(a.get(), b.get(), n, width, height, depth, _block_size_1D);
 }
 

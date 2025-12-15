@@ -50,7 +50,7 @@ static void readBinaryFile(const char* filepath, unsigned char** raw_data, int n
     size_t read_size = fread(*raw_data, 1, total_size, file);
     if (read_size != total_size) {
         fprintf(stderr, "Error: Could not read complete file %s\n", filepath);
-        free(*raw_data);
+        if (*raw_data) free(*raw_data);
         fclose(file);
         exit(EXIT_FAILURE);
     }
@@ -93,7 +93,7 @@ static void parseAndNormalize(unsigned char* raw_data, float* images, int* label
         CUDA_CHECK(cudaMemcpy(images, d_images, image_data_size * sizeof(float), cudaMemcpyDeviceToHost));
         
         // Cleanup
-        free(raw_images);
+        if (raw_images) free(raw_images);
         CUDA_CHECK(cudaFree(d_raw_images));
         CUDA_CHECK(cudaFree(d_images));
     } else {

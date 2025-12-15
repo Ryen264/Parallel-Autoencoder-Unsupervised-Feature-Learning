@@ -2,19 +2,16 @@
 #include "cpu_autoencoder.h"
 #include "cpu_layers.h"
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
 #include <sstream>
+#include <utility>
 
-using std::ifstream, std::ofstream;
-using std::max_element;
-using std::memcpy;
-using std::printf, std::puts;
-using std::stringstream;
-using std::swap;
+using namespace std;
 
-string AUTOENCODER_FILENAME = "autoencoder_.bin";
+string AUTOENCODER_FILENAME = "autoencoder.bin";
 
 /**
  * @brief Generate a random array with elements between 0 and 1
@@ -22,7 +19,7 @@ string AUTOENCODER_FILENAME = "autoencoder_.bin";
  * @param arr The array
  * @param n The number of elements
  */
-void generate_array(const std::unique_ptr<float[]> &arr, int n) {
+void generate_array(const unique_ptr<float[]> &arr, int n) {
   float *ptr = arr.get();
   for (int i = 0; i < n; ++i)
     ptr[i] = 1.0f * rand() / RAND_MAX;
@@ -35,7 +32,7 @@ void generate_array(const std::unique_ptr<float[]> &arr, int n) {
  * @param data The data
  * @param size Number of bytes to read
  */
-void read_data(std::ifstream &buffer, const std::unique_ptr<float[]> &data, int size) {
+void read_data(ifstream &buffer, const unique_ptr<float[]> &data, int size) {
   char *ptr = reinterpret_cast<char *>(data.get());
   buffer.read(ptr, size);
 }
@@ -47,7 +44,7 @@ void read_data(std::ifstream &buffer, const std::unique_ptr<float[]> &data, int 
  * @param data The data
  * @param size Number of bytes to write
  */
-void write_data(std::ostream &buffer, const std::unique_ptr<float[]> &data, int size) {
+void write_data(ostream &buffer, const unique_ptr<float[]> &data, int size) {
   const char *ptr = reinterpret_cast<const char *>(data.get());
   buffer.write(ptr, size);
 }
@@ -70,15 +67,15 @@ Cpu_Autoencoder::Cpu_Autoencoder() {
   generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE);
   generate_array(_decoder_bias_2, DECODER_FILTER_2_DEPTH);
 
-  generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE);
-  generate_array(_decoder_bias_2, DECODER_FILTER_2_DEPTH);
+  generate_array(_decoder_filter_3, DECODER_FILTER_3_SIZE);
+  generate_array(_decoder_bias_3, DECODER_FILTER_3_DEPTH);
 };
 
 Cpu_Autoencoder::Cpu_Autoencoder(const char *filename) {
   _allocate_mem();
 
   // Read from file
-  ifstream buffer(filename, std::ios::in | std::ios::binary);
+  ifstream buffer(filename, ios::in | ios::binary);
 
   // Read first encoder conv2D layer
   read_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
@@ -96,7 +93,7 @@ Cpu_Autoencoder::Cpu_Autoencoder(const char *filename) {
   read_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
   read_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
 
-  // Read third encoder conv2D layer
+  // Read third decoder conv2D layer
   read_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
   read_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
 };
@@ -169,7 +166,7 @@ Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
 
   // Dim: n * w/2 * w/2 * 128
   cpu_add_bias(_out_encoder_filter_2.get(),
-               _encoder_bias_1.get(),
+               _encoder_bias_2.get(),
                _out_encoder_bias_2.get(),
                n,
                width / 2,
@@ -196,7 +193,7 @@ Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
   Dataset res(n, width / 4, height / 4, ENCODER_FILTER_2_DEPTH);
   memcpy(res.get_data(),
          _out_max_pooling_2.get(),
-         n * width / 4 * height / 4 * ENCODER_FILTER_2_DEPTH * sizeof(float));
+         n * (width / 4) * (height / 4) * ENCODER_FILTER_2_DEPTH * sizeof(float));
 
   return res;
 }
@@ -295,8 +292,8 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
                4 * height,
                DECODER_FILTER_3_DEPTH);
 
-  // Return the result (Dim: n * w/4 * w/4 * 128)
-  Dataset res(n, width / 4, height / 4, ENCODER_FILTER_2_DEPTH);
+  // Return the result (Dim: n * 4w * 4h * 3)
+  Dataset res(n, 4 * width, 4 * height, DECODER_FILTER_3_DEPTH);
   memcpy(res.get_data(),
          _out_decoder_bias_3.get(),
          n * 4 * width * 4 * height * DECODER_FILTER_3_DEPTH * sizeof(float));
@@ -581,6 +578,7 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
 
   printf("=======================TRAINING START=======================\n");
   for (int epoch = 1; epoch <= n_epoch; ++epoch) {
+    auto start = chrono::high_resolution_clock::now();
     printf("Epoch %d:\n", epoch);
 
     float total_loss = 0;
@@ -590,7 +588,9 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
 
     // Print average loss for the epoch
     float avg_loss = total_loss / dataset.n;
-    printf("  Loss: %.4f\n", avg_loss);
+    auto end = chrono::high_resolution_clock::now();
+    auto duration = chrono::duration_cast<chrono::milliseconds>(end - start);
+    printf("  Loss: %.4f, Time: %lld ms\n", avg_loss, duration.count());
 
     // Save at checkpoints
     if (checkpoint > 0 && epoch % checkpoint == 0) {
@@ -614,7 +614,7 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
 Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
   // Encode by batches to use less memory
   int width = dataset.width, height = dataset.height, depth = dataset.depth;
-  int encoded_image_bytes = width / 4 * height / 4 * ENCODER_FILTER_2_DEPTH * sizeof(float);
+  int encoded_image_bytes = (width / 4) * (height / 4) * ENCODER_FILTER_2_DEPTH * sizeof(float);
   int offset = 0;
 
   vector<Dataset> batches = create_minibatches(dataset, ENCODE_BATCH_SIZE);
@@ -788,7 +788,7 @@ float Cpu_Autoencoder::eval(const Dataset &dataset) {
 }
 
 void Cpu_Autoencoder::save_parameters(const char *filename) const {
-  ofstream buffer(filename, std::ios::out | std::ios::binary);
+  ofstream buffer(filename, ios::out | ios::binary);
 
   // Write first encoder conv2D layer
   write_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
@@ -806,7 +806,7 @@ void Cpu_Autoencoder::save_parameters(const char *filename) const {
   write_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
   write_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
 
-  // Write third encoder conv2D layer
+  // Write third decoder conv2D layer
   write_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
   write_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
 }

@@ -4,12 +4,12 @@
 #include <vector>
 #include <string>
 
-// #include <libsvm/svm.h>
-// !git clone https://github.com/cjlin1/libsvm.git
-#include "/content/libsvm/svm.h"
+// Include cuML SVM header
+#include <cuml/svm/svm.hpp>
 using namespace std;
 
 class SVMmodel {
+
 /*
 Train SVM (Library)
 + Input: train_features + labels  
@@ -23,15 +23,12 @@ Evaluate
 + Compare with baseline methods
 */
 private:
-    svm_model* model;
-    svm_parameter parameters;
+    cuml::SVM<double> model;
+    cuml::SVMParams parameters;
     double accuracy;
     bool isTrained;
     
     // Helper methods
-    svm_problem* createProblem(const vector<vector<double>>& data, 
-                              const vector<int>& labels);
-    void freeProblem(svm_problem* problem);
     void initializeParameters();
 
 public:

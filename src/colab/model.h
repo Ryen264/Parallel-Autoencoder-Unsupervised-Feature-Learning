@@ -3,10 +3,10 @@
 
 #include <vector>
 #include <string>
+
 // #include <libsvm/svm.h>
 // !git clone https://github.com/cjlin1/libsvm.git
 #include "/content/libsvm/svm.h"
-
 using namespace std;
 
 class SVMmodel {

@@ -1,10 +1,9 @@
 #include <algorithm>
 #include <cstring>
+
 #include "constants.h"
 #include "cpu_layers.h"
-
-using std::max_element;
-using std::memset;
+using namespace std;
 
 #define SQR(x)                              ((x) * (x))
 #define MAX(a, b)                           ((a) > (b) ? (a) : (b))

@@ -3,9 +3,11 @@
 
 #include <vector>
 #include <string>
-#include <libsvm/svm.h>
-//!git clone https://github.com/cjlin1/libsvm.git
-//#include "/content/libsvm/svm.h"
+
+// #include <libsvm/svm.h>
+// !git clone https://github.com/cjlin1/libsvm.git
+#include "/content/libsvm/svm.h"
+using namespace std;
 
 class SVMmodel {
 /*
@@ -27,8 +29,8 @@ private:
     bool isTrained;
     
     // Helper methods
-    svm_problem* createProblem(const std::vector<std::vector<double>>& data, 
-                              const std::vector<int>& labels);
+    svm_problem* createProblem(const vector<vector<double>>& data, 
+                              const vector<int>& labels);
     void freeProblem(svm_problem* problem);
     void initializeParameters();
 
@@ -38,25 +40,25 @@ public:
     ~SVMmodel();
 
     // Training
-    void train(const std::vector<std::vector<double>>& data, const std::vector<int>& labels);
+    void train(const vector<vector<double>>& data, const vector<int>& labels);
     
     // Prediction
-    int predict(const std::vector<double>& sample) const;
-    std::vector<int> predictBatch(const std::vector<std::vector<double>>& samples) const;
+    int predict(const vector<double>& sample) const;
+    vector<int> predictBatch(const vector<vector<double>>& samples) const;
     
     // Testing
-    double test(const std::vector<std::vector<double>>& testData, 
-               const std::vector<int>& testLabels);
-    void printConfusionMatrix(const std::vector<int>& predicted, 
-                             const std::vector<int>& actual, int numClasses = 10);
+    double test(const vector<vector<double>>& testData, 
+               const vector<int>& testLabels);
+    void printConfusionMatrix(const vector<int>& predicted, 
+                             const vector<int>& actual, int numClasses = 10);
     
     // Model persistence
-    bool save(const std::string& modelPath) const;
-    bool load(const std::string& modelPath);
+    bool save(const string& modelPath) const;
+    bool load(const string& modelPath);
     
     // Utility methods
     double getAccuracy() const;
-    bool isTrained() const;
+    bool getIsTrained() const;
     void printModelInfo() const;
 };
 

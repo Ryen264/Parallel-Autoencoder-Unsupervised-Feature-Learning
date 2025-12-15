@@ -1,6 +1,8 @@
 #include <iostream>
 #include <cstdlib>
-#include "../include/model.h"
+
+#include "model.h"
+using namespace std;
 
 // Constructor
 SVMmodel::SVMmodel() : model(nullptr), accuracy(0.0), isTrained(false) {
@@ -11,7 +13,10 @@ SVMmodel::SVMmodel() : model(nullptr), accuracy(0.0), isTrained(false) {
 SVMmodel::~SVMmodel() {
     if (model != nullptr) {
         svm_free_model_content(model);
-        free(model);
+        if (model) free((void *)model);
+        else {
+            cerr << "Error: Memory deallocation failed" << endl;
+        }
     }
 }
 
@@ -33,8 +38,8 @@ void SVMmodel::initializeParameters() {
     parameters.weight = nullptr;
 }
 
-svm_problem* SVMmodel::createProblem(const std::vector<std::vector<double>>& data, 
-                                     const std::vector<int>& labels) {
+svm_problem* SVMmodel::createProblem(const vector<vector<double>>& data, 
+                                     const vector<int>& labels) {
     int numSamples = data.size();
     int numFeatures = data[0].size();
     
@@ -64,23 +69,35 @@ svm_problem* SVMmodel::createProblem(const std::vector<std::vector<double>>& dat
 void SVMmodel::freeProblem(svm_problem* problem) {
     if (problem != nullptr) {
         for (int i = 0; i < problem->l; i++) {
-            free(problem->x[i]);
+            if (problem->x[i]) free((void *)problem->x[i]);
+            else {
+                cerr << "Error: Memory deallocation failed" << endl;
+            }
         }
-        free(problem->x);
-        free(problem->y);
-        free(problem);
+        if (problem->x) free((void *)problem->x);
+        else {
+            cerr << "Error: Memory deallocation failed" << endl;
+        }
+        if (problem->y) free((void *)problem->y);
+        else {
+            cerr << "Error: Memory deallocation failed" << endl;
+        }
+        if (problem) free((void *)problem);
+        else {
+            cerr << "Error: Memory deallocation failed" << endl;
+        }
     }
 }
 
-void SVMmodel::train(const std::vector<std::vector<double>>& data, 
-                     const std::vector<int>& labels) {
+void SVMmodel::train(const vector<vector<double>>& data, 
+                     const vector<int>& labels) {
     if (data.empty() || labels.empty()) {
-        std::cerr << "Error: Empty training data" << std::endl;
+        cerr << "Error: Empty training data" << endl;
         return;
     }
     
     if (data.size() != labels.size()) {
-        std::cerr << "Error: Data and labels size mismatch" << std::endl;
+        cerr << "Error: Data and labels size mismatch" << endl;
         return;
     }
     
@@ -90,7 +107,7 @@ void SVMmodel::train(const std::vector<std::vector<double>>& data,
     // Check parameters
     const char* errMsg = svm_check_parameter(problem, &parameters);
     if (errMsg != nullptr) {
-        std::cerr << "Error: " << errMsg << std::endl;
+        cerr << "Error: " << errMsg << endl;
         freeProblem(problem);
         return;
     }
@@ -101,12 +118,12 @@ void SVMmodel::train(const std::vector<std::vector<double>>& data,
     
     freeProblem(problem);
     isTrained = true;
-    std::cout << "Model trained successfully" << std::endl;
+    cout << "Model trained successfully" << endl;
 }
 
-int SVMmodel::predict(const std::vector<double>& sample) const {
+int SVMmodel::predict(const vector<double>& sample) const {
     if (!isTrained || model == nullptr) {
-        std::cerr << "Error: Model not trained" << std::endl;
+        cerr << "Error: Model not trained" << endl;
         return -1;
     }
     
@@ -122,26 +139,29 @@ int SVMmodel::predict(const std::vector<double>& sample) const {
     // Predict
     double prediction = svm_predict(model, x);
     
-    free(x);
+    if (x) free((void *)x);
+    else {
+        cerr << "Error: Memory deallocation failed" << endl;
+    }
     return (int)prediction;
 }
 
-std::vector<int> SVMmodel::predictBatch(const std::vector<std::vector<double>>& samples) const {
-    std::vector<int> predictions;
+vector<int> SVMmodel::predictBatch(const vector<vector<double>>& samples) const {
+    vector<int> predictions;
     for (const auto& sample : samples) {
         predictions.push_back(predict(sample));
     }
     return predictions;
 }
 
-double SVMmodel::test(const std::vector<std::vector<double>>& testData, 
-                      const std::vector<int>& testLabels) {
+double SVMmodel::test(const vector<vector<double>>& testData, 
+                      const vector<int>& testLabels) {
     if (!isTrained || model == nullptr) {
-        std::cerr << "Error: Model not trained" << std::endl;
+        cerr << "Error: Model not trained" << endl;
         return 0.0;
     }
     
-    std::vector<int> predictions = predictBatch(testData);
+    vector<int> predictions = predictBatch(testData);
     
     int correct = 0;
     for (size_t i = 0; i < testLabels.size(); i++) {
@@ -152,7 +172,7 @@ double SVMmodel::test(const std::vector<std::vector<double>>& testData,
     
     accuracy = (double)correct / testLabels.size();
     
-    std::cout << "Test Accuracy: " << (accuracy * 100.0) << "%" << std::endl;
+    cout << "Test Accuracy: " << (accuracy * 100.0) << "%" << endl;
     
     // Print confusion matrix
     printConfusionMatrix(predictions, testLabels);
@@ -160,9 +180,9 @@ double SVMmodel::test(const std::vector<std::vector<double>>& testData,
     return accuracy;
 }
 
-void SVMmodel::printConfusionMatrix(const std::vector<int>& predicted, 
-                                   const std::vector<int>& actual, int numClasses) {
-    std::vector<std::vector<int>> confusionMatrix(numClasses, std::vector<int>(numClasses, 0));
+void SVMmodel::printConfusionMatrix(const vector<int>& predicted, 
+                                   const vector<int>& actual, int numClasses) {
+    vector<vector<int>> confusionMatrix(numClasses, vector<int>(numClasses, 0));
     
     for (size_t i = 0; i < actual.size(); i++) {
         if (actual[i] >= 0 && actual[i] < numClasses && 
@@ -171,47 +191,47 @@ void SVMmodel::printConfusionMatrix(const std::vector<int>& predicted,
         }
     }
     
-    std::cout << "\nConfusion Matrix:" << std::endl;
-    std::cout << "Actual \\ Predicted | ";
+    cout << "\nConfusion Matrix:" << endl;
+    cout << "Actual \\ Predicted | ";
     for (int i = 0; i < numClasses; i++) {
-        std::cout << i << " ";
+        cout << i << " ";
     }
-    std::cout << std::endl;
-    std::cout << "--------------------" << std::endl;
+    cout << endl;
+    cout << "--------------------" << endl;
     
     for (int i = 0; i < numClasses; i++) {
-        std::cout << i << " | ";
+        cout << i << " | ";
         for (int j = 0; j < numClasses; j++) {
-            std::cout << confusionMatrix[i][j] << " ";
+            cout << confusionMatrix[i][j] << " ";
         }
-        std::cout << std::endl;
+        cout << endl;
     }
 }
 
-bool SVMmodel::save(const std::string& modelPath) const {
+bool SVMmodel::save(const string& modelPath) const {
     if (!isTrained || model == nullptr) {
-        std::cerr << "Error: Model not trained or invalid" << std::endl;
+        cerr << "Error: Model not trained or invalid" << endl;
         return false;
     }
     
     if (svm_save_model(modelPath.c_str(), model) != 0) {
-        std::cerr << "Error: Failed to save model to " << modelPath << std::endl;
+        cerr << "Error: Failed to save model to " << modelPath << endl;
         return false;
     }
     
-    std::cout << "Model saved to " << modelPath << std::endl;
+    cout << "Model saved to " << modelPath << endl;
     return true;
 }
 
-bool SVMmodel::load(const std::string& modelPath) {
+bool SVMmodel::load(const string& modelPath) {
     model = svm_load_model(modelPath.c_str());
     if (model == nullptr) {
-        std::cerr << "Error: Failed to load model from " << modelPath << std::endl;
+        cerr << "Error: Failed to load model from " << modelPath << endl;
         return false;
     }
     
     isTrained = true;
-    std::cout << "Model loaded from " << modelPath << std::endl;
+    cout << "Model loaded from " << modelPath << endl;
     return true;
 }
 
@@ -219,22 +239,22 @@ double SVMmodel::getAccuracy() const {
     return accuracy;
 }
 
-bool SVMmodel::isTrained() const {
+bool SVMmodel::getIsTrained() const {
     return isTrained;
 }
 
 void SVMmodel::printModelInfo() const {
     if (!isTrained || model == nullptr) {
-        std::cout << "Model is not trained" << std::endl;
+        cout << "Model is not trained" << endl;
         return;
     }
     
-    std::cout << "\n=== SVM Model Information ===" << std::endl;
-    std::cout << "Number of support vectors: " << model->l << std::endl;
-    std::cout << "Number of classes: " << model->nr_class << std::endl;
-    std::cout << "Number of features: " << model->SV[0] != nullptr ? "computed" : "unknown" << std::endl;
-    std::cout << "Kernel type: RBF" << std::endl;
-    std::cout << "C parameter: " << parameters.C << std::endl;
-    std::cout << "Accuracy: " << (accuracy * 100.0) << "%" << std::endl;
-    std::cout << "============================\n" << std::endl;
+    cout << "\n=== SVM Model Information ===" << endl;
+    cout << "Number of support vectors: " << model->l << endl;
+    cout << "Number of classes: " << model->nr_class << endl;
+    cout << "Number of features: " << (model->SV[0] != nullptr ? "computed" : "unknown") << endl;
+    cout << "Kernel type: RBF" << endl;
+    cout << "C parameter: " << parameters.C << endl;
+    cout << "Accuracy: " << (accuracy * 100.0) << "%" << endl;
+    cout << "============================\n" << endl;
 }

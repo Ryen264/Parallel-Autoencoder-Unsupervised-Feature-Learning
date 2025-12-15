@@ -1,15 +1,10 @@
-#ifndef DATA_H
-#define DATA_H
+#ifndef DATASET_H
+#define DATASET_H
 
 // Use unique_ptr to prevent memory leak
 #include <memory>
 #include <vector>
-
 using namespace std;
-
-using std::move;
-using std::unique_ptr, std::make_unique;
-using std::vector;
 
 /**
  * @brief Struct that represents a list of image (either encoded or decoded)
@@ -73,7 +68,7 @@ struct Dataset {
      * @return float* The flatten images
      */
     float *get_data() const;
-    
+
     /**
      * @brief Get the labels of the dataset
      *

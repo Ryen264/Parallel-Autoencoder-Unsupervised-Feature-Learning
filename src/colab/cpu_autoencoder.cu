@@ -1,6 +1,3 @@
-#include "constants.h"
-#include "cpu_autoencoder.h"
-#include "cpu_layers.h"
 #include <algorithm>
 #include <chrono>
 #include <cstdio>
@@ -9,6 +6,9 @@
 #include <sstream>
 #include <utility>
 
+#include "constants.h"
+#include "cpu_autoencoder.h"
+#include "cpu_layers.h"
 using namespace std;
 
 string AUTOENCODER_FILENAME = "autoencoder.bin";
@@ -590,7 +590,7 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
     float avg_loss = total_loss / dataset.n;
     auto end = chrono::high_resolution_clock::now();
     auto duration = chrono::duration_cast<chrono::milliseconds>(end - start);
-    printf("  Loss: %.4f, Time: %lld ms\n", avg_loss, duration.count());
+    printf("  Loss: %.4f, Time: %ld ms\n", avg_loss, duration.count());
 
     // Save at checkpoints
     if (checkpoint > 0 && epoch % checkpoint == 0) {

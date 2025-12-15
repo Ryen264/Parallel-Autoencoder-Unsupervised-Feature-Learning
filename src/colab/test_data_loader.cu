@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <cuda_runtime.h>
 #include <math.h>
+
 #include "data_loader.h"
 #include "constants.h"
 

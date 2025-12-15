@@ -50,6 +50,8 @@ Dataset phase_1_cpu(const char *dataset_dir, const char *output_dir,
 
     // Create and train model
     Cpu_Autoencoder autoencoder;
+    printf("Training Autoencoder for %d epochs with batch size %d and learning rate %.4f\n", 
+           n_epoch, batch_size, learning_rate);
     autoencoder.fit(dataset, n_epoch, batch_size, learning_rate, verbose, checkpoint, output_dir);
 
     // Eval
@@ -136,7 +138,8 @@ int main(int argc, char *argv[]) {
         cout << "Phase 1: Training Autoencoder" << endl;
         
         auto start_time = chrono::high_resolution_clock::now();
-        Dataset encoded_dataset = phase_1_cpu(DATASET_DIR.c_str(), MODEL_OUTPUT_DIR.c_str(),
+        bool is_train = true;
+        Dataset encoded_dataset = phase_1_cpu(DATASET_DIR.c_str(), MODEL_OUTPUT_DIR.c_str(), is_train,
                                                 N_EPOCH, BATCH_SIZE, LEARNING_RATE, VERBOSE, CHECKPOINT);
         auto end_time = chrono::high_resolution_clock::now();
         

@@ -206,8 +206,8 @@ void shuffle_dataset(Dataset &dataset) {
 
     // Copy data base on indices
     for (int i = 0; i < n; ++i) {
-        memcpy(new_data.get() + i * image_bytes, data + indices[i] * image_bytes, image_bytes);
-        memcpy(new_labels.get() + i * sizeof(int), labels + indices[i] * sizeof(int), sizeof(int));
+        memcpy(new_data.get() + i * image_size, data + indices[i] * image_size, image_bytes);
+        memcpy(new_labels.get() + i, labels + indices[i], sizeof(int));
     }
 
     // Change the pointers of the original dataset

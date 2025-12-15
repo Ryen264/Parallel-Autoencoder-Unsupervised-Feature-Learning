@@ -17,7 +17,7 @@ class Cpu_Autoencoder {
   unique_ptr<float[]> _out_encoder_bias_1;
 
   unique_ptr<float[]> _out_encoder_relu_1;
-  unique_ptr<float[]> _out_max_pooling_1;
+  unique_ptr<float[]> _out_avg_pooling_1;
 
   unique_ptr<float[]> _encoder_filter_2;
   unique_ptr<float[]> _encoder_bias_2;
@@ -25,7 +25,7 @@ class Cpu_Autoencoder {
   unique_ptr<float[]> _out_encoder_bias_2;
 
   unique_ptr<float[]> _out_encoder_relu_2;
-  unique_ptr<float[]> _out_max_pooling_2;
+  unique_ptr<float[]> _out_avg_pooling_2;
 
   unique_ptr<float[]> _decoder_filter_1;
   unique_ptr<float[]> _decoder_bias_1;

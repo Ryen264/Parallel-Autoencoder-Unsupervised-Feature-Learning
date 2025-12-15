@@ -20,7 +20,7 @@ using std::stringstream;
 using std::swap;
 
 /**
- * @brief Generate a random array with elements between -0.001 and 0.001
+ * @brief Generate a random array with elements between -0.01 and 0.01
  *
  * @param arr The array
  * @param n The number of elements
@@ -28,7 +28,7 @@ using std::swap;
 void generate_array(float *arr, int n) {
   vector<float> tmp(n);
   for (int i = 0; i < n; ++i)
-    tmp[i] = 0.002f * (rand() - RAND_MAX / 2) / RAND_MAX;
+    tmp[i] = 0.2f * (rand() - RAND_MAX / 2) / RAND_MAX;
   CUDA_CHECK(cudaMemcpy(arr, tmp.data(), n * sizeof(float), cudaMemcpyHostToDevice));
 }
 
@@ -574,14 +574,8 @@ float Gpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
                     _block_size_1D);
 
   // Max pooling backwards (dim: n * w/2 * w/2 * 128)
-  gpu_avg_pooling_backward(_out_encoder_relu_2,
-                           d_out,
-                           d_in,
-                           n,
-                           width / 2,
-                           height / 2,
-                           ENCODER_FILTER_2_DEPTH,
-                           _block_size_3D_2);
+  gpu_avg_pooling_backward(
+      d_out, d_in, n, width / 2, height / 2, ENCODER_FILTER_2_DEPTH, _block_size_3D_2);
 
   gpu_relu_backward(_out_encoder_bias_2,
                     d_in,
@@ -626,14 +620,8 @@ float Gpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
                     learning_rate,
                     _block_size_1D);
 
-  gpu_avg_pooling_backward(_out_encoder_relu_1,
-                           d_out,
-                           d_in,
-                           n,
-                           width,
-                           height,
-                           ENCODER_FILTER_1_DEPTH,
-                           _block_size_3D_1);
+  gpu_avg_pooling_backward(
+      d_out, d_in, n, width, height, ENCODER_FILTER_1_DEPTH, _block_size_3D_1);
 
   gpu_relu_backward(_out_encoder_bias_1,
                     d_in,
@@ -720,10 +708,7 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
     }
 
     total_time += epoch_time;
-
-    // Print average loss for the epoch
-    float avg_loss = total_loss / dataset.n;
-    printf("\nTime: %s, Loss: %.4f\n\n", format_time(epoch_time).c_str(), avg_loss);
+    puts("\n");
 
     // Save at checkpoints
     if (checkpoint > 0 && epoch % checkpoint == 0) {

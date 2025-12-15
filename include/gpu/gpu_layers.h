@@ -70,7 +70,7 @@ void gpu_relu(
  * @param depth The depth of the input array
  * @param block_size The block size to call the kernel functions
  */
-void gpu_max_pooling(
+void gpu_avg_pooling(
     float *in, float *out, int n, int width, int height, int depth, dim3 block_size);
 
 /**
@@ -161,7 +161,7 @@ void gpu_relu_backward(float *in,
  * @param depth The depth of the images
  * @param block_size The block size to call the kernel functions
  */
-void gpu_max_pooling_backward(float *in,
+void gpu_avg_pooling_backward(float *in,
                               float *d_out,
                               float *d_in,
                               int    n,

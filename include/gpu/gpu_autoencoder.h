@@ -2,66 +2,65 @@
 #define CPU_AUTOENCODER_H
 
 #include "data_loader.h"
-#include "gpu_unique_ptr.h"
 
 /**
  * @brief The class that encapsulates the network using CPU
  *
  */
 class Gpu_Autoencoder {
-  Gpu_Unique_Ptr _encoder_filter_1;
-  Gpu_Unique_Ptr _encoder_bias_1;
+  float *_encoder_filter_1;
+  float *_encoder_bias_1;
 
   // Save output for backwards propogation
-  Gpu_Unique_Ptr _out_encoder_filter_1;
-  Gpu_Unique_Ptr _out_encoder_bias_1;
+  float *_out_encoder_filter_1;
+  float *_out_encoder_bias_1;
 
-  Gpu_Unique_Ptr _out_encoder_relu_1;
-  Gpu_Unique_Ptr _out_max_pooling_1;
+  float *_out_encoder_relu_1;
+  float *_out_avg_pooling_1;
 
-  Gpu_Unique_Ptr _encoder_filter_2;
-  Gpu_Unique_Ptr _encoder_bias_2;
-  Gpu_Unique_Ptr _out_encoder_filter_2;
-  Gpu_Unique_Ptr _out_encoder_bias_2;
+  float *_encoder_filter_2;
+  float *_encoder_bias_2;
+  float *_out_encoder_filter_2;
+  float *_out_encoder_bias_2;
 
-  Gpu_Unique_Ptr _out_encoder_relu_2;
-  Gpu_Unique_Ptr _out_max_pooling_2;
+  float *_out_encoder_relu_2;
+  float *_out_avg_pooling_2;
 
-  Gpu_Unique_Ptr _decoder_filter_1;
-  Gpu_Unique_Ptr _decoder_bias_1;
-  Gpu_Unique_Ptr _out_decoder_filter_1;
-  Gpu_Unique_Ptr _out_decoder_bias_1;
+  float *_decoder_filter_1;
+  float *_decoder_bias_1;
+  float *_out_decoder_filter_1;
+  float *_out_decoder_bias_1;
 
-  Gpu_Unique_Ptr _out_decoder_relu_1;
-  Gpu_Unique_Ptr _out_upsampling_1;
+  float *_out_decoder_relu_1;
+  float *_out_upsampling_1;
 
-  Gpu_Unique_Ptr _decoder_filter_2;
-  Gpu_Unique_Ptr _decoder_bias_2;
-  Gpu_Unique_Ptr _out_decoder_filter_2;
-  Gpu_Unique_Ptr _out_decoder_bias_2;
+  float *_decoder_filter_2;
+  float *_decoder_bias_2;
+  float *_out_decoder_filter_2;
+  float *_out_decoder_bias_2;
 
-  Gpu_Unique_Ptr _out_decoder_relu_2;
-  Gpu_Unique_Ptr _out_upsampling_2;
+  float *_out_decoder_relu_2;
+  float *_out_upsampling_2;
 
-  Gpu_Unique_Ptr _decoder_filter_3;
-  Gpu_Unique_Ptr _decoder_bias_3;
-  Gpu_Unique_Ptr _out_decoder_filter_3;
-  Gpu_Unique_Ptr _out_decoder_bias_3;
+  float *_decoder_filter_3;
+  float *_decoder_bias_3;
+  float *_out_decoder_filter_3;
+  float *_out_decoder_bias_3;
 
   // Gradients
-  Gpu_Unique_Ptr _d_in;
-  Gpu_Unique_Ptr _d_out;
-  Gpu_Unique_Ptr _d_filter;
+  float *_d_in;
+  float *_d_out;
+  float *_d_filter;
 
   // Batch data
-  Gpu_Unique_Ptr _batch_data;
-  Gpu_Unique_Ptr _res_data;
+  float *_batch_data;
+  float *_res_data;
 
   // Block sizes
   static constexpr dim3 _block_size_1D   = dim3(1024);
-  static constexpr dim3 _block_size_3D_1 = dim3(32, 32, 1);
-  static constexpr dim3 _block_size_3D_2 = dim3(16, 16, 4);
-  static constexpr dim3 _block_size_3D_3 = dim3(8, 8, 16);
+  static constexpr dim3 _block_size_3D_1 = dim3(1, 32, 32);
+  static constexpr dim3 _block_size_3D_2 = dim3(4, 16, 16);
+  static constexpr dim3 _block_size_3D_3 = dim3(16, 8, 8);
 
   /**
    * @brief Perform a formward pass
@@ -119,7 +118,7 @@ public:
    * @brief Destroy the Autoencoder object
    *
    */
-  ~Gpu_Autoencoder() = default;
+  ~Gpu_Autoencoder();
 
   /**
    * @brief Encodes a dataset

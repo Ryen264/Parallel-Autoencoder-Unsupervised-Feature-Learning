@@ -11,13 +11,12 @@
 #include "data_loader.h"
 #include "model.h"
 #include "visualization.h"
-
 using namespace std;
 
-// string DATASET_DIR = "./data/cifar-10-batches-bin";
-string DATASET_DIR = "/content/drive/MyDrive/@fithcmú/LapTrinhSongSong/data/cifar-10-batches-bin";
-// string MODEL_OUTPUT_DIR = "./model";
-string MODEL_OUTPUT_DIR = "/content/model";
+string DATASET_DIR = "./data/cifar-10-batches-bin";
+// string DATASET_DIR = "/content/drive/MyDrive/@fithcmú/LapTrinhSongSong/data/cifar-10-batches-bin";
+string MODEL_OUTPUT_DIR = "./model";
+// string MODEL_OUTPUT_DIR = "/content/model";
 
 string ENCODED_DATASET_FILE = "encoded_dataset.bin";
 string LABELS_FILE = "labels.bin";

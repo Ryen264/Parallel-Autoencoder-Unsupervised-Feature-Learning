@@ -1,6 +1,8 @@
 #include <iostream>
 #include <cstdlib>
+
 #include "model.h"
+using namespace std;
 
 // Constructor
 SVMmodel::SVMmodel() : model(nullptr), accuracy(0.0), isTrained(false) {
@@ -11,7 +13,10 @@ SVMmodel::SVMmodel() : model(nullptr), accuracy(0.0), isTrained(false) {
 SVMmodel::~SVMmodel() {
     if (model != nullptr) {
         svm_free_model_content(model);
-        free(model);
+        if (model) free((void *)model);
+        else {
+            cerr << "Error: Memory deallocation failed" << endl;
+        }
     }
 }
 
@@ -64,11 +69,23 @@ svm_problem* SVMmodel::createProblem(const vector<vector<double>>& data,
 void SVMmodel::freeProblem(svm_problem* problem) {
     if (problem != nullptr) {
         for (int i = 0; i < problem->l; i++) {
-            free(problem->x[i]);
+            if (problem->x[i]) free((void *)problem->x[i]);
+            else {
+                cerr << "Error: Memory deallocation failed" << endl;
+            }
         }
-        free(problem->x);
-        free(problem->y);
-        free(problem);
+        if (problem->x) free((void *)problem->x);
+        else {
+            cerr << "Error: Memory deallocation failed" << endl;
+        }
+        if (problem->y) free((void *)problem->y);
+        else {
+            cerr << "Error: Memory deallocation failed" << endl;
+        }
+        if (problem) free((void *)problem);
+        else {
+            cerr << "Error: Memory deallocation failed" << endl;
+        }
     }
 }
 
@@ -122,7 +139,10 @@ int SVMmodel::predict(const vector<double>& sample) const {
     // Predict
     double prediction = svm_predict(model, x);
     
-    free(x);
+    if (x) free((void *)x);
+    else {
+        cerr << "Error: Memory deallocation failed" << endl;
+    }
     return (int)prediction;
 }
 

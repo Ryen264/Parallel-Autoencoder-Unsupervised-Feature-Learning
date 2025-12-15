@@ -57,7 +57,7 @@ void cpu_max_pooling(float *in, float *out,
                     int n, int width, int height, int depth);
 
 /**
- * @brief Use nearest neighbor interpolation to double spatial dimension
+ * @brief Upsampling layer to upsample by twice
  *
  * @param in The input array
  * @param out The output array
@@ -70,111 +70,110 @@ void cpu_upsampling(float *in, float *out,
                     int n, int width, int height, int depth);
 
 /**
- * @brief Calculate the mean squared error between the output and the target
+ * @brief Mean squared error loss
  *
- * @param expected The target array
- * @param actual The array to calculate MSE
- * @param n The number of images in the array
- * @param width The width of the input array
- * @param height The height of the input array
- * @param depth The depth of the array
- *
- * @return float The MSE value
+ * @param expected The expected result
+ * @param actual The actual result
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
+ * @return float The MSE loss
  */
 float cpu_mse_loss(float *expected, float *actual,
-                    int n, int width, int height, int depth);
+                int n, int width, int height, int depth);
 
 /**
- * @brief Calculate gradiant of the loss function
+ * @brief Mean squared error gradient
  *
- * @param expected The target array
- * @param actual The array to calculate MSE
- * @param d_out Array to pass delta (backward propagation)
- * @param n The number of images in the array
- * @param width The width of the input array
- * @param height The height of the input array
- * @param depth The depth of the array
+ * @param expected The expected result
+ * @param actual The actual result
+ * @param d_out The output array (delta_out)
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
  */
 void cpu_mse_grad(float *expected, float *actual, float *d_out,
                 int n, int width, int height, int depth);
 
 /**
- * @brief Backward propagation for ReLU
+ * @brief ReLU layer backwards pass
  *
- * @param in The input data
- * @param d_out The output delta
- * @param d_in The input delta
+ * @param in The input from the forward pass
+ * @param d_in The incoming gradient
+ * @param d_out The output gradient
  * @param n The number of images
  * @param width The width of the images
  * @param height The height of the images
  * @param depth The depth of the images
  */
-void cpu_relu_backward(float *in, float *d_out, float *d_in,
+void cpu_relu_backward(float *in, float *d_in, float *d_out,
                         int n, int width, int height, int depth);
 
 /**
- * @brief Backward propagation for max pooling
+ * @brief Max pooling backwards pass
  *
- * @param in The input data
- * @param d_out The output delta
- * @param d_in The input delta
+ * @param in The input from the forward pass
+ * @param d_in The incoming gradient
+ * @param d_out The output gradient
  * @param n The number of images
  * @param width The width of the images
  * @param height The height of the images
  * @param depth The depth of the images
  */
-void cpu_max_pooling_backward(float *in, float *d_out, float *d_in,
-                            int n, int width, int height, int depth);
+void cpu_max_pooling_backward(float *in, float *d_in, float *d_out,
+                                int n, int width, int height, int depth);
 
 /**
- * @brief Backward propagation for upsampling
+ * @brief Upsampling backwards pass
  *
- * @param d_out The output delta
- * @param d_in The input delta
+ * @param d_in The incoming gradient
+ * @param d_out The output gradient
  * @param n The number of images
  * @param width The width of the images
  * @param height The height of the images
  * @param depth The depth of the images
  */
-void cpu_upsampling_backward(float *d_out, float *d_in,
+void cpu_upsampling_backward(float *d_in, float *d_out,
                             int n, int width, int height, int depth);
 
 /**
- * @brief Calculate gradient for conv2D bias
+ * @brief Bias gradient calculation
  *
- * @param d_out The output delta
- * @param grad_bias The gradient output
- * @param n Number of images
- * @param width Width of the images
- * @param height Height of the images
- * @param depth Depth of the images
+ * @param d_in The incoming gradient
+ * @param d_bias The bias gradient output
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
  */
-void cpu_bias_grad(float *d_out, float *grad_bias,
-                    int n, int width, int height, int depth);
+void cpu_bias_grad(float *d_in, float *d_bias,
+                int n, int width, int height, int depth);
 
 /**
- * @brief Calculate gradient for conv2D filter
+ * @brief Conv2D gradient calculation
  *
- * @param in The input images
- * @param d_out The output delta
- * @param grad_filter The gradient output
- * @param n Number of images
- * @param width Width of the images
- * @param height Height of the images
- * @param depth Depth of the images
- * @param n_filter Number of filters
+ * @param in The input from forward pass
+ * @param d_out The incoming gradient
+ * @param d_filter The filter gradient output
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
+ * @param n_filter The number of filters
  */
-void cpu_conv2D_grad(float *in, float *d_out, float *grad_filter,
-                     int n, int width, int height, int depth, int n_filter);
+void cpu_conv2D_grad(float *in, float *d_out, float *d_filter,
+                    int n, int width, int height, int depth, int n_filter);
 
 /**
- * @brief Update the weights of the array
+ * @brief Update weights using gradient descent
  *
- * @param in The input array
- * @param grad The gradient
- * @param size The size of the array
- * @param learning_rate The learning
+ * @param weight The weights to update
+ * @param gradient The gradient
+ * @param size The size of the arrays
+ * @param learning_rate The learning rate
  */
-void cpu_update_weight(float *in, float *grad, int size, float learning_rate);
+void cpu_update_weight(float *weight, float *gradient, int size, float learning_rate);
 
 #endif

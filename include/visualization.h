@@ -18,4 +18,4 @@ void generate_speedup_graph_svg(const std::vector<std::string>& labels, const st
 // Generate HTML dashboard with embedded charts
 void generate_visualization_html(const std::string& bar_chart_file, const std::string& speedup_file, const std::string& html_file);
 
-#endif // VISUALIZATION_H
+#endif

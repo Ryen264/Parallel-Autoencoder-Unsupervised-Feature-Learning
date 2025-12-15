@@ -1,15 +1,17 @@
 #include <algorithm>
 #include <cstring>
+#include <memory>
+#include <random>
 #include <stdio.h>
 #include <stdlib.h>
-#include <cuda_runtime.h>
 #include <time.h>
-#include <random>
+#include <utility>
+#include <vector>
+#include <cuda_runtime.h>
+
 #include "data_loader.h"
 #include "constants.h"
-
-using std::memcpy;
-using std::shuffle;
+using namespace std;
 
 // Error checking macro
 #define CUDA_CHECK(call) \
@@ -50,7 +52,10 @@ static void readBinaryFile(const char* filepath, unsigned char** raw_data, int n
     size_t read_size = fread(*raw_data, 1, total_size, file);
     if (read_size != total_size) {
         fprintf(stderr, "Error: Could not read complete file %s\n", filepath);
-        free(*raw_data);
+        if (raw_data) free((void *)*raw_data);
+        else {
+            fprintf(stderr, "Error: Memory deallocation failed\n");
+        }
         fclose(file);
         exit(EXIT_FAILURE);
     }
@@ -93,9 +98,12 @@ static void parseAndNormalize(unsigned char* raw_data, float* images, int* label
         CUDA_CHECK(cudaMemcpy(images, d_images, image_data_size * sizeof(float), cudaMemcpyDeviceToHost));
         
         // Cleanup
-        free(raw_images);
-        CUDA_CHECK(cudaFree(d_raw_images));
-        CUDA_CHECK(cudaFree(d_images));
+        if (raw_images) free((void *)raw_images);
+        else {
+            fprintf(stderr, "Error: Memory deallocation failed\n");
+        }
+        CUDA_CHECK(cudaFree((void *)d_raw_images));
+        CUDA_CHECK(cudaFree((void *)d_images));
     } else {
         // CPU normalization
         for (int i = 0; i < num_samples; i++)
@@ -154,7 +162,10 @@ Dataset load_dataset(const char *dataset_dir, bool is_train) {
             int offset = (batch - 1) * (NUM_TRAIN_SAMPLES / NUM_BATCHES);
             parseAndNormalize(raw_data, images + offset * IMAGE_SIZE, labels + offset, NUM_TRAIN_SAMPLES / NUM_BATCHES, use_cuda);
             
-            free(raw_data);
+            if (raw_data) free((void *)raw_data);
+            else {
+                fprintf(stderr, "Error: Memory deallocation failed\n");
+            }
             printf("  ✓ Loaded batch %d/5\n", batch);
         }
         printf("✓ Training data loaded: %d samples\n", num_samples);
@@ -167,7 +178,10 @@ Dataset load_dataset(const char *dataset_dir, bool is_train) {
         unsigned char* raw_data;
         readBinaryFile(filepath, &raw_data, NUM_TEST_SAMPLES);
         parseAndNormalize(raw_data, images, labels, NUM_TEST_SAMPLES, use_cuda);
-        free(raw_data);
+        if (raw_data) free((void *)raw_data);
+        else {
+            fprintf(stderr, "Error: Memory deallocation failed\n");
+        }
         printf("✓ Test data loaded: %d samples\n", num_samples);
     }
     
@@ -201,7 +215,7 @@ void shuffle_dataset(Dataset &dataset) {
         indices[i] = i;
 
     // Shuffle the indices
-    std::mt19937 rng(time(nullptr));
+    mt19937 rng(time(nullptr));
     shuffle(indices.begin(), indices.end(), rng);
 
     // Copy data base on indices

@@ -25,7 +25,7 @@ public:
    * @param text The text to display
    * @param size The length of the bar (default: 100 characters)
    */
-  Progress_Bar(int step, const string &text = "", int size = 100);
+  Progress_Bar(int step, const string &text = "", int size = 50);
 
   /**
    * @brief Update to the next step, first call starts at 1

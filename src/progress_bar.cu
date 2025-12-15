@@ -5,20 +5,20 @@
 Progress_Bar::Progress_Bar(int step, const string &text, int size)
     : _step(step)
     , _size(size)
-    , _cur_step(1)
+    , _cur_step(0)
     , _text(text)
-    , _number_padding(1 + log10(_step))
-    , _progress(_DONE_CHAR, size)
-    , _padding(_SPACE_CHAR, size) {};
+    , _number_padding(1 + log10(step))
+    , _progress(size, _DONE_CHAR)
+    , _padding(size, _SPACE_CHAR) {};
 
 void Progress_Bar::update() {
   if (_cur_step == _step) {
     printf(
-        "%s %d/%d: [%s] (100%%)\n", _text.c_str(), _cur_step, _step, _progress.c_str());
+        "\r%s %d/%d [%s] (100%%)", _text.c_str(), _cur_step, _step, _progress.c_str());
   } else {
     int percentage = round(100.0f * _cur_step / _step);
     int progress   = _cur_step * _size / _step;
-    printf("%s %0*d/%d: [%.*s%c%.*s] (%02d%%)\n",
+    printf("\r%s %0*d/%d [%.*s%c%.*s] (%02d%%)",
            _text.c_str(),
            _number_padding,
            _cur_step,
@@ -32,4 +32,6 @@ void Progress_Bar::update() {
 
     ++_cur_step;
   }
+
+  fflush(stdout);
 }

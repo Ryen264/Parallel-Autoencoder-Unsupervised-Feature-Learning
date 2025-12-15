@@ -12,7 +12,7 @@
   }
 
 #define GET_1D_IDX(i, j, d, width, depth)                                              \
-  ((depth) + (j) * (depth) + (i) * (width) * (depth))
+  ((d) + (j) * (depth) + (i) * (width) * (depth))
 
 #define SQR(x) ((x) * (x))
 

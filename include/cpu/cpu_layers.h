@@ -13,8 +13,14 @@
  * @param depth The depth of the input array
  * @param n_filter The number of filters
  */
-void cpu_conv2D(float *in, float *filter, float *out, 
-                int n, int width, int height, int depth, int n_filter);
+void cpu_conv2D(float *in,
+                float *filter,
+                float *out,
+                int    n,
+                int    width,
+                int    height,
+                int    depth,
+                int    n_filter);
 
 /**
  * @brief Apply bias into images
@@ -27,8 +33,8 @@ void cpu_conv2D(float *in, float *filter, float *out,
  * @param height The height of the images
  * @param depth The depth of the images
  */
-void cpu_add_bias(float *in, float *bias, float *out,
-                int n, int width, int height, int depth);
+void cpu_add_bias(
+    float *in, float *bias, float *out, int n, int width, int height, int depth);
 
 /**
  * @brief ReLU layer
@@ -40,8 +46,7 @@ void cpu_add_bias(float *in, float *bias, float *out,
  * @param height The height of the input array
  * @param depth The depth of the input array
  */
-void cpu_relu(float *in, float *out,
-            int n, int width, int height, int depth);
+void cpu_relu(float *in, float *out, int n, int width, int height, int depth);
 
 /**
  * @brief Max pooling layer to downsample by half
@@ -53,8 +58,7 @@ void cpu_relu(float *in, float *out,
  * @param height The height of the input array
  * @param depth The depth of the input array
  */
-void cpu_max_pooling(float *in, float *out,
-                    int n, int width, int height, int depth);
+void cpu_avg_pooling(float *in, float *out, int n, int width, int height, int depth);
 
 /**
  * @brief Upsampling layer to upsample by twice
@@ -66,8 +70,7 @@ void cpu_max_pooling(float *in, float *out,
  * @param height The height of the input array
  * @param depth The depth of the input array
  */
-void cpu_upsampling(float *in, float *out,
-                    int n, int width, int height, int depth);
+void cpu_upsampling(float *in, float *out, int n, int width, int height, int depth);
 
 /**
  * @brief Mean squared error loss
@@ -80,8 +83,8 @@ void cpu_upsampling(float *in, float *out,
  * @param depth The depth of the images
  * @return float The MSE loss
  */
-float cpu_mse_loss(float *expected, float *actual,
-                int n, int width, int height, int depth);
+float
+cpu_mse_loss(float *expected, float *actual, int n, int width, int height, int depth);
 
 /**
  * @brief Mean squared error gradient
@@ -94,8 +97,13 @@ float cpu_mse_loss(float *expected, float *actual,
  * @param height The height of the images
  * @param depth The depth of the images
  */
-void cpu_mse_grad(float *expected, float *actual, float *d_out,
-                int n, int width, int height, int depth);
+void cpu_mse_grad(float *expected,
+                  float *actual,
+                  float *d_out,
+                  int    n,
+                  int    width,
+                  int    height,
+                  int    depth);
 
 /**
  * @brief ReLU layer backwards pass
@@ -108,8 +116,8 @@ void cpu_mse_grad(float *expected, float *actual, float *d_out,
  * @param height The height of the images
  * @param depth The depth of the images
  */
-void cpu_relu_backward(float *in, float *d_in, float *d_out,
-                        int n, int width, int height, int depth);
+void cpu_relu_backward(
+    float *in, float *d_in, float *d_out, int n, int width, int height, int depth);
 
 /**
  * @brief Max pooling backwards pass
@@ -122,8 +130,8 @@ void cpu_relu_backward(float *in, float *d_in, float *d_out,
  * @param height The height of the images
  * @param depth The depth of the images
  */
-void cpu_max_pooling_backward(float *in, float *d_in, float *d_out,
-                                int n, int width, int height, int depth);
+void cpu_avg_pooling_backward(
+    float *d_in, float *d_out, int n, int width, int height, int depth);
 
 /**
  * @brief Upsampling backwards pass
@@ -135,8 +143,8 @@ void cpu_max_pooling_backward(float *in, float *d_in, float *d_out,
  * @param height The height of the images
  * @param depth The depth of the images
  */
-void cpu_upsampling_backward(float *d_in, float *d_out,
-                            int n, int width, int height, int depth);
+void cpu_upsampling_backward(
+    float *d_in, float *d_out, int n, int width, int height, int depth);
 
 /**
  * @brief Bias gradient calculation
@@ -148,8 +156,7 @@ void cpu_upsampling_backward(float *d_in, float *d_out,
  * @param height The height of the images
  * @param depth The depth of the images
  */
-void cpu_bias_grad(float *d_in, float *d_bias,
-                int n, int width, int height, int depth);
+void cpu_bias_grad(float *d_in, float *d_bias, int n, int width, int height, int depth);
 
 /**
  * @brief Conv2D gradient calculation
@@ -163,8 +170,14 @@ void cpu_bias_grad(float *d_in, float *d_bias,
  * @param depth The depth of the images
  * @param n_filter The number of filters
  */
-void cpu_conv2D_grad(float *in, float *d_out, float *d_filter,
-                    int n, int width, int height, int depth, int n_filter);
+void cpu_conv2D_grad(float *in,
+                     float *d_out,
+                     float *d_filter,
+                     int    n,
+                     int    width,
+                     int    height,
+                     int    depth,
+                     int    n_filter);
 
 /**
  * @brief Update weights using gradient descent

@@ -1,6 +1,8 @@
 #ifndef MACRO_H
 #define MACRO_H
 
+#include <cstdio>
+
 #define CUDA_CHECK(err)                                                                \
   {                                                                                    \
     if (err != cudaSuccess) {                                                          \

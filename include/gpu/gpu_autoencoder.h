@@ -2,72 +2,73 @@
 #define CPU_AUTOENCODER_H
 
 #include "data_loader.h"
+#include "gpu_unique_ptr.h"
 
 /**
  * @brief The class that encapsulates the network using CPU
  *
  */
-class Cpu_Autoencoder {
-
-  unique_ptr<float[]> _encoder_filter_1;
-  unique_ptr<float[]> _encoder_bias_1;
+class Gpu_Autoencoder {
+  Gpu_Unique_Ptr _encoder_filter_1;
+  Gpu_Unique_Ptr _encoder_bias_1;
 
   // Save output for backwards propogation
-  unique_ptr<float[]> _out_encoder_filter_1;
-  unique_ptr<float[]> _out_encoder_bias_1;
+  Gpu_Unique_Ptr _out_encoder_filter_1;
+  Gpu_Unique_Ptr _out_encoder_bias_1;
 
-  unique_ptr<float[]> _out_encoder_relu_1;
-  unique_ptr<float[]> _out_max_pooling_1;
+  Gpu_Unique_Ptr _out_encoder_relu_1;
+  Gpu_Unique_Ptr _out_max_pooling_1;
 
-  unique_ptr<float[]> _encoder_filter_2;
-  unique_ptr<float[]> _encoder_bias_2;
-  unique_ptr<float[]> _out_encoder_filter_2;
-  unique_ptr<float[]> _out_encoder_bias_2;
+  Gpu_Unique_Ptr _encoder_filter_2;
+  Gpu_Unique_Ptr _encoder_bias_2;
+  Gpu_Unique_Ptr _out_encoder_filter_2;
+  Gpu_Unique_Ptr _out_encoder_bias_2;
 
-  unique_ptr<float[]> _out_encoder_relu_2;
-  unique_ptr<float[]> _out_max_pooling_2;
+  Gpu_Unique_Ptr _out_encoder_relu_2;
+  Gpu_Unique_Ptr _out_max_pooling_2;
 
-  unique_ptr<float[]> _decoder_filter_1;
-  unique_ptr<float[]> _decoder_bias_1;
-  unique_ptr<float[]> _out_decoder_filter_1;
-  unique_ptr<float[]> _out_decoder_bias_1;
+  Gpu_Unique_Ptr _decoder_filter_1;
+  Gpu_Unique_Ptr _decoder_bias_1;
+  Gpu_Unique_Ptr _out_decoder_filter_1;
+  Gpu_Unique_Ptr _out_decoder_bias_1;
 
-  unique_ptr<float[]> _out_decoder_relu_1;
-  unique_ptr<float[]> _out_upsampling_1;
+  Gpu_Unique_Ptr _out_decoder_relu_1;
+  Gpu_Unique_Ptr _out_upsampling_1;
 
-  unique_ptr<float[]> _decoder_filter_2;
-  unique_ptr<float[]> _decoder_bias_2;
-  unique_ptr<float[]> _out_decoder_filter_2;
-  unique_ptr<float[]> _out_decoder_bias_2;
+  Gpu_Unique_Ptr _decoder_filter_2;
+  Gpu_Unique_Ptr _decoder_bias_2;
+  Gpu_Unique_Ptr _out_decoder_filter_2;
+  Gpu_Unique_Ptr _out_decoder_bias_2;
 
-  unique_ptr<float[]> _out_decoder_relu_2;
-  unique_ptr<float[]> _out_upsampling_2;
+  Gpu_Unique_Ptr _out_decoder_relu_2;
+  Gpu_Unique_Ptr _out_upsampling_2;
 
-  unique_ptr<float[]> _decoder_filter_3;
-  unique_ptr<float[]> _decoder_bias_3;
-  unique_ptr<float[]> _out_decoder_filter_3;
-  unique_ptr<float[]> _out_decoder_bias_3;
+  Gpu_Unique_Ptr _decoder_filter_3;
+  Gpu_Unique_Ptr _decoder_bias_3;
+  Gpu_Unique_Ptr _out_decoder_filter_3;
+  Gpu_Unique_Ptr _out_decoder_bias_3;
 
   // Gradients
-  unique_ptr<float[]> _d_in;
-  unique_ptr<float[]> _d_out;
-  unique_ptr<float[]> _d_filter;
+  Gpu_Unique_Ptr _d_in;
+  Gpu_Unique_Ptr _d_out;
+  Gpu_Unique_Ptr _d_filter;
+
+  // Batch data
+  Gpu_Unique_Ptr _batch_data;
+  Gpu_Unique_Ptr _res_data;
+
+  // Block sizes
+  static constexpr dim3 _block_size_1D   = dim3(1024);
+  static constexpr dim3 _block_size_3D_1 = dim3(32, 32, 1);
+  static constexpr dim3 _block_size_3D_2 = dim3(16, 16, 4);
+  static constexpr dim3 _block_size_3D_3 = dim3(8, 8, 16);
 
   /**
-   * @brief Encode while saving outputs for training
+   * @brief Perform a formward pass
    *
    * @param dataset The dataset to encode
-   * @return Dataset The encoded dataset
    */
-  Dataset _encode_save_output(const Dataset &dataset);
-
-  /**
-   * @brief Decode while saving outputs for training
-   *
-   * @param dataset The dataset to decode
-   * @return Dataset The decoded dataset
-   */
-  Dataset _decode_save_output(const Dataset &dataset);
+  void _forward_pass(const Dataset &dataset);
 
   /**
    * @brief Allocate memory for the parameters
@@ -105,20 +106,20 @@ public:
    * @brief Initialize a new autoencoder with random paramters
    *
    */
-  Cpu_Autoencoder();
+  Gpu_Autoencoder();
 
   /**
    * @brief Reads the parameters from a file
    *
    * @param filename The file containing the model's parameters
    */
-  Cpu_Autoencoder(const char *filename);
+  Gpu_Autoencoder(const char *filename);
 
   /**
    * @brief Destroy the Autoencoder object
    *
    */
-  ~Cpu_Autoencoder() = default;
+  ~Gpu_Autoencoder() = default;
 
   /**
    * @brief Encodes a dataset
@@ -162,7 +163,7 @@ public:
    * @param dataset The dataset to be evaluated
    * @return float The MSE between the actual and expected result
    */
-  float eval(const Dataset &dataset);
+  float eval(const Dataset &dataset) const;
 
   /**
    * @brief Write the model's parameters to a file

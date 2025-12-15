@@ -141,8 +141,9 @@ Dataset load_dataset(const char *dataset_dir, bool is_train) {
     int num_samples = is_train ? NUM_TRAIN_SAMPLES : NUM_TEST_SAMPLES;
     
     // Allocate memory for images and labels
-    float* images = (float*)malloc(num_samples * IMAGE_SIZE * sizeof(float));
-    int* labels = (int*)malloc(num_samples * sizeof(int));
+    // Use new[] because unique_ptr uses delete[] by default
+    float* images = new float[num_samples * IMAGE_SIZE];
+    int* labels = new int[num_samples];
     
     if (!images || !labels) {
         fprintf(stderr, "Error: Memory allocation failed\n");

@@ -333,7 +333,8 @@ void Cpu_Autoencoder::_allocate_output_mem(int n, int width, int height) {
                                            DECODER_FILTER_3_SIZE };
   constexpr int MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
 
-  _d_in     = make_unique<float[]>(MAX_FILTER_DEPTH);
+  _d_in     = make_unique<float[]>(n * width * height * MAX_FILTER_DEPTH);
+  
   _d_out    = make_unique<float[]>(n * width * height * MAX_FILTER_DEPTH);
   _d_filter = make_unique<float[]>(MAX_FILTER_SIZE);
 }

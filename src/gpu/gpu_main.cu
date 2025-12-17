@@ -62,10 +62,12 @@ int main() {
                              encoded_dataset.depth *
                              sizeof(float);
   ofstream buffer(ENCODED_DATASET_FILE, ios::out | ios::binary);
-  buffer.write(encoded_dataset.get_data(), encoded_dataset_size);
+  buffer.write(reinterpret_cast<char *>(encoded_dataset.get_data()),
+               encoded_dataset_size);
   buffer.close();
 
   buffer.open(ENCODED_LABEL_FILE, ios::out | ios::binary);
-  buffer.write(encoded_dataset.get_labels(), encoded_dataset.n * sizeof(int));
+  buffer.write(reinterpret_cast<char *>(encoded_dataset.get_labels()),
+               encoded_dataset.n * sizeof(int));
   buffer.close();
 }

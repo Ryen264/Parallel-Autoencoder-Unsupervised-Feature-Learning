@@ -1,4 +1,4 @@
-#include "gpu/gpu_layers.h"
+#include "gpu_layers.h"
 
 // -------------------- Conv2D Forward --------------------
 __global__ void gpu_conv2D_kernel(float *in,
@@ -406,8 +406,7 @@ void gpu_relu_backward(float *in,
   gpu_relu_backward_kernel<<<grid_size, block_size>>>(in, d_out, d_in, size);
 }
 
-void gpu_avg_pooling_backward(float *in,
-                              float *d_out,
+void gpu_avg_pooling_backward(float *d_out,
                               float *d_in,
                               int    n,
                               int    width,

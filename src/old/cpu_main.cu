@@ -15,11 +15,6 @@
 #include <memory>
 using namespace std;
 
-string RUN_MODE       = "alls";   // "phase_1", "phase_2", "all"
-string HARDWARE_MODE  = "gpu";    // "cpu", "gpu"
-bool USE_DUMMY_DATA   = false;    // only for phase 2
-bool IS_SAVE_MODEL    = true;
-
 // const string DATASET_DIR       = "./data/cifar-10-batches-bin";
 const string DATASET_DIR          = "/content/drive/MyDrive/@fithcmú/LapTrinhSongSong/data/cifar-10-batches-bin";
 // const string MODEL_OUTPUT_DIR  = "./model";
@@ -34,6 +29,10 @@ const string VISUALIZATION_TRAINING_TIMES_CSV = "training_times.csv";
 const string VISUALIZATION_SPEEDUP_GRAPH_SVG  = "speedup_graph.svg";
 const string VISUALIZATION_SPEEDUP_GRAPH_CSV  = "speedup_data.csv";
 const string VISUALIZATION_HTML_DASHBOARD     = "performance_analysis.html";
+
+const string RUN_MODE = "all"; // "phase_1", "phase_2", "all"
+const bool USE_DUMMY_DATA = false; // only for phase 2
+const bool IS_SAVE_MODEL = true;
 
 Dataset dummy_dataset(int n, int width, int height, int depth) {
     unique_ptr<float[]> data(new float[n * width * height * depth]);
@@ -140,18 +139,12 @@ void save_speedup_graph(const vector<string>& labels, const vector<double>& spee
 
 int main(int argc, char *argv[]) {
     // Override default parameters from command line if provided
-    // Usage: ./main [RUN_MODE] [HARDWARE_MODE] [USE_DUMMY_DATA]
+    // Usage: ./main [RUN_MODE] [USE_DUMMY_DATA]
     if (argc > 1) {
         RUN_MODE = argv[1];
     }
     if (argc > 2) {
-        HARDWARE_MODE = argv[2];
-    }
-    if (argc > 3) {
-        USE_DUMMY_DATA = string(argv[3]) == "true";
-    }
-    if (argc > 4) {
-        IS_SAVE_MODEL = string(argv[4]) == "true";
+        USE_DUMMY_DATA = string(argv[2]) == "true";
     }
 
     // Timing variables
@@ -167,22 +160,18 @@ int main(int argc, char *argv[]) {
         
         auto start_time = chrono::high_resolution_clock::now();
         bool is_train = true;
-        if (HARDWARE_MODE == "gpu") {
-            Dataset encoded_dataset = phase_1_gpu(DATASET_DIR.c_str(), MODEL_OUTPUT_DIR.c_str(), is_train,
-                                                    N_EPOCH, BATCH_SIZE, LEARNING_RATE, VERBOSE, CHECKPOINT);
-        } else {
-            Dataset encoded_dataset = phase_1_cpu(DATASET_DIR.c_str(), MODEL_OUTPUT_DIR.c_str(), is_train,
-                                                    N_EPOCH, BATCH_SIZE, LEARNING_RATE, VERBOSE, CHECKPOINT);
-        }
+        Dataset encoded_dataset = phase_1_cpu(DATASET_DIR.c_str(), MODEL_OUTPUT_DIR.c_str(), is_train,
+                                                N_EPOCH, BATCH_SIZE, LEARNING_RATE, VERBOSE, CHECKPOINT);
         auto end_time = chrono::high_resolution_clock::now();
         
         double phase1_time = chrono::duration<double>(end_time - start_time).count();
-        phase_labels.push_back("Phase 1 (" + HARDWARE_MODE + " Autoencoder)");
+        phase_labels.push_back("Phase 1 (CPU)");
         phase_times.push_back(phase1_time);
         baseline_time = phase1_time;
         speedups.push_back(1.0); // Baseline
         
-        cout << "Phase 1 completed in " << fixed << setprecision(2) << phase1_time << " seconds" << endl;
+        cout << "Phase 1 completed in " << fixed << setprecision(2) 
+                  << phase1_time << " seconds" << endl;
         
         // Save encoded dataset for phase 2
         FILE *f = fopen(ENCODED_DATASET_FILE.c_str(), "wb");
@@ -273,7 +262,8 @@ int main(int argc, char *argv[]) {
         for (double time : phase_times) {
             total_time += time;
         }
-        cout << "Total execution time: " << fixed << setprecision(2) << total_time << " seconds" << endl;
+        cout << "Total execution time: " << fixed << setprecision(2) 
+                  << total_time << " seconds" << endl;
         
         // Generate SVG visualizations
         cout << "\nGenerating visualizations..." << endl;

@@ -67,7 +67,7 @@ class Gpu_Autoencoder {
    *
    * @param dataset The dataset to encode
    */
-  void _forward_pass(const Dataset &dataset);
+  void _forward_pass(float *data, int n, int width, int height, int depth);
 
   /**
    * @brief Allocate memory for the parameters
@@ -98,7 +98,8 @@ class Gpu_Autoencoder {
    * @param learning_rate The learning rate
    * @return float Loss of the minibatch
    */
-  float _fit_batch(const Dataset &batch, float learning_rate);
+  float
+  _fit_batch(float *data, int n, int width, int height, int depth, float learning_rate);
 
 public:
   /**

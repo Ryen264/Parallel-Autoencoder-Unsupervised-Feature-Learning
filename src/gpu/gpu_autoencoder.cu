@@ -1,23 +1,4 @@
-#include "constants.h"
-#include "gpu_autoencoder.h"
-#include "gpu_layers.h"
-#include "macro.h"
-#include "progress_bar.h"
-#include "timer.h"
-#include "utils.h"
-#include <algorithm>
-#include <cstdio>
-#include <cstring>
-#include <fstream>
-#include <numeric>
-#include <sstream>
-
-using std::ifstream, std::ofstream;
-using std::max_element;
-using std::memcpy;
-using std::printf, std::puts;
-using std::stringstream;
-using std::swap;
+#include "gpu/gpu_autoencoder.h"
 
 /**
  * @brief Generate a random array with elements between -0.01 and 0.01
@@ -39,7 +20,7 @@ void generate_array(float *arr, int n) {
  * @param data The data
  * @param size Number of bytes to read
  */
-void read_data(std::ifstream &buffer, float *data, int size) {
+void read_data(ifstream &buffer, float *data, int size) {
   unique_ptr<char[]> ptr = make_unique<char[]>(size);
   buffer.read(ptr.get(), size);
   CUDA_CHECK(cudaMemcpy(data, ptr.get(), size, cudaMemcpyHostToDevice));
@@ -52,7 +33,7 @@ void read_data(std::ifstream &buffer, float *data, int size) {
  * @param data The data
  * @param size Number of bytes to write
  */
-void write_data(std::ostream &buffer, float *data, int size) {
+void write_data(ostream &buffer, float *data, int size) {
   unique_ptr<char[]> ptr = make_unique<char[]>(size);
   CUDA_CHECK(cudaMemcpy(ptr.get(), data, size, cudaMemcpyDeviceToHost));
   buffer.write(ptr.get(), size);
@@ -84,7 +65,7 @@ Gpu_Autoencoder::Gpu_Autoencoder(const char *filename) {
   _allocate_mem();
 
   // Read from file
-  ifstream buffer(filename, std::ios::in | std::ios::binary);
+  ifstream buffer(filename, ios::in | ios::binary);
 
   // Read first encoder conv2D layer
   read_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
@@ -953,7 +934,7 @@ float Gpu_Autoencoder::eval(const Dataset &dataset) const {
 }
 
 void Gpu_Autoencoder::save_parameters(const char *filename) const {
-  ofstream buffer(filename, std::ios::out | std::ios::binary);
+  ofstream buffer(filename, ios::out | ios::binary);
 
   // Write first encoder conv2D layer
   write_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));

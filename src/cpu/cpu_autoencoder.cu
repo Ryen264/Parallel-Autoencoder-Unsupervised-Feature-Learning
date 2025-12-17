@@ -1,19 +1,4 @@
-#include <algorithm>
-#include <chrono>
-#include <cstdio>
-#include <cstring>
-#include <fstream>
-#include <sstream>
-#include <utility>
-
-#include "constants.h"
-#include "cpu_autoencoder.h"
-#include "cpu_layers.h"
-#include "progress_bar.h"
-#include "timer.h"
-#include "utils.h"
-
-using namespace std;
+#include "cpu/cpu_autoencoder.h"
 
 string AUTOENCODER_FILENAME = "autoencoder.bin";
 

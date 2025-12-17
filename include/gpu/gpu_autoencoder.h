@@ -1,7 +1,21 @@
-#ifndef CPU_AUTOENCODER_H
-#define CPU_AUTOENCODER_H
+#ifndef GPU_AUTOENCODER_H
+#define GPU_AUTOENCODER_H
 
 #include "data_loader.h"
+#include "constants.h"
+#include "gpu_layers.h"
+#include "macro.h"
+#include "progress_bar.h"
+#include "timer.h"
+#include "utils.h"
+
+#include <algorithm>
+#include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <numeric>
+#include <sstream>
+using namespace std;
 
 /**
  * @brief The class that encapsulates the network using CPU

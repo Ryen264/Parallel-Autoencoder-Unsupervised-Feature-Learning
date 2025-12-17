@@ -1,6 +1,13 @@
 #ifndef CPU_LAYERS_H
 #define CPU_LAYERS_H
 
+#include "constants.h"
+#include "macro.h"
+
+#include <algorithm>
+#include <cstring>
+using namespace std;
+
 /**
  * @brief 2D convolution layer with padding=1 and stride=1
  *
@@ -49,7 +56,7 @@ void cpu_add_bias(
 void cpu_relu(float *in, float *out, int n, int width, int height, int depth);
 
 /**
- * @brief Max pooling layer to downsample by half
+ * @brief Avg pooling layer to downsample by half
  *
  * @param in The input array
  * @param out The output array
@@ -120,7 +127,7 @@ void cpu_relu_backward(
     float *in, float *d_in, float *d_out, int n, int width, int height, int depth);
 
 /**
- * @brief Max pooling backwards pass
+ * @brief Avg pooling backwards pass
  *
  * @param in The input from the forward pass
  * @param d_in The incoming gradient

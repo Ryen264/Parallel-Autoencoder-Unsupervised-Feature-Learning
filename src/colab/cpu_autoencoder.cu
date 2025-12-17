@@ -1,4 +1,4 @@
-#include "cpu_autoencoder.h"
+#include "cpu/cpu_autoencoder.h"
 
 string AUTOENCODER_FILENAME = "autoencoder.bin";
 

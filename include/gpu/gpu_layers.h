@@ -1,6 +1,12 @@
 #ifndef GPU_LAYERS_H
 #define GPU_LAYERS_H
 
+#include "constants.h"
+#include "macro.h"
+
+#include <algorithm>
+using namespace std;
+
 /**
  * @brief 2D convolution layer with padding=1 and stride=1
  *

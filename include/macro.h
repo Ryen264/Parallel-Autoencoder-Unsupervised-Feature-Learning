@@ -2,6 +2,7 @@
 #define MACRO_H
 
 #include <cstdio>
+using namespace std;
 
 #define CUDA_CHECK(err)                                                                \
   {                                                                                    \

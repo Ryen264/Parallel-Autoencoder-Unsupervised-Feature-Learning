@@ -1,17 +1,4 @@
-#include <algorithm>
-#include <cstring>
-#include <cuda_runtime.h>
-#include <memory>
-#include <random>
-#include <stdio.h>
-#include <stdlib.h>
-#include <time.h>
-#include <utility>
-#include <vector>
-
-#include "constants.h"
 #include "data_loader.h"
-using namespace std;
 
 // Error checking macro
 #define CUDA_CHECK(call)                                                               \
@@ -164,12 +151,12 @@ float *Dataset::get_data() const { return data.get(); }
 int *Dataset::get_labels() const { return labels.get(); }
 
 // Load CIFAR-10 dataset from binary files
-Dataset load_dataset(const char *dataset_dir, int n_batches, bool is_train) {
+Dataset load_dataset(const char *dataset_dir, bool is_train) {
   // Check if CUDA is available
   int  deviceCount;
   bool use_cuda = (cudaGetDeviceCount(&deviceCount) == cudaSuccess && deviceCount > 0);
 
-  int num_samples = is_train ? n_batches * NUM_PER_BATCH : NUM_TEST_SAMPLES;
+  int num_samples = is_train ? NUM_TRAIN_SAMPLES : NUM_TEST_SAMPLES;
 
   // Allocate memory for images and labels
   // Use new[] because unique_ptr uses delete[] by default
@@ -189,13 +176,13 @@ Dataset load_dataset(const char *dataset_dir, int n_batches, bool is_train) {
       snprintf(filepath, sizeof(filepath), "%s/data_batch_%d.bin", dataset_dir, batch);
 
       unsigned char *raw_data;
-      readBinaryFile(filepath, &raw_data, NUM_PER_BATCH);
+      readBinaryFile(filepath, &raw_data, NUM_TRAIN_SAMPLES / NUM_BATCHES);
 
       int offset = (batch - 1) * (NUM_TRAIN_SAMPLES / NUM_BATCHES);
       parseAndNormalize(raw_data,
                         images + offset * IMAGE_SIZE,
                         labels + offset,
-                        NUM_PER_BATCH,
+                        NUM_TRAIN_SAMPLES / NUM_BATCHES,
                         use_cuda);
 
       if (raw_data)

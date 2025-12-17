@@ -1,4 +1,4 @@
-#include "cpu_layers.h"
+#include "cpu/cpu_layers.h"
 
 void cpu_conv2D(float *in,
                 float *filter,

@@ -2,7 +2,9 @@
 #define PROGRESS_BAR_H
 
 #include <string>
-using std::string;
+#include <cmath>
+#include <cstdio>
+using namespace std;
 
 class Progress_Bar {
   int    _cur_step;

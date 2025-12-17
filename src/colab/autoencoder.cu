@@ -1,10 +1,4 @@
-#include <cstdlib>
-#include <fstream>
-#include <memory>
-
 #include "autoencoder.h"
-#include "constants.h"
-using namespace std;
 
 /**
  * @brief Generate a random array with elements between 0 and 1

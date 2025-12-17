@@ -4,6 +4,11 @@
 #include "constants.h"
 #include "data_loader.h"
 
+#include <cstdlib>
+#include <fstream>
+#include <memory>
+using namespace std;
+
 /**
  * @brief Interface class that encapsulates the network
  *

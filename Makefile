@@ -5,7 +5,7 @@
 NVCC = nvcc
 CXX = g++
 NVCC_FLAGS = -std=c++14 -arch=sm_50 -O3
-INCLUDE_DIRS = -I./include
+INCLUDE_DIRS = -I./include -I./cuml-new/cpp/include -I./raft/cpp/include -I./rmm/cpp/include
 LIBSVM_DIR = ./libsvm
 LIBSVM_LIB = -L$(LIBSVM_DIR) -lsvm
 

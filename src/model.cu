@@ -1,91 +1,92 @@
 #include <iostream>
 #include <cstdlib>
+#include <cuda_runtime.h>
 
 #include "model.h"
 using namespace std;
 
 // Constructor
-SVMmodel::SVMmodel() : model(nullptr), accuracy(0.0), isTrained(false) {
+SVMmodel::SVMmodel() : accuracy(0.0), isTrained(false), n_features(0) {
+    // Create cuML handle
+    cumlCreate(&handle);
+    
+    // Initialize model pointers
+    n_support = 0;
+    b = 0.0f;
+    dual_coefs = nullptr;
+    x_support = nullptr;
+    support_idx = nullptr;
+    n_classes = 0;
+    unique_labels = nullptr;
+    
     initializeParameters();
 }
 
 // Destructor
 SVMmodel::~SVMmodel() {
-    if (model != nullptr) {
-        svm_free_model_content(model);
-        if (model) free((void *)model);
-        else {
-            cerr << "Error: Memory deallocation failed" << endl;
-        }
+    if (isTrained) {
+        // Free device memory
+        if (dual_coefs) cudaFree(dual_coefs);
+        if (x_support) cudaFree(x_support);
+        if (support_idx) cudaFree(support_idx);
+        if (unique_labels) cudaFree(unique_labels);
     }
+    cumlDestroy(handle);
 }
 
 void SVMmodel::initializeParameters() {
-    parameters.svm_type = C_SVC;           // C-classification
-    parameters.kernel_type = RBF;          // RBF kernel
-    parameters.degree = 3;
-    parameters.gamma = 0;                  // Auto: 1/num_features
-    parameters.coef0 = 0;
-    parameters.C = 10.0;                   // Hyperparameter C
-    parameters.nu = 0.5;
-    parameters.p = 0.1;
-    parameters.cache_size = 100;
-    parameters.eps = 1e-3;
-    parameters.shrinking = 1;
-    parameters.probability = 1;            // Enable probability estimates
-    parameters.nr_weight = 0;
-    parameters.weight_label = nullptr;
-    parameters.weight = nullptr;
+    // SVM parameters
+    C = 10.0f;                      // Penalty term
+    cache_size = 200.0f;            // Kernel cache size in MiB
+    max_iter = 100;                 // Max iterations
+    nochange_steps = 100;           // Steps without change before stopping
+    tol = 1e-3f;                    // Tolerance
+    
+    // Kernel parameters (RBF kernel)
+    kernel_type = RBF;
+    degree = 3;
+    gamma = 0.0f;                   // Auto: 1/n_features
+    coef0 = 0.0f;
 }
 
-svm_problem* SVMmodel::createProblem(const vector<vector<double>>& data, 
-                                     const vector<int>& labels) {
-    int numSamples = data.size();
-    int numFeatures = data[0].size();
+float* SVMmodel::convertToDeviceArray(const vector<vector<double>>& data, int& n_rows, int& n_cols) {
+    n_rows = data.size();
+    n_cols = data[0].size();
     
-    svm_problem* problem = (svm_problem*)malloc(sizeof(svm_problem));
-    problem->l = numSamples;
-    problem->y = (double*)malloc(numSamples * sizeof(double));
-    problem->x = (svm_node**)malloc(numSamples * sizeof(svm_node*));
-    
-    // Copy labels
-    for (int i = 0; i < numSamples; i++) {
-        problem->y[i] = (double)labels[i];
-    }
-    
-    // Copy features
-    for (int i = 0; i < numSamples; i++) {
-        problem->x[i] = (svm_node*)malloc((numFeatures + 1) * sizeof(svm_node));
-        for (int j = 0; j < numFeatures; j++) {
-            problem->x[i][j].index = j + 1;  // libsvm uses 1-based indexing
-            problem->x[i][j].value = data[i][j];
+    // Allocate host memory and convert to column-major format
+    float* h_data = new float[n_rows * n_cols];
+    for (int j = 0; j < n_cols; j++) {
+        for (int i = 0; i < n_rows; i++) {
+            h_data[j * n_rows + i] = static_cast<float>(data[i][j]);
         }
-        problem->x[i][numFeatures].index = -1;  // End marker
     }
     
-    return problem;
+    // Allocate device memory and copy
+    float* d_data;
+    cudaMalloc(&d_data, n_rows * n_cols * sizeof(float));
+    cudaMemcpy(d_data, h_data, n_rows * n_cols * sizeof(float), cudaMemcpyHostToDevice);
+    
+    delete[] h_data;
+    return d_data;
 }
 
-void SVMmodel::freeProblem(svm_problem* problem) {
-    if (problem != nullptr) {
-        for (int i = 0; i < problem->l; i++) {
-            if (problem->x[i]) free((void *)problem->x[i]);
-            else {
-                cerr << "Error: Memory deallocation failed" << endl;
-            }
-        }
-        if (problem->x) free((void *)problem->x);
-        else {
-            cerr << "Error: Memory deallocation failed" << endl;
-        }
-        if (problem->y) free((void *)problem->y);
-        else {
-            cerr << "Error: Memory deallocation failed" << endl;
-        }
-        if (problem) free((void *)problem);
-        else {
-            cerr << "Error: Memory deallocation failed" << endl;
-        }
+float* SVMmodel::convertToDeviceLabels(const vector<int>& labels, int n_rows) {
+    float* h_labels = new float[n_rows];
+    for (int i = 0; i < n_rows; i++) {
+        h_labels[i] = static_cast<float>(labels[i]);
+    }
+    
+    float* d_labels;
+    cudaMalloc(&d_labels, n_rows * sizeof(float));
+    cudaMemcpy(d_labels, h_labels, n_rows * sizeof(float), cudaMemcpyHostToDevice);
+    
+    delete[] h_labels;
+    return d_labels;
+}
+
+void SVMmodel::freeDeviceMemory(float* ptr) {
+    if (ptr != nullptr) {
+        cudaFree(ptr);
     }
 }
 
@@ -101,62 +102,176 @@ void SVMmodel::train(const vector<vector<double>>& data,
         return;
     }
     
-    // Create problem structure
-    svm_problem* problem = createProblem(data, labels);
+    // Convert data to device arrays
+    int n_rows, n_cols;
+    float* d_data = convertToDeviceArray(data, n_rows, n_cols);
+    float* d_labels = convertToDeviceLabels(labels, n_rows);
+    n_features = n_cols;
     
-    // Check parameters
-    const char* errMsg = svm_check_parameter(problem, &parameters);
-    if (errMsg != nullptr) {
-        cerr << "Error: " << errMsg << endl;
-        freeProblem(problem);
-        return;
+    // Set auto gamma if not set
+    if (gamma == 0.0f) {
+        gamma = 1.0f / n_cols;
     }
     
-    // Train model
-    svm_set_print_string_function([](const char*) {}); // Suppress output
-    model = svm_train(problem, &parameters);
+    // Train the model using cuML C API
+    cumlError_t result = cumlSpSvcFit(
+        handle,
+        d_data,
+        n_rows,
+        n_cols,
+        d_labels,
+        C,
+        cache_size,
+        max_iter,
+        nochange_steps,
+        tol,
+        0,  // verbosity
+        kernel_type,
+        degree,
+        gamma,
+        coef0,
+        &n_support,
+        &b,
+        &dual_coefs,
+        &x_support,
+        &support_idx,
+        &n_classes,
+        &unique_labels
+    );
     
-    freeProblem(problem);
-    isTrained = true;
-    cout << "Model trained successfully" << endl;
+    if (result == CUML_SUCCESS) {
+        isTrained = true;
+        cout << "Model trained successfully" << endl;
+        cout << "Number of support vectors: " << n_support << endl;
+    } else {
+        cerr << "Error during training: cuML error code " << result << endl;
+    }
+    
+    // Free temporary device memory
+    freeDeviceMemory(d_data);
+    freeDeviceMemory(d_labels);
 }
 
 int SVMmodel::predict(const vector<double>& sample) const {
-    if (!isTrained || model == nullptr) {
+    if (!isTrained) {
         cerr << "Error: Model not trained" << endl;
         return -1;
     }
     
-    // Create feature node
-    int numFeatures = sample.size();
-    svm_node* x = (svm_node*)malloc((numFeatures + 1) * sizeof(svm_node));
-    for (int i = 0; i < numFeatures; i++) {
-        x[i].index = i + 1;
-        x[i].value = sample[i];
+    // Convert single sample to column-major format
+    int n_cols = sample.size();
+    float* h_sample = new float[n_cols];
+    for (int i = 0; i < n_cols; i++) {
+        h_sample[i] = static_cast<float>(sample[i]);
     }
-    x[numFeatures].index = -1;
     
-    // Predict
-    double prediction = svm_predict(model, x);
+    // Copy to device
+    float* d_sample;
+    cudaMalloc(&d_sample, n_cols * sizeof(float));
+    cudaMemcpy(d_sample, h_sample, n_cols * sizeof(float), cudaMemcpyHostToDevice);
     
-    if (x) free((void *)x);
-    else {
-        cerr << "Error: Memory deallocation failed" << endl;
+    // Allocate prediction output on device
+    float* d_pred;
+    cudaMalloc(&d_pred, sizeof(float));
+    
+    // Predict using cuML C API
+    cumlError_t result = cumlSpSvcPredict(
+        handle,
+        d_sample,
+        1,
+        n_features,
+        kernel_type,
+        degree,
+        gamma,
+        coef0,
+        n_support,
+        b,
+        dual_coefs,
+        x_support,
+        n_classes,
+        unique_labels,
+        d_pred,
+        200.0f,  // buffer_size
+        1        // predict_class = true
+    );
+    
+    // Copy result back to host
+    float h_pred = -1;
+    if (result == CUML_SUCCESS) {
+        cudaMemcpy(&h_pred, d_pred, sizeof(float), cudaMemcpyDeviceToHost);
+    } else {
+        cerr << "Error during prediction" << endl;
     }
-    return (int)prediction;
+    
+    // Cleanup
+    delete[] h_sample;
+    cudaFree(d_sample);
+    cudaFree(d_pred);
+    
+    return static_cast<int>(h_pred);
 }
 
 vector<int> SVMmodel::predictBatch(const vector<vector<double>>& samples) const {
-    vector<int> predictions;
-    for (const auto& sample : samples) {
-        predictions.push_back(predict(sample));
+    if (!isTrained) {
+        cerr << "Error: Model not trained" << endl;
+        return vector<int>();
     }
+    
+    // Convert batch to device array
+    int n_rows, n_cols;
+    float* d_samples = const_cast<SVMmodel*>(this)->convertToDeviceArray(samples, n_rows, n_cols);
+    
+    // Allocate predictions on device
+    float* d_preds;
+    cudaMalloc(&d_preds, n_rows * sizeof(float));
+    
+    // Predict using cuML C API
+    cumlError_t result = cumlSpSvcPredict(
+        handle,
+        d_samples,
+        n_rows,
+        n_features,
+        kernel_type,
+        degree,
+        gamma,
+        coef0,
+        n_support,
+        b,
+        dual_coefs,
+        x_support,
+        n_classes,
+        unique_labels,
+        d_preds,
+        200.0f,  // buffer_size
+        1        // predict_class = true
+    );
+    
+    vector<int> predictions;
+    if (result == CUML_SUCCESS) {
+        // Copy predictions back to host
+        float* h_preds = new float[n_rows];
+        cudaMemcpy(h_preds, d_preds, n_rows * sizeof(float), cudaMemcpyDeviceToHost);
+        
+        // Convert to vector<int>
+        predictions.resize(n_rows);
+        for (int i = 0; i < n_rows; i++) {
+            predictions[i] = static_cast<int>(h_preds[i]);
+        }
+        delete[] h_preds;
+    } else {
+        cerr << "Error during batch prediction" << endl;
+    }
+    
+    // Cleanup
+    const_cast<SVMmodel*>(this)->freeDeviceMemory(d_samples);
+    cudaFree(d_preds);
+    
     return predictions;
 }
 
 double SVMmodel::test(const vector<vector<double>>& testData, 
                       const vector<int>& testLabels) {
-    if (!isTrained || model == nullptr) {
+    if (!isTrained) {
         cerr << "Error: Model not trained" << endl;
         return 0.0;
     }
@@ -209,30 +324,21 @@ void SVMmodel::printConfusionMatrix(const vector<int>& predicted,
 }
 
 bool SVMmodel::save(const string& modelPath) const {
-    if (!isTrained || model == nullptr) {
+    if (!isTrained) {
         cerr << "Error: Model not trained or invalid" << endl;
         return false;
     }
     
-    if (svm_save_model(modelPath.c_str(), model) != 0) {
-        cerr << "Error: Failed to save model to " << modelPath << endl;
-        return false;
-    }
-    
-    cout << "Model saved to " << modelPath << endl;
-    return true;
+    // TODO: Implement custom model serialization for cuML
+    // cuML doesn't provide built-in save/load like libsvm
+    cerr << "Warning: Model save/load not yet implemented for cuML" << endl;
+    return false;
 }
 
 bool SVMmodel::load(const string& modelPath) {
-    model = svm_load_model(modelPath.c_str());
-    if (model == nullptr) {
-        cerr << "Error: Failed to load model from " << modelPath << endl;
-        return false;
-    }
-    
-    isTrained = true;
-    cout << "Model loaded from " << modelPath << endl;
-    return true;
+    // TODO: Implement custom model deserialization for cuML
+    cerr << "Warning: Model save/load not yet implemented for cuML" << endl;
+    return false;
 }
 
 double SVMmodel::getAccuracy() const {
@@ -244,17 +350,18 @@ bool SVMmodel::getIsTrained() const {
 }
 
 void SVMmodel::printModelInfo() const {
-    if (!isTrained || model == nullptr) {
+    if (!isTrained) {
         cout << "Model is not trained" << endl;
         return;
     }
     
-    cout << "\n=== SVM Model Information ===" << endl;
-    cout << "Number of support vectors: " << model->l << endl;
-    cout << "Number of classes: " << model->nr_class << endl;
-    cout << "Number of features: " << (model->SV[0] != nullptr ? "computed" : "unknown") << endl;
+    cout << "\n=== cuML SVM Model Information ===" << endl;
+    cout << "Number of support vectors: " << n_support << endl;
+    cout << "Number of classes: " << n_classes << endl;
+    cout << "Number of features: " << n_features << endl;
     cout << "Kernel type: RBF" << endl;
-    cout << "C parameter: " << parameters.C << endl;
+    cout << "C parameter: " << C << endl;
+    cout << "Gamma: " << gamma << endl;
     cout << "Accuracy: " << (accuracy * 100.0) << "%" << endl;
     cout << "============================\n" << endl;
 }

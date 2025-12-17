@@ -1,0 +1,90 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2019-2025, NVIDIA CORPORATION.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+#pragma once
+
+#include <cuml/matrix/kernel_params.hpp>
+
+#include <cublas_v2.h>
+
+namespace ML {
+namespace SVM {
+
+template <typename math_t>
+struct SvmModel;
+struct SvmParameter;
+
+// Forward declarations of the stateless API
+/**
+ * @brief Fit a support vector regressor to the training data.
+ *
+ * Each row of the input data stores a feature vector.
+ *
+ * The output buffers in model shall be unallocated on entry.
+ *
+ * @tparam math_t floating point type
+ * @param [in] handle the cuML handle
+ * @param [in] X device pointer for the input data in column major format.
+ *   Size n_rows x n_cols.
+ * @param [in] n_rows number of rows
+ * @param [in] n_cols number of columns
+ * @param [in] y device pointer for target values. Size [n_rows].
+ * @param [in] param parameters for training
+ * @param [in] kernel_params parameters for the kernel function
+ * @param [out] model parameters of the trained model
+ * @param [in] sample_weight optional sample weights, size [n_rows]
+ * @return n_iter: the number of solver iterations run during fitting
+ */
+template <typename math_t>
+int svrFit(const raft::handle_t& handle,
+           math_t* X,
+           int n_rows,
+           int n_cols,
+           math_t* y,
+           const SvmParameter& param,
+           ML::matrix::KernelParams& kernel_params,
+           SvmModel<math_t>& model,
+           const math_t* sample_weight = nullptr);
+
+/**
+ * @brief Fit a support vector regressor to the training data.
+ *
+ * Each row of the input data stores a feature vector.
+ *
+ * The output buffers in model shall be unallocated on entry.
+ *
+ * @tparam math_t floating point type
+ * @param [in] handle the cuML handle
+ * @param [in] indptr device pointer for CSR row positions. Size [n_rows + 1].
+ * @param [in] indices device pointer for CSR column indices. Size [nnz].
+ * @param [in] data device pointer for the CSR data. Size [nnz].
+ * @param [in] n_rows number of rows
+ * @param [in] n_cols number of columns
+ * @param [in] nnz number of stored entries.
+ * @param [in] y device pointer for target values. Size [n_rows].
+ * @param [in] param parameters for training
+ * @param [in] kernel_params parameters for the kernel function
+ * @param [out] model parameters of the trained model
+ * @param [in] sample_weight optional sample weights, size [n_rows]
+ * @return n_iter: the number of solver iterations run during fitting
+ */
+template <typename math_t>
+int svrFitSparse(const raft::handle_t& handle,
+                 int* indptr,
+                 int* indices,
+                 math_t* data,
+                 int n_rows,
+                 int n_cols,
+                 int nnz,
+                 math_t* y,
+                 const SvmParameter& param,
+                 ML::matrix::KernelParams& kernel_params,
+                 SvmModel<math_t>& model,
+                 const math_t* sample_weight = nullptr);
+
+// For prediction we use svcPredict
+
+};  // end namespace SVM
+};  // end namespace ML

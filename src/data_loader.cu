@@ -118,8 +118,8 @@ Dataset::Dataset()
     : data(nullptr), labels(nullptr), n(0), width(0), height(0), depth(0) {};
 
 Dataset::Dataset(int n, int width, int height, int depth)
-    : data(make_unique<float[]>(n * width * height * depth))
-    , labels(make_unique<int[]>(n))
+    : data(new float[n * width * height * depth])
+    , labels(new int[n])
     , n(n)
     , width(width)
     , height(height)
@@ -127,7 +127,7 @@ Dataset::Dataset(int n, int width, int height, int depth)
 
 Dataset::Dataset(unique_ptr<float[]> &data, int n, int width, int height, int depth)
     : data(move(data))
-    , labels(make_unique<int[]>(n))
+    , labels(new int[n])
     , n(n)
     , width(width)
     , height(height)
@@ -234,8 +234,8 @@ void shuffle_dataset(Dataset &dataset) {
   float *data        = dataset.get_data();
   int   *labels      = dataset.get_labels();
 
-  unique_ptr<float[]> new_data   = make_unique<float[]>(n * image_size);
-  unique_ptr<int[]>   new_labels = make_unique<int[]>(n);
+  unique_ptr<float[]> new_data(new float[n * image_size]);
+  unique_ptr<int[]>   new_labels(new int[n]);
 
   // Create list of indices
   vector<int> indices(n);

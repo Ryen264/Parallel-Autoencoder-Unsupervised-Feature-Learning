@@ -121,7 +121,10 @@ int main(int argc, char *argv[]) {
         string labels_path = DATASET_DIR + "/" + LABELS_FILE;
         FILE *lf = fopen(labels_path.c_str(), "rb");
         if (lf) {
-            fread(labels.data(), sizeof(int), NUM_TRAIN_SAMPLES, lf);
+            size_t labels_read = fread(labels.data(), sizeof(int), NUM_TRAIN_SAMPLES, lf);
+            if (labels_read != NUM_TRAIN_SAMPLES) {
+                cerr << "Warning: Expected " << NUM_TRAIN_SAMPLES << " labels, but read " << labels_read << endl;
+            }
             fclose(lf);
         } else {
             cerr << "Warning: Labels file not found, using random labels" << endl;

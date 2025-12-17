@@ -26,9 +26,9 @@ DEPS := $(OBJECTS:.o=.d)
 
 TARGET_DIR = bin
 GPU_AUTOENCODER_DEPS = $(OBJ_DIR)/data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_DIR)/timer.o $(OBJ_DIR)/utils.o $(GPU_OBJECTS)
-GPU_AUTOENCODER_TARGET = gpu_autoencoder
+GPU_AUTOENCODER_TARGET = gpu_main
 
-gpu_autoencoder: $(GPU_AUTOENCODER_DEPS)
+gpu_main: $(GPU_AUTOENCODER_DEPS)
 	@echo "Compiling gpu autoencoder..."
 	@mkdir -p $(TARGET_DIR)
 	$(NVCC) $(NVCC_FLAGS) -o $(TARGET_DIR)/$(GPU_AUTOENCODER_TARGET) $(GPU_AUTOENCODER_DEPS)

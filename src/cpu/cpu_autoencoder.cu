@@ -603,7 +603,7 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
     // Save at checkpoints
     if (checkpoint > 0 && epoch % checkpoint == 0) {
       stringstream builder;
-      builder << output_dir << '/' << "gpu_autoencoder_" << epoch << ".bin";
+      builder << output_dir << '/' << "cpu_autoencoder_" << epoch << ".bin";
       save_parameters(builder.str().c_str());
     }
   }

@@ -1,9 +1,9 @@
 #include "visualization.h"
 
-void generate_bar_chart_svg(const std::vector<std::string>& labels, const std::vector<double>& times, const std::string& filename) {
-    std::ofstream file(filename);
+void generate_bar_chart_svg(const vector<string>& labels, const vector<double>& times, const string& filename) {
+    ofstream file(filename);
     if (!file.is_open()) {
-        std::cerr << "Error: Cannot open file " << filename << std::endl;
+        cerr << "Error: Cannot open file " << filename << endl;
         return;
     }
     
@@ -17,7 +17,7 @@ void generate_bar_chart_svg(const std::vector<std::string>& labels, const std::v
     int chart_width = width - margin_left - margin_right;
     int chart_height = height - margin_top - margin_bottom;
     
-    double max_time = *std::max_element(times.begin(), times.end());
+    double max_time = *max_element(times.begin(), times.end());
     int bar_height = chart_height / labels.size() - 20;
     
     // SVG header
@@ -34,7 +34,7 @@ void generate_bar_chart_svg(const std::vector<std::string>& labels, const std::v
     file << "  <text x=\"" << width/2 << "\" y=\"30\" class=\"title\" text-anchor=\"middle\">Training Time by Phase</text>\n";
     
     // Draw bars
-    std::vector<std::string> colors = {"#4472C4", "#ED7D31", "#A5A5A5", "#FFC000", "#5B9BD5"};
+    vector<string> colors = {"#4472C4", "#ED7D31", "#A5A5A5", "#FFC000", "#5B9BD5"};
     for (size_t i = 0; i < labels.size(); ++i) {
         int y = margin_top + i * (bar_height + 20);
         int bar_width = static_cast<int>((times[i] / max_time) * chart_width);
@@ -50,7 +50,7 @@ void generate_bar_chart_svg(const std::vector<std::string>& labels, const std::v
         
         // Value
         file << "  <text x=\"" << (margin_left + bar_width + 5) << "\" y=\"" << (y + bar_height/2 + 5) 
-             << "\" class=\"value\">" << std::fixed << std::setprecision(2) << times[i] << "s</text>\n";
+             << "\" class=\"value\">" << fixed << setprecision(2) << times[i] << "s</text>\n";
     }
     
     // X-axis
@@ -62,13 +62,13 @@ void generate_bar_chart_svg(const std::vector<std::string>& labels, const std::v
     
     file << "</svg>\n";
     file.close();
-    std::cout << "Bar chart SVG saved to " << filename << std::endl;
+    cout << "Bar chart SVG saved to " << filename << endl;
 }
 
-void generate_speedup_graph_svg(const std::vector<std::string>& labels, const std::vector<double>& speedups, const std::string& filename) {
-    std::ofstream file(filename);
+void generate_speedup_graph_svg(const vector<string>& labels, const vector<double>& speedups, const string& filename) {
+    ofstream file(filename);
     if (!file.is_open()) {
-        std::cerr << "Error: Cannot open file " << filename << std::endl;
+        cerr << "Error: Cannot open file " << filename << endl;
         return;
     }
     
@@ -82,7 +82,7 @@ void generate_speedup_graph_svg(const std::vector<std::string>& labels, const st
     int chart_width = width - margin_left - margin_right;
     int chart_height = height - margin_top - margin_bottom;
     
-    double max_speedup = *std::max_element(speedups.begin(), speedups.end());
+    double max_speedup = *max_element(speedups.begin(), speedups.end());
     double y_scale = chart_height / (max_speedup * 1.2); // 20% padding
     double x_step = labels.size() > 1 ? chart_width / (labels.size() - 1) : 0;
     
@@ -117,7 +117,7 @@ void generate_speedup_graph_svg(const std::vector<std::string>& labels, const st
          << "\" class=\"label\" text-anchor=\"middle\">Phase</text>\n";
     
     // Draw line and points
-    std::stringstream path;
+    stringstream path;
     path << "M ";
     for (size_t i = 0; i < labels.size(); ++i) {
         int x = margin_left + (labels.size() == 1 ? chart_width/2 : static_cast<int>(i * x_step));
@@ -140,7 +140,7 @@ void generate_speedup_graph_svg(const std::vector<std::string>& labels, const st
         // Draw speedup value
         file << "  <text x=\"" << x << "\" y=\"" << (y - 10) 
              << "\" class=\"value\" text-anchor=\"middle\">" 
-             << std::fixed << std::setprecision(2) << speedups[i] << "x</text>\n";
+             << fixed << setprecision(2) << speedups[i] << "x</text>\n";
     }
     
     // Draw line
@@ -150,13 +150,13 @@ void generate_speedup_graph_svg(const std::vector<std::string>& labels, const st
     
     file << "</svg>\n";
     file.close();
-    std::cout << "Speedup graph SVG saved to " << filename << std::endl;
+    cout << "Speedup graph SVG saved to " << filename << endl;
 }
 
-void generate_visualization_html(const std::string& bar_chart_file, const std::string& speedup_file, const std::string& html_file) {
-    std::ofstream file(html_file);
+void generate_visualization_html(const string& bar_chart_file, const string& speedup_file, const string& html_file) {
+    ofstream file(html_file);
     if (!file.is_open()) {
-        std::cerr << "Error: Cannot open file " << html_file << std::endl;
+        cerr << "Error: Cannot open file " << html_file << endl;
         return;
     }
     
@@ -193,6 +193,6 @@ void generate_visualization_html(const std::string& bar_chart_file, const std::s
     file << "  </div>\n";
     file << "</body>\n</html>\n";
     file.close();
-    std::cout << "\n✓ Visualization HTML dashboard saved to " << html_file << std::endl;
-    std::cout << "  Open " << html_file << " in your browser to view the charts." << std::endl;
+    cout << "\n✓ Visualization HTML dashboard saved to " << html_file << endl;
+    cout << "  Open " << html_file << " in your browser to view the charts." << endl;
 }

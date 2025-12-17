@@ -1,10 +1,4 @@
-#include <algorithm>
-#include <cstring>
-
-#include "constants.h"
-#include "cpu_layers.h"
-#include "macro.h"
-using namespace std;
+#include "cpu/cpu_layers.h"
 
 void cpu_conv2D(float *in,
                 float *filter,

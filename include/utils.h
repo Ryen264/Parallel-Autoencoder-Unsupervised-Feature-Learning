@@ -2,13 +2,17 @@
 #define UTILS_H
 
 #include <string>
+#include <iomanip>
+#include <sstream>
+#include <cmath>
+using namespace std;
 
 /**
  * @brief Format time in milliseconds to string
  *
  * @param time_ms Time in milliseconds
- * @return std::string The formated string
+ * @return string The formated string
  */
-std::string format_time(float time_ms);
+string format_time(float time_ms);
 
 #endif

@@ -1,9 +1,4 @@
-#include "constants.h"
-#include "gpu_layers.h"
-#include "macro.h"
-#include <algorithm>
-
-using std::max_element;
+#include "gpu/gpu_layers.h"
 
 // -------------------- Conv2D Forward --------------------
 __global__ void gpu_conv2D_kernel(float *in,

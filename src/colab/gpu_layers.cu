@@ -1,4 +1,4 @@
-#include "gpu_layers.h"
+#include "gpu/gpu_layers.h"
 
 // -------------------- Conv2D Forward --------------------
 __global__ void gpu_conv2D_kernel(float *in,

@@ -2,6 +2,20 @@
 #define CPU_AUTOENCODER_H
 
 #include "data_loader.h"
+#include "constants.h"
+#include "cpu_layers.h"
+#include "progress_bar.h"
+#include "timer.h"
+#include "utils.h"
+
+#include <algorithm>
+#include <chrono>
+#include <cstdio>
+#include <cstring>
+#include <fstream>
+#include <sstream>
+#include <utility>
+using namespace std;
 
 /**
  * @brief The class that encapsulates the network using CPU

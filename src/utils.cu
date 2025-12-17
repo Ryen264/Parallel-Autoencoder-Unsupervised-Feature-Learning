@@ -1,18 +1,18 @@
 #include "utils.h"
-#include <iomanip>
-#include <sstream>
 
-std::string format_time(float time_ms) {
-  std::stringstream builder;
+string format_time(float time_ms) {
+  stringstream builder;
   time_ms /= 1000;
 
   if (time_ms < 60) {
-    builder << std::fixed << std::setprecision(3) << time_ms << 's';
+    builder << fixed << setprecision(3) << time_ms << 's';
     return builder.str();
   }
 
-  auto [total_min, sec] = std::div(time_ms, 60);
-  auto [hour, min]      = std::div(total_min, 60);
+  int total_min = static_cast<int>(time_ms) / 60;
+  int sec = static_cast<int>(time_ms) % 60;
+  int hour = total_min / 60;
+  int min = total_min % 60;
 
   int entry = 0;
 

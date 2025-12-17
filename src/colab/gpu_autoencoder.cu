@@ -1,4 +1,4 @@
-#include "gpu_autoencoder.h"
+#include "gpu/gpu_autoencoder.h"
 
 /**
  * @brief Generate a random array with elements between -0.01 and 0.01

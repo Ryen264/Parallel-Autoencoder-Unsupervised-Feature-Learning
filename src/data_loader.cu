@@ -151,12 +151,12 @@ float *Dataset::get_data() const { return data.get(); }
 int *Dataset::get_labels() const { return labels.get(); }
 
 // Load CIFAR-10 dataset from binary files
-Dataset load_dataset(const char *dataset_dir, bool is_train) {
+Dataset load_dataset(const char *dataset_dir, int n_batches, bool is_train) {
   // Check if CUDA is available
   int  deviceCount;
   bool use_cuda = (cudaGetDeviceCount(&deviceCount) == cudaSuccess && deviceCount > 0);
 
-  int num_samples = is_train ? NUM_TRAIN_SAMPLES : NUM_TEST_SAMPLES;
+  int num_samples = is_train ? n_batches * NUM_PER_BATCH : NUM_TEST_SAMPLES;
 
   // Allocate memory for images and labels
   // Use new[] because unique_ptr uses delete[] by default
@@ -171,7 +171,7 @@ Dataset load_dataset(const char *dataset_dir, bool is_train) {
   if (is_train) {
     // Load training data (5 batches)
     printf("Loading training data from %s...\n", dataset_dir);
-    for (int batch = 1; batch <= NUM_BATCHES; batch++) {
+    for (int batch = 1; batch <= n_batches; batch++) {
       char filepath[512];
       snprintf(filepath, sizeof(filepath), "%s/data_batch_%d.bin", dataset_dir, batch);
 

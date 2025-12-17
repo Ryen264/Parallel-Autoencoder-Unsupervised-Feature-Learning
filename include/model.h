@@ -4,9 +4,10 @@
 #include <vector>
 #include <string>
 
-// #include <libsvm/svm.h>
-// !git clone https://github.com/cjlin1/libsvm.git
-#include "/content/libsvm/svm.h"
+// cuML SVM C API header
+#include <cuml/svm/svm_api.h>
+#include <cuml/cuml_api.h>
+
 using namespace std;
 
 class SVMmodel {
@@ -23,15 +24,36 @@ Evaluate
 + Compare with baseline methods
 */
 private:
-    svm_model* model;
-    svm_parameter parameters;
+    cumlHandle_t handle;
+    
+    // Model parameters
+    int n_support;
+    float b;
+    float* dual_coefs;
+    float* x_support;
+    int* support_idx;
+    int n_classes;
+    float* unique_labels;
+    
+    // Training parameters
+    float C;
+    float cache_size;
+    int max_iter;
+    int nochange_steps;
+    float tol;
+    cumlSvmKernelType kernel_type;
+    int degree;
+    float gamma;
+    float coef0;
+    
     double accuracy;
     bool isTrained;
+    int n_features;
     
-    // Helper methods
-    svm_problem* createProblem(const vector<vector<double>>& data, 
-                              const vector<int>& labels);
-    void freeProblem(svm_problem* problem);
+    // Helper methods for data conversion
+    float* convertToDeviceArray(const vector<vector<double>>& data, int& n_rows, int& n_cols);
+    float* convertToDeviceLabels(const vector<int>& labels, int n_rows);
+    void freeDeviceMemory(float* ptr);
     void initializeParameters();
 
 public:

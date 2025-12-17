@@ -1,9 +1,18 @@
 #ifndef DATASET_H
 #define DATASET_H
 
-// Use unique_ptr to prevent memory leak
+#include "constants.h"
+
 #include <memory>
 #include <vector>
+#include <algorithm>
+#include <cstring>
+#include <random>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+#include <utility>
+#include <cuda_runtime.h>
 using namespace std;
 
 /**
@@ -11,18 +20,12 @@ using namespace std;
  *
  */
 struct Dataset {
-    // The list of images (flattened)
-    unique_ptr<float[]> data;
-    // The list of the labels
-    unique_ptr<int[]> labels;
-    // The number of images in the list
-    int n;
-    // The width of the image
-    int width;
-    // The height of the image
-    int height;
-    // The bit-depth of the image
-    int depth;
+    unique_ptr<float[]> data;   // The list of images (flattened)
+    unique_ptr<int[]> labels;   // The list of the labels
+    int n;                      // The number of images in the list
+    int width;                  // The width of the image
+    int height;                 // The height of the image
+    int depth;                  // The depth of the image
 
     /**
      * @brief Default constructor - creates an empty dataset

@@ -1,3 +1,10 @@
+#include "constants.h"
+#include "data_loader.h"
+#include "model.h"
+#include "visualization.h"
+#include "cpu_autoencoder.h"
+#include "gpu_autoencoder.h"
+
 #include <iostream>
 #include <vector>
 #include <cstdio>
@@ -5,31 +12,27 @@
 #include <fstream>
 #include <iomanip>
 #include <string>
-
-#include "constants.h"
-#include "cpu_autoencoder.h"
-#include "data_loader.h"
-#include "model.h"
-#include "visualization.h"
+#include <memory>
 using namespace std;
 
-string DATASET_DIR = "./data/cifar-10-batches-bin";
-// string DATASET_DIR = "/content/drive/MyDrive/@fithcmú/LapTrinhSongSong/data/cifar-10-batches-bin";
-string MODEL_OUTPUT_DIR = "./model";
-// string MODEL_OUTPUT_DIR = "/content/model";
+// const string DATASET_DIR       = "./data/cifar-10-batches-bin";
+const string DATASET_DIR          = "/content/drive/MyDrive/@fithcmú/LapTrinhSongSong/data/cifar-10-batches-bin";
+// const string MODEL_OUTPUT_DIR  = "./model";
+const string MODEL_OUTPUT_DIR     = "/content/model";
 
-string ENCODED_DATASET_FILE = "encoded_dataset.bin";
-string LABELS_FILE = "labels.bin";
-string SVM_MODEL_FILE = "svm_model.bin";
+const string ENCODED_DATASET_FILE = "encoded_dataset.bin";
+const string LABELS_FILE          = "labels.bin";
+const string SVM_MODEL_FILE       = "svm_model.bin";
 
-string VISUALIZATION_TRAINING_TIMES_SVG = "training_times.svg";
-string VISUALIZATION_TRAINING_TIMES_CSV = "training_times.csv";
-string VISUALIZATION_SPEEDUP_GRAPH_SVG = "speedup_graph.svg";
-string VISUALIZATION_SPEEDUP_GRAPH_CSV = "speedup_data.csv";
-string VISUALIZATION_HTML_DASHBOARD = "performance_analysis.html";
+const string VISUALIZATION_TRAINING_TIMES_SVG = "training_times.svg";
+const string VISUALIZATION_TRAINING_TIMES_CSV = "training_times.csv";
+const string VISUALIZATION_SPEEDUP_GRAPH_SVG  = "speedup_graph.svg";
+const string VISUALIZATION_SPEEDUP_GRAPH_CSV  = "speedup_data.csv";
+const string VISUALIZATION_HTML_DASHBOARD     = "performance_analysis.html";
 
-string RUN_MODE = "all"; // "phase_1", "phase_2", "all"
-bool USE_DUMMY_DATA = false; // only for phase 2
+const string RUN_MODE = "all"; // "phase_1", "phase_2", "all"
+const bool USE_DUMMY_DATA = false; // only for phase 2
+const bool IS_SAVE_MODEL = true;
 
 Dataset dummy_dataset(int n, int width, int height, int depth) {
     unique_ptr<float[]> data(new float[n * width * height * depth]);
@@ -41,25 +44,33 @@ Dataset dummy_dataset(int n, int width, int height, int depth) {
 
 Dataset phase_1_cpu(const char *dataset_dir, const char *output_dir,
                     bool is_train = true, int n_epoch = 20, int batch_size = 32, float learning_rate = 0.001f, bool verbose = false, int checkpoint = 0) {
-    // Read dataset
     Dataset dataset = load_dataset(dataset_dir, is_train);
-
-    // Shuffle dataset
     shuffle_dataset(dataset);
 
-    // Create and train model
     Cpu_Autoencoder autoencoder;
-    printf("Training Autoencoder for %d epochs with batch size %d and learning rate %.4f\n", 
+    printf("Training CPU Autoencoder for %d epochs with batch size %d and learning rate %.4f\n", 
            n_epoch, batch_size, learning_rate);
     autoencoder.fit(dataset, n_epoch, batch_size, learning_rate, verbose, checkpoint, output_dir);
 
-    // Eval
-    printf("Autoencoder MSE = %.4f", autoencoder.eval(dataset));
+    printf("CPU autoencoder MSE = %.4f", autoencoder.eval(dataset));
     return autoencoder.encode(dataset);
 }
 
-double phase_2(const Dataset &encoded_dataset, const vector<int> &labels, float train_ratio = 0.8f) {
-    // Prepare data for SVM
+Dataset phase_1_gpu(const char *dataset_dir, const char *output_dir,
+                    bool is_train = true, int n_epoch = 20, int batch_size = 32, float learning_rate = 0.001f, bool verbose = false, int checkpoint = 0) {
+    Dataset dataset = load_dataset(dataset_dir, is_train);
+    shuffle_dataset(dataset);
+
+    Gpu_Autoencoder autoencoder;
+    printf("Training GPU Autoencoder for %d epochs with batch size %d and learning rate %.4f\n", 
+           n_epoch, batch_size, learning_rate);
+    autoencoder.fit(dataset, n_epoch, batch_size, learning_rate, verbose, checkpoint, output_dir);
+
+    printf("GPU autoencoder MSE = %.4f", autoencoder.eval(dataset));
+    return autoencoder.encode(dataset);
+}
+
+double phase_2(const Dataset &encoded_dataset, const vector<int> &labels, float train_ratio = 0.8f, bool is_save_model = true) {
     vector<vector<double>> data;
     for (int i = 0; i < encoded_dataset.n; ++i) {
         vector<double> sample(encoded_dataset.width * encoded_dataset.height * encoded_dataset.depth);
@@ -77,11 +88,22 @@ double phase_2(const Dataset &encoded_dataset, const vector<int> &labels, float 
     vector<int> testLabels(labels.begin() + train_size, labels.end());
 
     // Train SVM model
-    SVMmodel svm_model;
+    SVMmodel svm_model(C, KERNEL_TYPE, GAMMA_TYPE, TOLERANCE, CACHE_SIZE, MAX_ITER, NOCHANGE_STEPS);
     svm_model.train(trainData, trainLabels);
 
     // Test SVM model
-    double accuracy = svm_model.test(testData, testLabels);
+    vector<int> predictions = svm_model.predict(testData);
+    double accuracy = svm_model.calculateAccuracy(testLabels, predictions, NUM_CLASSES);
+    vector<double> conf_matrix = svm_model.calculateConfusionMatrix(testLabels, predictions, NUM_CLASSES);
+
+    svm_model.printAccuracy(accuracy);
+    svm_model.printConfusionMatrix(conf_matrix);
+
+    if (is_save_model) {
+        string svm_model_path = MODEL_OUTPUT_DIR + "/" + SVM_MODEL_FILE;
+        svm_model.save(svm_model_path);
+    }
+
     return accuracy;
 }
 
@@ -211,7 +233,7 @@ int main(int argc, char *argv[]) {
 
         // Train SVM on encoded data
         auto start_time = chrono::high_resolution_clock::now();
-        double accuracy = phase_2(encoded_dataset, labels, TRAIN_RATIO);
+        double accuracy = phase_2(encoded_dataset, labels, TRAIN_RATIO, IS_SAVE_MODEL);
         auto end_time = chrono::high_resolution_clock::now();
         
         double phase2_time = chrono::duration<double>(end_time - start_time).count();
@@ -226,13 +248,7 @@ int main(int argc, char *argv[]) {
         }
         
         cout << "SVM Accuracy on Encoded Data: " << accuracy * 100.0 << "%" << endl;
-        cout << "Phase 2 completed in " << fixed << setprecision(2) 
-                  << phase2_time << " seconds" << endl;
-        
-        // Save the trained SVM model
-        SVMmodel svm_model;
-        string svm_model_path = MODEL_OUTPUT_DIR + "/" + SVM_MODEL_FILE;
-        svm_model.save(svm_model_path);
+        cout << "Phase 2 completed in " << fixed << setprecision(2) << phase2_time << " seconds" << endl;
     }
 
     // Generate visualizations if any phase was run

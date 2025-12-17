@@ -27,7 +27,7 @@ DEPS := $(OBJECTS:.o=.d)
 TARGET_DIR = bin
 GPU_TRAIN_TARGET = gpu_autoencoder_train
 
-gpu: $(OBJECTS) $(GPU_OBJECTS)
+gpu_train: data_loader.o progress_bar.o timer.o utils.o $(GPU_OBJECTS)
 	@mkdir -p $(TARGET_DIR)
 	$(NVCC) $(NVCC_FLAGS) -o $(TARGET_DIR)/$(GPU_TRAIN_TARGET) $(OBJECTS) $(GPU_OBJECTS)
 

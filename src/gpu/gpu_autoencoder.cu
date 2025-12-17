@@ -667,6 +667,13 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
   Timer timer;
   float total_time = 0;
 
+  printf(
+      "Training GPU Autoencoder for %d epochs with batch size %d and learning rate "
+      "%.4f\n",
+      n_epoch,
+      batch_size,
+      learning_rate);
+
   puts("=======================TRAINING START=======================");
   for (int epoch = 1; epoch <= n_epoch; ++epoch) {
     printf("Epoch %d/%d:\n", epoch, n_epoch);

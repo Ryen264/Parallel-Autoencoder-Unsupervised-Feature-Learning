@@ -7,10 +7,6 @@
 #include <string>
 #include <fstream>
 #include <cuda_runtime.h>   // CUDA runtime for cudaStream_t
-// #include <cuml-new/cpp/include/cuml/svm/svc.hpp>
-// #include <raft/cpp/include/raft/core/handle.hpp>
-// #include <rmm/cpp/include/rmm/device_uvector.hpp>
-// #include <rmm/cpp/include/rmm/device_buffer.hpp>
 #include <cuml/svm/svc.hpp>
 #include <raft/core/handle.hpp>
 #include <rmm/device_uvector.hpp>
@@ -34,7 +30,7 @@ private:
     bool    is_trained;
     int     n_features;
 
-    handle_t handle;        // RAFT handle
+    raft::handle_t handle;        // RAFT handle
     ML::SVM::SVC<float> svm_model;          // cuML ML::SVM model
     
     // Training parameters

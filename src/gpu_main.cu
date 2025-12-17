@@ -1,9 +1,10 @@
+#include "constants.h"
 #include "data_loader.h"
 #include "gpu_autoencoder.h"
 
 int main() {
-  Dataset dataset = load_dataset("data");
+  Dataset dataset = load_dataset("data/cifar-10-batches-bin");
 
   Gpu_Autoencoder autoencoder;
-  autoencoder.fit(dataset, 20, 32, 0.001, true, 0);
+  autoencoder.fit(dataset, N_EPOCH, BATCH_SIZE, LEARNING_RATE, VERBOSE, CHECKPOINT);
 }

@@ -5,14 +5,13 @@
 #include <cstdio>
 #include <filesystem>
 #include <fstream>
-#include <string_view>
 using namespace std;
 
-constexpr string_view DATASET_DIR          = "./data/cifar-10-batches-bin";
-constexpr string_view MODEL_OUTPUT_DIR     = "./model";
-constexpr string_view ENCODED_DATASET_DIR  = "./data/encoded";
-constexpr string_view ENCODED_DATASET_FILE = "./data/encoded/gpu_encoded_dataset.bin";
-constexpr string_view ENCODED_LABEL_FILE   = "./data/encoded/gpu_label_dataset.bin";
+constexpr const char *DATASET_DIR          = "./data/cifar-10-batches-bin";
+constexpr const char *MODEL_OUTPUT_DIR     = "./model";
+constexpr const char *ENCODED_DATASET_DIR  = "./data/encoded";
+constexpr const char *ENCODED_DATASET_FILE = "./data/encoded/gpu_encoded_dataset.bin";
+constexpr const char *ENCODED_LABEL_FILE   = "./data/encoded/gpu_label_dataset.bin";
 constexpr int         N_BATCHES            = 2;
 
 // Dataset phase_1_gpu(const char *dataset_dir,

@@ -2,16 +2,19 @@
 #define SVM_MODEL_H
 
 #include "constants.h"
+#include "libsvm/svm.h"
+
+#include <cmath>
+#include <cstring>
 #include <iostream>
 #include <vector>
 #include <string>
 #include <fstream>
-#include <cuda_runtime.h>   // CUDA runtime for cudaStream_t
-#include <cuml/svm/svc.hpp>
-#include <raft/core/handle.hpp>
-#include <rmm/device_uvector.hpp>
-#include <rmm/device_buffer.hpp>
 using namespace std;
+
+// Forward declaration of libsvm structures
+struct svm_model;
+struct svm_node;
 
 class SVMmodel {
 /*
@@ -30,8 +33,8 @@ private:
     bool    is_trained;
     int     n_features;
 
-    raft::handle_t handle;        // RAFT handle
-    ML::SVM::SVC<float> svm_model;          // cuML ML::SVM model
+    // LIBSVM model
+    svm_model* svm_model;
     
     // Training parameters
     float   C;
@@ -48,17 +51,13 @@ private:
 
     // Model parameters
     int     n_support;
-    float   b;
-    float*  dual_coefs;
-    float*  x_support;
-    int*    support_idx;
+    float   bias;
     int     n_classes;
-    float*  unique_labels;
     
     // Helper methods for data conversion
-    float* convertToDeviceArray(const vector<vector<double>>& data, int& n_rows, int& n_cols);
-    float* convertToDeviceLabels(const vector<int>& labels, int n_rows);
-    void freeDeviceMemory(float* ptr);
+    float*  convertToDeviceArray(const vector<vector<double>>& data, int& n_rows, int& n_cols);
+    float*  convertToDeviceLabels(const vector<int>& labels, int n_rows);
+    void    freeDeviceMemory(float* ptr);
 
 public:
     // Constructor and Destructor
@@ -73,6 +72,7 @@ public:
     // Prediction
     vector<int> predict(const vector<vector<double>>& samples) const;
     double calculateAccuracy(const vector<int>& predicted, const vector<int>& actual, int numClasses = 10);
+    vector<vector<int>> calculateClassificationReport(const vector<int>& predicted, const vector<int>& actual, int numClasses = 10);
     vector<vector<int>> calculateConfusionMatrix(const vector<int>& predicted, const vector<int>& actual, int numClasses = 10);
 
     // Testing

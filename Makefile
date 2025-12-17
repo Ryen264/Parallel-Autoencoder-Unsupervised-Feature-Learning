@@ -5,7 +5,9 @@
 NVCC = nvcc
 CXX = g++
 NVCC_FLAGS = -std=c++20 -arch=sm_75 -O3 --expt-relaxed-constexpr -diag-suppress 3012
-INCLUDE_DIRS = -I./include -I./include/cpu -I./include/gpu
+INCLUDE_DIRS = -I./include -I./include/cpu -I./include/gpu -I./libsvm
+LIBSVM_DIR = libsvm
+LIBSVM_OBJ = $(LIBSVM_DIR)/svm.o
 
 # Source files
 SRC_DIR = src
@@ -28,10 +30,15 @@ TARGET_DIR = bin
 GPU_AUTOENCODER_DEPS = $(OBJ_DIR)/data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_DIR)/timer.o $(OBJ_DIR)/utils.o $(GPU_OBJECTS)
 GPU_AUTOENCODER_TARGET = gpu_autoencoder
 
-gpu_autoencoder: $(GPU_AUTOENCODER_DEPS)
+# Compile libsvm
+$(LIBSVM_OBJ): $(LIBSVM_DIR)/svm.cpp
+	@echo "Compiling libsvm..."
+	$(CXX) -c -O3 -fPIC $(LIBSVM_DIR)/svm.cpp -o $(LIBSVM_OBJ)
+
+gpu_autoencoder: $(LIBSVM_OBJ) $(GPU_AUTOENCODER_DEPS)
 	@echo "Compiling gpu autoencoder..."
 	@mkdir -p $(TARGET_DIR)
-	$(NVCC) $(NVCC_FLAGS) -o $(TARGET_DIR)/$(GPU_AUTOENCODER_TARGET) $(GPU_AUTOENCODER_DEPS)
+	$(NVCC) $(NVCC_FLAGS) -o $(TARGET_DIR)/$(GPU_AUTOENCODER_TARGET) $(GPU_AUTOENCODER_DEPS) $(LIBSVM_OBJ)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu $(CONSTANTS) $(MACRO)
 	@echo "Compiling $<..."
@@ -39,4 +46,4 @@ $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu $(CONSTANTS) $(MACRO)
 	$(NVCC) $(NVCC_FLAGS) $(INCLUDE_DIRS) -c $< -o $@
 
 clean:
-	@rm -rf $(OBJ_DIR) $(TARGET_DIR)
+	@rm -rf $(OBJ_DIR) $(TARGET_DIR) $(LIBSVM_OBJ)

@@ -15,15 +15,13 @@
 #include <memory>
 using namespace std;
 
-string RUN_MODE       = "alls";   // "phase_1", "phase_2", "all"
-string HARDWARE_MODE  = "gpu";    // "cpu", "gpu"
-bool USE_DUMMY_DATA   = false;    // only for phase 2
+string RUN_MODE       = "all";  // "phase_1", "phase_2", "all"
+string HARDWARE_MODE  = "gpu";  // "cpu", "gpu"
+bool USE_DUMMY_DATA   = false;  // only for phase 2
 bool IS_SAVE_MODEL    = true;
 
-// const string DATASET_DIR       = "./data/cifar-10-batches-bin";
-const string DATASET_DIR          = "/content/drive/MyDrive/@fithcmú/LapTrinhSongSong/data/cifar-10-batches-bin";
-// const string MODEL_OUTPUT_DIR  = "./model";
-const string MODEL_OUTPUT_DIR     = "/content/model";
+const string DATASET_DIR       = "./data/cifar-10-batches-bin";
+const string MODEL_OUTPUT_DIR  = "./model";
 
 const string ENCODED_DATASET_FILE = "encoded_dataset.bin";
 const string LABELS_FILE          = "labels.bin";

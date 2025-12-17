@@ -21,17 +21,17 @@ constexpr int IMAGE_HEIGHT = 32;
 constexpr int IMAGE_DEPTH  = 3;
 constexpr int IMAGE_SIZE   = IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH;
 
-constexpr float C = 10.0f;
-constexpr string KERNEL_TYPE = "RBF";
-constexpr string GAMMA_TYPE  = "auto";
-constexpr float TOLERANCE    = 1e-3f;
-constexpr float CACHE_SIZE   = 200.0f; // in MB
-constexpr int   MAX_ITER      = 100;
-constexpr int   NOCHANGE_STEPS = 100;
-constexpr int   VERBOSITY     = 0;
-
-constexpr int CONV_FILTER_WIDTH  = 3;
-constexpr int CONV_FILTER_HEIGHT = 3;
+// SVM parameters
+constexpr float  C_PARAM            = 10.0f;
+constexpr const char* KERNEL_PARAM  = "RBF";
+constexpr const char* GAMMA_PARAM   = "auto";
+constexpr float  TOLERANCE          = 1e-3f;
+constexpr float  CACHE_SIZE         = 200.0f; // in MB
+constexpr int    MAX_ITER           = 100;
+constexpr int    NOCHANGE_STEPS     = 100;
+constexpr int    VERBOSITY          = 0;
+constexpr int    CONV_FILTER_WIDTH  = 3;
+constexpr int    CONV_FILTER_HEIGHT = 3;
 
 constexpr int MAX_FILTER_DEPTH = 256;
 constexpr int MAX_IMAGE_SIZE   = IMAGE_WIDTH * IMAGE_HEIGHT * MAX_FILTER_DEPTH;

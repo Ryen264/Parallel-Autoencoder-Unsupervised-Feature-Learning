@@ -169,7 +169,6 @@ Dataset load_dataset(const char *dataset_dir, int n_batches, bool is_train) {
   }
 
   if (is_train) {
-    // Load training data (5 batches)
     printf("Loading training data from %s...\n", dataset_dir);
     for (int batch = 1; batch <= n_batches; batch++) {
       char filepath[512];
@@ -190,7 +189,7 @@ Dataset load_dataset(const char *dataset_dir, int n_batches, bool is_train) {
       else {
         fprintf(stderr, "Error: Memory deallocation failed\n");
       }
-      printf("  ✓ Loaded batch %d/%d\n", batch, NUM_BATCHES);
+      printf("  ✓ Loaded batch %d/%d\n", batch, n_batches);
     }
     printf("✓ Training data loaded: %d samples\n", num_samples);
   } else {

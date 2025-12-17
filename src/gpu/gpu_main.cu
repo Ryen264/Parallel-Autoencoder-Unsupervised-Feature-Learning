@@ -41,9 +41,9 @@ constexpr int         N_BATCHES            = 2;
 
 int main() {
   Gpu_Autoencoder autoencoder;
-  Dataset         dataset = load_dataset(DATASET_DIR.data(), N_BATCHES, true);
+  Dataset         dataset = load_dataset(DATASET_DIR, N_BATCHES, true);
 
-  autoencoder.fit(train_dataset,
+  autoencoder.fit(dataset,
                   N_EPOCH,
                   BATCH_SIZE,
                   LEARNING_RATE,
@@ -53,7 +53,7 @@ int main() {
 
   puts("\n=======================ENCODING TEST DATASET=======================");
   filesystem::create_directories(ENCODED_DATASET_DIR);
-  dataset = load_dataset(DATASET_DIR.data(), 1, false);
+  dataset = load_dataset(DATASET_DIR, 1, false);
 
   Dataset encoded_dataset      = autoencoder.encode(dataset);
   int     encoded_dataset_size = encoded_dataset.n *
@@ -61,11 +61,11 @@ int main() {
                              encoded_dataset.height *
                              encoded_dataset.depth *
                              sizeof(float);
-  ofstream buffer(ENCODED_DATASET_FILE, "wb");
+  ofstream buffer(ENCODED_DATASET_FILE, ios::out | ios::binary);
   buffer.write(encoded_dataset.get_data(), encoded_dataset_size);
   buffer.close();
 
-  buffer.open(ENCODED_LABEL_FILE, "wb");
+  buffer.open(ENCODED_LABEL_FILE, ios::out | ios::binary);
   buffer.write(encoded_dataset.get_labels(), encoded_dataset.n * sizeof(int));
   buffer.close();
 }

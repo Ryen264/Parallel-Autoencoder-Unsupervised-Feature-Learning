@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <numeric>
 #include <sstream>
@@ -680,6 +681,8 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
 
   // Allocate memory for training
   _allocate_output_mem(batch_size, dataset.width, dataset.height);
+
+  std::filesystem::create_directories(output_dir);
 
   Timer timer;
   float total_time = 0;

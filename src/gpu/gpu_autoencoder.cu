@@ -6,7 +6,7 @@
  * @param arr The array
  * @param n The number of elements
  */
-void generate_array(float *arr, int n, const mt19937 &rng) {
+void generate_array(float *arr, int n, mt19937 &rng) {
   vector<float>              tmp(n);
   normal_distribution<float> d(0.0f, sqrt(2.0f / n));
   for (int i = 0; i < n; ++i)

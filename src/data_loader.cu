@@ -14,11 +14,11 @@
     }                                                                                  \
   } while (0)
 
-// CUDA kernel for normalization: convert uint8 [0, 255] to float [-1, 1]
+// CUDA kernel for normalization: convert uint8 [0, 255] to float [0, 1]
 __global__ void normalizeKernel(unsigned char *input, float *output, int size) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < size)
-    output[idx] = input[idx] / 127.5f - 1.0f;
+    output[idx] = input[idx] / 255.0f;
 }
 
 // Read a single CIFAR-10 binary file

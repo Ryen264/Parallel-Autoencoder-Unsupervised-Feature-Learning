@@ -1,15 +1,16 @@
 #include "gpu_autoencoder.h"
 
 /**
- * @brief Generate a random array with elements between -0.01 and 0.01
+ * @brief Generate a random array with elements using Kaiming initialization
  *
  * @param arr The array
  * @param n The number of elements
  */
-void generate_array(float *arr, int n) {
-  vector<float> tmp(n);
+void generate_array(float *arr, int n, const mt19937 &rng) {
+  vector<float>       tmp(n);
+  normal_distribution d(0, sqrt(2.0f / n));
   for (int i = 0; i < n; ++i)
-    tmp[i] = 0.2f * (rand() - RAND_MAX / 2) / RAND_MAX;
+    tmp[i] = d(rng);
   CUDA_CHECK(cudaMemcpy(arr, tmp.data(), n * sizeof(float), cudaMemcpyHostToDevice));
 }
 
@@ -41,24 +42,25 @@ void write_data(ostream &buffer, float *data, int size) {
 
 Gpu_Autoencoder::Gpu_Autoencoder() {
   _allocate_mem();
+  mt19937 rng(time(nullptr));
 
   // Random init
   srand(time(0));
 
-  generate_array(_encoder_filter_1, ENCODER_FILTER_1_SIZE);
-  generate_array(_encoder_bias_1, ENCODER_FILTER_1_DEPTH);
+  generate_array(_encoder_filter_1, ENCODER_FILTER_1_SIZE, rng);
+  generate_array(_encoder_bias_1, ENCODER_FILTER_1_DEPTH, rng);
 
-  generate_array(_encoder_filter_2, ENCODER_FILTER_2_SIZE);
-  generate_array(_encoder_bias_2, ENCODER_FILTER_2_DEPTH);
+  generate_array(_encoder_filter_2, ENCODER_FILTER_2_SIZE, rng);
+  generate_array(_encoder_bias_2, ENCODER_FILTER_2_DEPTH, rng);
 
-  generate_array(_decoder_filter_1, DECODER_FILTER_1_SIZE);
-  generate_array(_decoder_bias_1, DECODER_FILTER_1_DEPTH);
+  generate_array(_decoder_filter_1, DECODER_FILTER_1_SIZE, rng);
+  generate_array(_decoder_bias_1, DECODER_FILTER_1_DEPTH, rng);
 
-  generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE);
-  generate_array(_decoder_bias_2, DECODER_FILTER_2_DEPTH);
+  generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE, rng);
+  generate_array(_decoder_bias_2, DECODER_FILTER_2_DEPTH, rng);
 
-  generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE);
-  generate_array(_decoder_bias_2, DECODER_FILTER_2_DEPTH);
+  generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE, rng);
+  generate_array(_decoder_bias_2, DECODER_FILTER_2_DEPTH, rng);
 }
 
 Gpu_Autoencoder::Gpu_Autoencoder(const char *filename) {

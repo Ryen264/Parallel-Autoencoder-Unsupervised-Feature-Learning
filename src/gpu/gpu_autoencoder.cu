@@ -863,9 +863,11 @@ Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
   // Placeholder, alternating
   float *a, *b;
   CUDA_CHECK(cudaMalloc(
-      &a, ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH * sizeof(float)));
+      &a,
+      ENCODE_BATCH_SIZE * 4 * width * 4 * height * MAX_FILTER_DEPTH * sizeof(float)));
   CUDA_CHECK(cudaMalloc(
-      &b, ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH * sizeof(float)));
+      &b,
+      ENCODE_BATCH_SIZE * 4 * width * 4 * height * MAX_FILTER_DEPTH * sizeof(float)));
 
   for (int i = 0; i < n_batch; ++i) {
     int in_offset      = i * ENCODE_BATCH_SIZE;

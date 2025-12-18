@@ -834,11 +834,11 @@ Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const {
                     _block_size_3D_3);
 
     // Copy batch
-    CUDA_CHECK(cudaMemcpy(res.get_data() + out_offset,
+    CUDA_CHECK(cudaMemcpy(res.get_data() + out_offset * encoded_image_size,
                           b,
                           cur_batch_size * encoded_image_size * sizeof(float),
                           cudaMemcpyDeviceToHost));
-    out_offset += cur_batch_size * encoded_image_size;
+    out_offset += cur_batch_size;
   }
 
   // Free memory
@@ -964,11 +964,11 @@ Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
                  _block_size_1D);
 
     // Copy batch
-    CUDA_CHECK(cudaMemcpy(res.get_data() + out_offset,
+    CUDA_CHECK(cudaMemcpy(res.get_data() + out_offset * decoded_image_size,
                           b,
                           cur_batch_size * decoded_image_size * sizeof(float),
                           cudaMemcpyDeviceToHost));
-    out_offset += cur_batch_size * decoded_image_size;
+    out_offset += cur_batch_size;
   }
 
   CUDA_CHECK(cudaFree(a));

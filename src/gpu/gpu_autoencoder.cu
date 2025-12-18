@@ -872,7 +872,7 @@ Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
     int cur_batch_size = min(ENCODE_BATCH_SIZE, n - in_offset);
 
     CUDA_CHECK(cudaMemcpy(b,
-                          dataset.get_data() + in_offset,
+                          dataset.get_data() + in_offset * image_size,
                           cur_batch_size * image_size * sizeof(float),
                           cudaMemcpyHostToDevice));
 

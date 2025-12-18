@@ -8,7 +8,7 @@
  */
 void generate_array(float *arr, int n, const mt19937 &rng) {
   vector<float>       tmp(n);
-  normal_distribution d(0, sqrt(2.0f / n));
+  normal_distribution d(0.0f, sqrt(2.0f / n));
   for (int i = 0; i < n; ++i)
     tmp[i] = d(rng);
   CUDA_CHECK(cudaMemcpy(arr, tmp.data(), n * sizeof(float), cudaMemcpyHostToDevice));

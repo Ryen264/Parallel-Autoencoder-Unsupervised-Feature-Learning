@@ -59,7 +59,7 @@ Gpu_Autoencoder::Gpu_Autoencoder() {
   generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE, rng);
   CUDA_CHECK(cudaMemset(_decoder_bias_2, 0, DECODER_FILTER_2_DEPTH * sizeof(float)));
 
-  generate_array(_decoder_filter_3, DECODER_FILTER_2_SIZE, rng);
+  generate_array(_decoder_filter_3, DECODER_FILTER_3_SIZE, rng);
   CUDA_CHECK(cudaMemset(_decoder_bias_3, 0, DECODER_FILTER_3_DEPTH * sizeof(float)));
 }
 

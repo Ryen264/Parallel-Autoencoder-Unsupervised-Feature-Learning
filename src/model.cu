@@ -76,8 +76,111 @@ void SVMmodel::freeDeviceMemory(float* ptr) {
     }
 }
 
+// Custom LIBSVM output handler for progress tracking
+static string libsvm_buffer = "";
+static int libsvm_epoch_counter = 0;
+static Timer* libsvm_timer = nullptr;
+static bool capturing_raw = false;
+static vector<string> raw_lines;
+static string current_iter = "N/A";
+
+static void print_libsvm_progress(const char *s) {
+    // Append all incoming text
+    libsvm_buffer += s;
+    
+    // Process complete lines
+    size_t newline_pos = libsvm_buffer.find('\n');
+    while (newline_pos != string::npos) {
+        string line = libsvm_buffer.substr(0, newline_pos);
+        libsvm_buffer = libsvm_buffer.substr(newline_pos + 1);
+        
+        // Start capturing when optimization finished appears
+        if (line.find("optimization finished") != string::npos) {
+            capturing_raw = true;
+            raw_lines.clear();
+            raw_lines.push_back(line);
+            
+            // Extract #iter from this line
+            size_t iter_pos = line.find("#iter = ");
+            if (iter_pos != string::npos) {
+                size_t iter_end = line.find(",", iter_pos);
+                if (iter_end == string::npos) iter_end = line.length();
+                current_iter = line.substr(iter_pos + 8, iter_end - (iter_pos + 8));
+                while (!current_iter.empty() && isspace(current_iter.back())) current_iter.pop_back();
+            }
+        }
+        // Continue capturing subsequent lines (nu, obj, nSV, etc.)
+        else if (capturing_raw) {
+            // Check if this line contains useful information
+            bool is_data_line = (line.find("nu = ") != string::npos || 
+                                 line.find("obj = ") != string::npos || 
+                                 line.find("nSV") != string::npos || 
+                                 line.find("rho") != string::npos);
+            
+            if (is_data_line) {
+                // Continue capturing data lines
+                raw_lines.push_back(line);
+            } else if (line.find("*") != string::npos || 
+                       (line.empty() && raw_lines.size() > 1) ||
+                       line.find("....") != string::npos) {
+                // Stop capturing when we see separator or empty line after data
+                capturing_raw = false;
+                libsvm_epoch_counter++;
+                
+                // Parse obj from captured lines
+                string obj_str = "N/A";
+                for (const auto& raw_line : raw_lines) {
+                    size_t obj_pos = raw_line.find("obj = ");
+                    if (obj_pos != string::npos) {
+                        size_t obj_end = raw_line.find(",", obj_pos);
+                        if (obj_end == string::npos) obj_end = raw_line.length();
+                        obj_str = raw_line.substr(obj_pos + 6, obj_end - (obj_pos + 6));
+                        while (!obj_str.empty() && isspace(obj_str.back())) obj_str.pop_back();
+                        break;
+                    }
+                }
+                
+                // Get elapsed time
+                float elapsed_time = 0.0f;
+                if (libsvm_timer) {
+                    libsvm_timer->stop();
+                    elapsed_time = libsvm_timer->get();
+                }
+                
+                // Display formatted output
+                printf("Classifier %d: #iter = %s, loss = %s, time = %s\n", 
+                       libsvm_epoch_counter, 
+                       current_iter.c_str(), 
+                       obj_str.c_str(),
+                       format_time(elapsed_time).c_str());
+                
+                // Print all raw lines
+                printf("  [Raw Output:\n");
+                for (const auto& raw_line : raw_lines) {
+                    printf("    %s\n", raw_line.c_str());
+                }
+                printf("  ]\n");
+                fflush(stdout);
+                
+                raw_lines.clear();
+            }
+            // If not a data line and not a stop condition, just skip it
+        }
+        
+        newline_pos = libsvm_buffer.find('\n');
+    }
+}
+
 void SVMmodel::train(const vector<vector<double>>& data, const vector<int>& labels) {
+    // Use custom LIBSVM output handler to display progress
+    libsvm_buffer.clear();
+    svm_set_print_string_function(&print_libsvm_progress);
+    
+    puts("=======================TRAINING START=======================");
     cout << "Starting SVM training with LIBSVM..." << endl;
+    
+    Timer timer;
+    timer.start();
     
     int n_samples = data.size();
     if (n_samples == 0) {
@@ -139,10 +242,33 @@ void SVMmodel::train(const vector<vector<double>>& data, const vector<int>& labe
     param.weight_label = nullptr;
     param.weight = nullptr;
     
-    cout << "Training with parameters:" << endl;
+    cout << "\nTraining with parameters:" << endl;
     cout << "  C: " << param.C << endl;
     cout << "  Kernel: " << kernel_type << endl;
     cout << "  Gamma: " << param.gamma << endl;
+    cout << "  Max iterations: " << max_iter << endl;
+    cout << "  Tolerance: " << tolerance << endl;
+    cout << "  Cache size: " << cache_size << " MB" << endl;
+    cout << "  Shrinking: " << (param.shrinking ? "enabled" : "disabled") << endl;
+    
+    // Count unique classes
+    set<int> unique_labels(labels.begin(), labels.end());
+    int n_unique_classes = unique_labels.size();
+    int n_binary_classifiers = (n_unique_classes * (n_unique_classes - 1)) / 2;
+    
+    cout << "\nTraining information:" << endl;
+    cout << "  Training samples: " << n_samples << endl;
+    cout << "  Features per sample: " << n_features << endl;
+    cout << "  Number of classes: " << n_unique_classes << endl;
+    cout << "  Binary classifiers (one-vs-one): " << n_binary_classifiers << endl;
+    cout << "  Batch size: " << n_samples << " (full dataset)" << endl;
+    cout << endl;
+    
+    cout << "Training Progress (optimizing " << n_binary_classifiers << " binary classifiers):" << endl;
+    
+    // Initialize epoch counter and timer for LIBSVM progress tracking
+    libsvm_epoch_counter = 0;
+    libsvm_timer = &timer;
     
     // Check parameters
     const char* error_msg = svm_check_parameter(&prob, &param);
@@ -162,6 +288,10 @@ void SVMmodel::train(const vector<vector<double>>& data, const vector<int>& labe
     }
     svm_model = svm_train(&prob, &param);
     
+    timer.stop();
+    float training_time = timer.get();
+    libsvm_timer = nullptr;  // Clear timer reference
+    
     // Store model information
     n_support = svm_model->l;
     n_classes = svm_model->nr_class;
@@ -175,9 +305,13 @@ void SVMmodel::train(const vector<vector<double>>& data, const vector<int>& labe
     delete[] prob.y;
     
     is_trained = true;
+    
+    printf(" - Time = %s\n", format_time(training_time).c_str());
+    puts("\n========================TRAINING END========================");
     cout << "Training completed successfully!" << endl;
     cout << "Number of support vectors: " << n_support << endl;
     cout << "Number of classes: " << n_classes << endl;
+    printf("Total training time: %s\n\n", format_time(training_time).c_str());
 }
 
 vector<int> SVMmodel::predict(const vector<vector<double>>& samples) const {
@@ -194,7 +328,20 @@ vector<int> SVMmodel::predict(const vector<vector<double>>& samples) const {
         throw runtime_error("Test data feature dimensions don't match training data!");
     }
     
+    cout << "\n======================PREDICTION START======================" << endl;
     cout << "Predicting on " << n_samples << " test samples..." << endl;
+    
+    cout << "\nPrediction information:" << endl;
+    cout << "  Test samples: " << n_samples << endl;
+    cout << "  Features per sample: " << n_features << endl;
+    cout << "  Number of classes: " << n_classes << endl;
+    cout << "  Number of support vectors: " << n_support << endl;
+    cout << endl;
+    
+    cout << "Prediction Progress:" << endl;
+    
+    Timer timer;
+    timer.start();
     
     vector<int> predictions(n_samples);
     
@@ -215,9 +362,41 @@ vector<int> SVMmodel::predict(const vector<vector<double>>& samples) const {
         predictions[i] = static_cast<int>(pred);
         
         delete[] x;
+        
+        // Display progress at milestones
+        bool should_display = false;
+        
+        if ((i + 1) % 1000 == 0) {
+            should_display = true;
+        } else if (n_samples >= 4) {
+            // Show at 25%, 50%, 75%, 100%
+            if ((i + 1) == n_samples / 4 || (i + 1) == n_samples / 2 || 
+                (i + 1) == 3 * n_samples / 4 || (i + 1) == n_samples) {
+                should_display = true;
+            }
+        } else if ((i + 1) == n_samples) {
+            // Always show at end
+            should_display = true;
+        }
+        
+        if (should_display) {
+            float elapsed_time = timer.get();
+            float progress = ((i + 1) * 100.0f) / n_samples;
+            printf("Predicted %d/%d samples (%.1f%%), time = %s\n", 
+                   i + 1, n_samples, progress, format_time(elapsed_time).c_str());
+            fflush(stdout);
+        }
     }
     
+    timer.stop();
+    float total_time = timer.get();
+    float avg_time_per_sample = total_time / n_samples;
+    
+    puts("");
+    cout << "=======================PREDICTION END=======================" << endl;
     cout << "Prediction completed!" << endl;
+    printf("Total prediction time: %s\n", format_time(total_time).c_str());
+    printf("Average time per sample: %s\n\n", format_time(avg_time_per_sample).c_str());
     return predictions;
 }
 

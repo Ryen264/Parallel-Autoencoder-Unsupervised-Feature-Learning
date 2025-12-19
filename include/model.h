@@ -3,6 +3,10 @@
 
 #include "constants.h"
 #include "libsvm/svm.h"
+#include "macro.h"
+#include "progress_bar.h"
+#include "timer.h"
+#include "utils.h"
 
 #include <cmath>
 #include <cstring>
@@ -10,6 +14,7 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <set>
 using namespace std;
 
 // Forward declaration of libsvm structures

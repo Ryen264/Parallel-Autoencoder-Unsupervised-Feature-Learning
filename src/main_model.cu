@@ -17,8 +17,10 @@ using namespace std;
 bool USE_DUMMY_DATA   = true;  // only for phase 2
 bool IS_SAVE_MODEL    = true;
 
-const string DATASET_DIR            = "./data/cifar-10-batches-bin";
-const string MODEL_OUTPUT_DIR       = "./model";
+// const string DATASET_DIR            = "./data/cifar-10-batches-bin";
+const string DATASET_DIR            = "/content/data/cifar-10-batches-bin";
+// const string MODEL_OUTPUT_DIR       = "./model";
+const string MODEL_OUTPUT_DIR       = "/content/model";
 
 const string ENCODED_DATASET_FILE   = "encoded_dataset.bin";
 const string LABELS_FILE            = "labels.bin";
@@ -86,11 +88,12 @@ int main(int argc, char *argv[]) {
     if (USE_DUMMY_DATA) {
         // Use dummy data for phase 2
         cout << "Using dummy data for Phase 2" << endl;
-        encoded_dataset = dummy_dataset(NUM_TRAIN_SAMPLES, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
+        int num_samples = NUM_TRAIN_SAMPLES + NUM_TEST_SAMPLES;
+        encoded_dataset = dummy_dataset(num_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
         
         // Create dummy labels
-        labels.resize(NUM_TRAIN_SAMPLES);
-        for (int i = 0; i < NUM_TRAIN_SAMPLES; ++i) {
+        labels.resize(num_samples);
+        for (int i = 0; i < num_samples; ++i) {
             labels[i] = rand() % NUM_CLASSES; // 10 classes
         }
     } else {
@@ -133,6 +136,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Train SVM on encoded data
-    double accuracy = phase_2(encoded_dataset, labels, TRAIN_RATIO, IS_SAVE_MODEL);
+    float train_ratio = NUM_TRAIN_SAMPLES / static_cast<float>(NUM_TRAIN_SAMPLES + NUM_TEST_SAMPLES);
+    double accuracy = phase_2(encoded_dataset, labels, train_ratio, IS_SAVE_MODEL);
     return 0;
 }

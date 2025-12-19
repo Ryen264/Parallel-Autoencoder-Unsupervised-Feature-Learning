@@ -98,7 +98,7 @@ __global__ void optimized1_conv2D_kernel(float *in,
         int cur_col = j - padding_x + f_j;
         if (cur_col >= 0)
           s_in[GET_1D_IDX_2D(shared_y, f_j, shared_width)] =
-              in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+              in[GET_1D_IDX(i, cur_col, d, width, height)];
       }
     }
 
@@ -107,7 +107,7 @@ __global__ void optimized1_conv2D_kernel(float *in,
         int cur_col = j + f_j;
         if (cur_col < width)
           s_in[GET_1D_IDX_2D(shared_y, shared_x + f_j, shared_width)] =
-              in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+              in[GET_1D_IDX(i, cur_col, d, width, height)];
       }
     }
 
@@ -122,7 +122,7 @@ __global__ void optimized1_conv2D_kernel(float *in,
     }
   }
 
-  out[GET_1D_IDX(y, x, f, width, height)] = sum;
+  out[GET_1D_IDX(i, j, f, width, height)] = sum;
 }
 
 // -------------------- Bias --------------------
@@ -331,16 +331,14 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
 
   int    padding_y     = CONV_FILTER_HEIGHT / 2;
   int    padding_x     = CONV_FILTER_WIDTH / 2;
-  int    shared_y      = tid_y + padding;
-  int    shared_x      = tid_x + padding;
+  int    shared_y      = tid_y + padding_y;
+  int    shared_x      = tid_x + padding_x;
   int    shared_height = dim_y + CONV_FILTER_HEIGHT - 1;
   int    shared_width  = dim_x + CONV_FILTER_WIDTH - 1;
-  float *filter_offset = filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;
   float  sum           = 0;
-
   float *d_filter_offset =
       d_filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;
-  float d_out_val = d_out[GET_1D_IDX(y, x, f, width, height)];
+  float d_out_val = d_out[GET_1D_IDX(i, j, f, width, height)];
 
   for (int d = 0; d < depth; ++d) {
     if (tid_x == 0 && tid_y == 0 && tid_z == 0)
@@ -409,7 +407,7 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
         int cur_col = j - padding_x + f_j;
         if (cur_col >= 0)
           s_in[GET_1D_IDX_2D(shared_y, f_j, shared_width)] =
-              in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+              in[GET_1D_IDX(i, cur_col, d, width, height)];
       }
     }
 
@@ -418,7 +416,7 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
         int cur_col = j + f_j;
         if (cur_col < width)
           s_in[GET_1D_IDX_2D(shared_y, shared_x + f_j, shared_width)] =
-              in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+              in[GET_1D_IDX(i, cur_col, d, width, height)];
       }
     }
 
@@ -426,10 +424,10 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
 
     for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
       for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
-        atomic_add(d_filter_offset +
-                       GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT),
-                   s_in[GET_1D_IDX_2D(tid_y + f_i, tid_x + f_j, shared_width)] *
-                       d_out_val);
+        atomicAdd(d_filter_offset +
+                      GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT),
+                  s_in[GET_1D_IDX_2D(tid_y + f_i, tid_x + f_j, shared_width)] *
+                      d_out_val);
       }
     }
   }

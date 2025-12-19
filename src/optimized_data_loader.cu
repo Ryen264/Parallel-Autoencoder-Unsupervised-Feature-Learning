@@ -204,7 +204,7 @@ Optimized_Dataset load_dataset(const char *dataset_dir,
 
   Optimized_Dataset dataset(num_samples, IMAGE_WIDTH, IMAGE_DEPTH, IMAGE_DEPTH);
   float            *data   = dataset.data;
-  float            *labels = dataset.labels;
+  int              *labels = dataset.labels;
 
   if (!data || !labels) {
     fprintf(stderr, "Error: Memory allocation failed\n");

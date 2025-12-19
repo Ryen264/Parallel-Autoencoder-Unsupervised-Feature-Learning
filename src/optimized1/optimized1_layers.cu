@@ -50,7 +50,7 @@ __global__ void optimized1_conv2D_kernel(float *in,
           for (int f_j = 0; f_j < padding_x; ++f_j) {
             int cur_col = j - padding_x + f_j;
             if (cur_col >= 0)
-              s_in[GET_1D_IDX(f_i, f_j, shared_width)] =
+              s_in[GET_1D_IDX_2D(f_i, f_j, shared_width)] =
                   in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
           }
         }
@@ -77,7 +77,7 @@ __global__ void optimized1_conv2D_kernel(float *in,
           for (int f_j = 0; f_j < padding_x; ++f_j) {
             int cur_col = j - padding_x + f_j;
             if (cur_col >= 0)
-              s_in[GET_1D_IDX(shared_y + f_i, f_j, shared_width)] =
+              s_in[GET_1D_IDX_2D(shared_y + f_i, f_j, shared_width)] =
                   in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
           }
         }
@@ -97,7 +97,7 @@ __global__ void optimized1_conv2D_kernel(float *in,
       for (int f_j = 0; f_j < padding_x; ++f_j) {
         int cur_col = j - padding_x + f_j;
         if (cur_col >= 0)
-          s_in[GET_1D_IDX(shared_y, f_j, shared_width)] =
+          s_in[GET_1D_IDX_2D(shared_y, f_j, shared_width)] =
               in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
       }
     }
@@ -361,7 +361,7 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
           for (int f_j = 0; f_j < padding_x; ++f_j) {
             int cur_col = j - padding_x + f_j;
             if (cur_col >= 0)
-              s_in[GET_1D_IDX(f_i, f_j, shared_width)] =
+              s_in[GET_1D_IDX_2D(f_i, f_j, shared_width)] =
                   in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
           }
         }
@@ -388,7 +388,7 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
           for (int f_j = 0; f_j < padding_x; ++f_j) {
             int cur_col = j - padding_x + f_j;
             if (cur_col >= 0)
-              s_in[GET_1D_IDX(shared_y + f_i, f_j, shared_width)] =
+              s_in[GET_1D_IDX_2D(shared_y + f_i, f_j, shared_width)] =
                   in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
           }
         }
@@ -408,7 +408,7 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
       for (int f_j = 0; f_j < padding_x; ++f_j) {
         int cur_col = j - padding_x + f_j;
         if (cur_col >= 0)
-          s_in[GET_1D_IDX(shared_y, f_j, shared_width)] =
+          s_in[GET_1D_IDX_2D(shared_y, f_j, shared_width)] =
               in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
       }
     }

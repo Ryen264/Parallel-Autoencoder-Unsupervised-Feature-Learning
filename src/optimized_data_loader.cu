@@ -104,7 +104,7 @@ __global__ void normalizeKernel(unsigned char *input, float *output, int size) {
 
 // Read a single CIFAR-10 binary file
 static void
-readBinaryFile(const char *filepath, unsigned char **raw_data, int num_samples) {
+readBinaryFile(const char *filepath, unsigned char *raw_data, int num_samples) {
   FILE *file = fopen(filepath, "rb");
   if (!file) {
     fprintf(stderr, "Error: Cannot open file %s\n", filepath);
@@ -114,24 +114,13 @@ readBinaryFile(const char *filepath, unsigned char **raw_data, int num_samples) 
   int record_size = 1 + IMAGE_SIZE; // 1 byte label + 3072 bytes image
   int total_size  = num_samples * record_size;
 
-  *raw_data = (unsigned char *)malloc(total_size);
-  if (!*raw_data) {
-    fprintf(stderr, "Error: Memory allocation failed\n");
+  size_t read_size = fread(raw_data, 1, total_size, file);
+  if (read_size != total_size) {
+    fprintf(stderr, "Error: Could not read complete file %s\n", filepath);
     fclose(file);
     exit(EXIT_FAILURE);
   }
 
-  size_t read_size = fread(*raw_data, 1, total_size, file);
-  if (read_size != total_size) {
-    fprintf(stderr, "Error: Could not read complete file %s\n", filepath);
-    if (raw_data)
-      free((void *)*raw_data);
-    else {
-      fprintf(stderr, "Error: Memory deallocation failed\n");
-    }
-    fclose(file);
-    exit(EXIT_FAILURE);
-  }
   fclose(file);
 }
 
@@ -139,77 +128,56 @@ readBinaryFile(const char *filepath, unsigned char **raw_data, int num_samples) 
 static void parseAndNormalize(unsigned char *raw_data,
                               float         *images,
                               int           *labels,
-                              int            num_samples,
-                              bool           use_cuda) {
+                              int            num_samples) {
   int record_size = 1 + IMAGE_SIZE;
 
   // Extract labels
   for (int i = 0; i < num_samples; i++)
     labels[i] = (int)raw_data[i * record_size];
 
-  if (use_cuda) {
-    // Allocate device memory for raw image data
-    unsigned char *d_raw_images;
-    float         *d_images;
-    int            image_data_size = num_samples * IMAGE_SIZE;
+  // Allocate device memory for raw image data
+  unsigned char *d_raw_images;
+  float         *d_images;
+  int            image_data_size = num_samples * IMAGE_SIZE;
 
-    CUDA_CHECK(cudaMalloc(&d_raw_images, image_data_size * sizeof(unsigned char)));
-    CUDA_CHECK(cudaMalloc(&d_images, image_data_size * sizeof(float)));
+  CUDA_CHECK(cudaMalloc(&d_raw_images, image_data_size * sizeof(unsigned char)));
+  CUDA_CHECK(cudaMalloc(&d_images, image_data_size * sizeof(float)));
 
-    // Copy raw image data to device (skip labels)
-    unsigned char *raw_images = (unsigned char *)malloc(image_data_size);
-    for (int i = 0; i < num_samples; i++)
-      memcpy(raw_images + i * IMAGE_SIZE, raw_data + i * record_size + 1, IMAGE_SIZE);
+  // Copy raw image data to device (skip labels)
+  unsigned char *raw_images;
+  CUDA_CHECK(cudaMallocHost(&raw_images, image_data_size));
+  for (int i = 0; i < num_samples; i++)
+    memcpy(raw_images + i * IMAGE_SIZE, raw_data + i * record_size + 1, IMAGE_SIZE);
 
-    CUDA_CHECK(cudaMemcpy(d_raw_images,
-                          raw_images,
-                          image_data_size * sizeof(unsigned char),
-                          cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(d_raw_images,
+                        raw_images,
+                        image_data_size * sizeof(unsigned char),
+                        cudaMemcpyHostToDevice));
 
-    // Launch normalization kernel
-    int blocksPerGrid = (image_data_size + MAX_BLOCK_SIZE - 1) / MAX_BLOCK_SIZE;
+  // Launch normalization kernel
+  int blocksPerGrid = (image_data_size + MAX_BLOCK_SIZE - 1) / MAX_BLOCK_SIZE;
 
-    normalizeKernel<<<blocksPerGrid, MAX_BLOCK_SIZE>>>(
-        d_raw_images, d_images, image_data_size);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
+  normalizeKernel<<<blocksPerGrid, MAX_BLOCK_SIZE>>>(
+      d_raw_images, d_images, image_data_size);
+  CUDA_CHECK(cudaGetLastError());
+  CUDA_CHECK(cudaDeviceSynchronize());
 
-    // Copy normalized data back to host
-    CUDA_CHECK(cudaMemcpy(
-        images, d_images, image_data_size * sizeof(float), cudaMemcpyDeviceToHost));
+  // Copy normalized data back to host
+  CUDA_CHECK(cudaMemcpy(
+      images, d_images, image_data_size * sizeof(float), cudaMemcpyDeviceToHost));
 
-    // Cleanup
-    if (raw_images)
-      free((void *)raw_images);
-    else {
-      fprintf(stderr, "Error: Memory deallocation failed\n");
-    }
-    CUDA_CHECK(cudaFree((void *)d_raw_images));
-    CUDA_CHECK(cudaFree((void *)d_images));
-  } else {
-    // CPU normalization
-    for (int i = 0; i < num_samples; i++)
-      for (int j = 0; j < IMAGE_SIZE; j++)
-        images[i * IMAGE_SIZE + j] = raw_data[i * record_size + 1 + j] / 255.0f;
-  }
+  // Cleanup
+  CUDA_CHECK(cudaFreeHost(raw_images));
+  CUDA_CHECK(cudaFree(d_raw_images));
+  CUDA_CHECK(cudaFree(d_images));
 }
 
-Optimized_Dataset load_dataset(const char *dataset_dir,
-                               int         n_batches,
-                               bool        is_train) { // Check if CUDA is available
-  int  deviceCount;
-  bool use_cuda = (cudaGetDeviceCount(&deviceCount) == cudaSuccess && deviceCount > 0);
-
+Optimized_Dataset load_dataset(const char *dataset_dir, int n_batches, bool is_train) {
   int num_samples = is_train ? n_batches * NUM_PER_BATCH : NUM_TEST_SAMPLES;
 
-  Optimized_Dataset dataset(num_samples, IMAGE_WIDTH, IMAGE_DEPTH, IMAGE_DEPTH);
-  float            *data   = dataset.data;
-  int              *labels = dataset.labels;
-
-  if (!data || !labels) {
-    fprintf(stderr, "Error: Memory allocation failed\n");
-    exit(EXIT_FAILURE);
-  }
+  Optimized_Dataset dataset(num_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
+  unsigned char    *raw_data;
+  CUDA_CHECK(cudaMallocHost(&raw_data, (IMAGE_SIZE + 1) * NUM_PER_BATCH));
 
   if (is_train) {
     printf("Loading training data from %s...\n", dataset_dir);
@@ -217,23 +185,17 @@ Optimized_Dataset load_dataset(const char *dataset_dir,
       char filepath[512];
       snprintf(filepath, sizeof(filepath), "%s/data_batch_%d.bin", dataset_dir, batch);
 
-      unsigned char *raw_data;
-      readBinaryFile(filepath, &raw_data, NUM_TRAIN_SAMPLES / NUM_BATCHES);
+      readBinaryFile(filepath, raw_data, NUM_PER_BATCH);
 
-      int offset = (batch - 1) * (NUM_TRAIN_SAMPLES / NUM_BATCHES);
+      int offset = (batch - 1) * NUM_PER_BATCH;
       parseAndNormalize(raw_data,
                         dataset.data + offset * IMAGE_SIZE,
                         dataset.labels + offset,
-                        NUM_TRAIN_SAMPLES / NUM_BATCHES,
-                        use_cuda);
+                        NUM_PER_BATCH);
 
-      if (raw_data)
-        free((void *)raw_data);
-      else {
-        fprintf(stderr, "Error: Memory deallocation failed\n");
-      }
       printf("  ✓ Loaded batch %d/%d\n", batch, n_batches);
     }
+
     printf("✓ Training data loaded: %d samples\n", num_samples);
   } else {
     // Load test data
@@ -241,17 +203,13 @@ Optimized_Dataset load_dataset(const char *dataset_dir,
     char filepath[512];
     snprintf(filepath, sizeof(filepath), "%s/test_batch.bin", dataset_dir);
 
-    unsigned char *raw_data;
-    readBinaryFile(filepath, &raw_data, NUM_TEST_SAMPLES);
-    parseAndNormalize(
-        raw_data, dataset.data, dataset.labels, NUM_TEST_SAMPLES, use_cuda);
-    if (raw_data)
-      free((void *)raw_data);
-    else {
-      fprintf(stderr, "Error: Memory deallocation failed\n");
-    }
+    readBinaryFile(filepath, raw_data, NUM_TEST_SAMPLES);
+    parseAndNormalize(raw_data, dataset.data, dataset.labels, NUM_TEST_SAMPLES);
+
     printf("✓ Test data loaded: %d samples\n", num_samples);
   }
+
+  CUDA_CHECK(cudaFreeHost(raw_data));
 
   // Verify normalization
   float min_val = dataset.data[0], max_val = dataset.data[0];

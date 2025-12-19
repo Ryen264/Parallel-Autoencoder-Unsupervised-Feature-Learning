@@ -335,7 +335,6 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
   int    shared_x      = tid_x + padding_x;
   int    shared_height = dim_y + CONV_FILTER_HEIGHT - 1;
   int    shared_width  = dim_x + CONV_FILTER_WIDTH - 1;
-  float  sum           = 0;
   float *d_filter_offset =
       d_filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;
   float d_out_val = d_out[GET_1D_IDX(i, j, f, width, height)];

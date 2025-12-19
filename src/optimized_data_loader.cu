@@ -203,6 +203,8 @@ Optimized_Dataset load_dataset(const char *dataset_dir,
   int num_samples = is_train ? n_batches * NUM_PER_BATCH : NUM_TEST_SAMPLES;
 
   Optimized_Dataset dataset(num_samples, IMAGE_WIDTH, IMAGE_DEPTH, IMAGE_DEPTH);
+  float            *data   = dataset.data;
+  float            *labels = dataset.labels;
 
   if (!data || !labels) {
     fprintf(stderr, "Error: Memory allocation failed\n");
@@ -288,12 +290,8 @@ void shuffle_dataset(Optimized_Dataset &dataset) {
 
   // Copy data base on indices
   for (int i = 0; i < n; ++i) {
-    CUDA_CHECK(cudaMemcpy(new_data + i * image_size,
-                          data + indices[i] * image_size,
-                          image_bytes,
-                          cudaMempcyHostToHost));
-    CUDA_CHECK(cudaMemcpy(
-        new_labels + i, labels + indices[i], sizeof(int), cudaMempcyHostToHost));
+    memcpy(new_data + i * image_size, data + indices[i] * image_size, image_bytes);
+    memcpy(new_labels + i, labels + indices[i], sizeof(int));
   }
 
   // Change the pointers of the original dataset

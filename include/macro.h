@@ -15,8 +15,6 @@ using namespace std;
 #define GET_1D_IDX(i, j, d, width, height)                                             \
   ((d) * (width) * (height) + (i) * (width) + (j))
 
-#define GET_1D_IDX_2D(i, j, width) ((i) * (width) + (j))
-
 #define SQR(x) ((x) * (x))
 
 #endif

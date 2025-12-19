@@ -463,15 +463,15 @@ float Optimized1_Autoencoder::_fit_batch(
                          _conv_block_size_2);
 
   // Pass delta backwards
-  optimized1_conv2D(d_out,
-                    _decoder_filter_3,
-                    d_in,
-                    n,
-                    width,
-                    height,
-                    DECODER_FILTER_2_DEPTH,
-                    DECODER_FILTER_3_DEPTH,
-                    _conv_block_size_2);
+  optimized1_conv2D_backward(d_out,
+                             _decoder_filter_3,
+                             d_in,
+                             n,
+                             width,
+                             height,
+                             DECODER_FILTER_2_DEPTH,
+                             DECODER_FILTER_3_DEPTH,
+                             _block_size_3D_1);
 
   // Swap d_out and d_in
   swap(d_out, d_in);
@@ -514,15 +514,15 @@ float Optimized1_Autoencoder::_fit_batch(
                          DECODER_FILTER_2_DEPTH,
                          _conv_block_size_3);
 
-  optimized1_conv2D(d_out,
-                    _decoder_filter_2,
-                    d_in,
-                    n,
-                    width / 2,
-                    height / 2,
-                    DECODER_FILTER_1_DEPTH,
-                    DECODER_FILTER_2_DEPTH,
-                    _conv_block_size_3);
+  optimized1_conv2D_backward(d_out,
+                             _decoder_filter_2,
+                             d_in,
+                             n,
+                             width / 2,
+                             height / 2,
+                             DECODER_FILTER_1_DEPTH,
+                             DECODER_FILTER_2_DEPTH,
+                             _block_size_3D_2);
 
   swap(d_out, d_in);
   optimized1_update_weight(_decoder_filter_2,
@@ -562,15 +562,15 @@ float Optimized1_Autoencoder::_fit_batch(
                          DECODER_FILTER_1_DEPTH,
                          _conv_block_size_3);
 
-  optimized1_conv2D(d_out,
-                    _decoder_filter_1,
-                    d_in,
-                    n,
-                    width / 4,
-                    height / 4,
-                    ENCODER_FILTER_2_DEPTH,
-                    DECODER_FILTER_1_DEPTH,
-                    _conv_block_size_3);
+  optimized1_conv2D_backward(d_out,
+                             _decoder_filter_1,
+                             d_in,
+                             n,
+                             width / 4,
+                             height / 4,
+                             ENCODER_FILTER_2_DEPTH,
+                             DECODER_FILTER_1_DEPTH,
+                             _block_size_3D_3);
 
   swap(d_out, d_in);
   optimized1_update_weight(_decoder_filter_1,
@@ -609,15 +609,15 @@ float Optimized1_Autoencoder::_fit_batch(
                          ENCODER_FILTER_2_DEPTH,
                          _conv_block_size_2);
 
-  optimized1_conv2D(d_out,
-                    _encoder_filter_2,
-                    d_in,
-                    n,
-                    width / 2,
-                    height / 2,
-                    ENCODER_FILTER_1_DEPTH,
-                    ENCODER_FILTER_2_DEPTH,
-                    _conv_block_size_2);
+  optimized1_conv2D_backward(d_out,
+                             _encoder_filter_2,
+                             d_in,
+                             n,
+                             width / 2,
+                             height / 2,
+                             ENCODER_FILTER_1_DEPTH,
+                             ENCODER_FILTER_2_DEPTH,
+                             _block_size_3D_2);
 
   swap(d_out, d_in);
   optimized1_update_weight(_encoder_filter_2,

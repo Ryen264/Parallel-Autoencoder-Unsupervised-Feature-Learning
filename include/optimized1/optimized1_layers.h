@@ -245,4 +245,14 @@ void optimized1_conv2D_grad(float *in,
 void optimized1_update_weight(
     float *weight, float *gradient, int size, float learning_rate, dim3 block_size);
 
+void optimized1_conv2D_backward(float *d_out,
+                                float *filter,
+                                float *d_in,
+                                int    n,
+                                int    width,
+                                int    height,
+                                int    depth,
+                                int    n_filter,
+                                dim3   block_size);
+
 #endif

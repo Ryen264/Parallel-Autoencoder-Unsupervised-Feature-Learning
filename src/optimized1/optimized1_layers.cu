@@ -457,6 +457,41 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
   }
 }
 
+__global__ void optimized1_conv2D_backward_kernel(float *d_out,
+                                                  float *filter,
+                                                  float *d_in,
+                                                  int    width,
+                                                  int    height,
+                                                  int    depth,
+                                                  int    n_filter) {
+  int x = blockIdx.x * blockDim.x + threadIdx.x;
+  int y = blockIdx.y * blockDim.y + threadIdx.y;
+  int d = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (x >= width || y >= height || d >= depth)
+    return;
+
+  float sum = 0;
+  for (int f = 0; f < n_filter; ++f) {
+    float *filter_offset = filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
+
+    for (int fy = 0; fy < CONV_FILTER_HEIGHT; ++fy) {
+      for (int fx = 0; fx < CONV_FILTER_WIDTH; ++fx) {
+        int out_x = x - fx + CONV_FILTER_WIDTH / 2;
+        int out_y = y - fy + CONV_FILTER_HEIGHT / 2;
+
+        if (out_x >= 0 && out_x < width && out_y >= 0 && out_y < height) {
+          sum += d_out[GET_1D_IDX(out_y, out_x, d, width, height)] *
+                 filter_offset[GET_1D_IDX(
+                     f_y, f_x, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)];
+        }
+      }
+    }
+  }
+
+  d_in[GET_1D_IDX(y, x, d, width, height)] = sum;
+}
+
 // optimized1 Max Pooling Backward
 __global__ void optimized1_avg_pooling_backward_kernel(
     float *d_out, float *d_in, int width, int height, int depth) {
@@ -692,4 +727,31 @@ void optimized1_update_weight(
   dim3 grid_size((size - 1) / block_size.x + 1);
   optimized1_update_weight_kernel<<<grid_size, block_size>>>(
       weight, gradient, size, learning_rate);
+}
+
+void optimized1_conv2D_backward(float *d_out,
+                                float *filter,
+                                float *d_in,
+                                int    n,
+                                int    width,
+                                int    height,
+                                int    depth,
+                                int    n_filter,
+                                dim3   block_size) {
+  dim3 grid_size((width - 1) / block_size.x + 1,
+                 (height - 1) / block_size.y + 1,
+                 (depth - 1) / block_size.z + 1);
+
+  for (int i = 0; i < n; ++i) {
+    int d_in_offset  = i * width * height * depth;
+    int d_out_offset = i * width * height * n_filter;
+
+    optimized1_conv2D_backward_kernel<<<grid_size, block_size>>>(d_out + d_out_offset,
+                                                                 filter,
+                                                                 d_in + d_in_offset,
+                                                                 width,
+                                                                 height,
+                                                                 depth,
+                                                                 n_filter);
+  }
 }

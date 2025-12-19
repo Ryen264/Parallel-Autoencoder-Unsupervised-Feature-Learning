@@ -24,8 +24,8 @@ __global__ void optimized1_conv2D_kernel(float *in,
 
   int    padding_y     = CONV_FILTER_HEIGHT / 2;
   int    padding_x     = CONV_FILTER_WIDTH / 2;
-  int    shared_y      = tid_y + padding;
-  int    shared_x      = tid_x + padding;
+  int    shared_y      = tid_y + padding_y;
+  int    shared_x      = tid_x + padding_x;
   int    shared_height = dim_y + CONV_FILTER_HEIGHT - 1;
   int    shared_width  = dim_x + CONV_FILTER_WIDTH - 1;
   float *filter_offset = filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;

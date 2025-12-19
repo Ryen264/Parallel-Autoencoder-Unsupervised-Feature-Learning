@@ -126,9 +126,10 @@ __global__ void optimized1_conv2D_kernel(float *in,
   for (int d = 0; d < depth; ++d) {
     for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
       for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
-        sum += s_in[GET_1D_IDX_2D(tid_y + f_i, tid_x + f_j, shared_width)] *
-               filter_offset[GET_1D_IDX(
-                   f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)];
+        sum +=
+            s_in[GET_1D_IDX(tid_y + f_i, tid_x + f_j, d, shared_width, shared_height)] *
+            filter_offset[GET_1D_IDX(
+                f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)];
       }
     }
   }
@@ -475,10 +476,10 @@ __global__ void optimized1_conv2D_backward_kernel(float *d_out,
   for (int f = 0; f < n_filter; ++f) {
     float *filter_offset = filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
 
-    for (int fy = 0; fy < CONV_FILTER_HEIGHT; ++fy) {
-      for (int fx = 0; fx < CONV_FILTER_WIDTH; ++fx) {
-        int out_x = x - fx + CONV_FILTER_WIDTH / 2;
-        int out_y = y - fy + CONV_FILTER_HEIGHT / 2;
+    for (int f_y = 0; f_y < CONV_FILTER_HEIGHT; ++f_y) {
+      for (int f_x = 0; f_x < CONV_FILTER_WIDTH; ++f_x) {
+        int out_x = x - f_x + CONV_FILTER_WIDTH / 2;
+        int out_y = y - f_y + CONV_FILTER_HEIGHT / 2;
 
         if (out_x >= 0 && out_x < width && out_y >= 0 && out_y < height) {
           sum += d_out[GET_1D_IDX(out_y, out_x, d, width, height)] *

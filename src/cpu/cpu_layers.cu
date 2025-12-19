@@ -177,10 +177,10 @@ void cpu_upsampling_backward(
           // Get current in pixel index (depth 0)
           float sum             = 0;
           int   neighbors_idx[] = {
-            GET_1D_IDX(i * 2, j * 2, d, 2 * width, 2 * depth),
-            GET_1D_IDX(i * 2, j * 2 + 1, d, 2 * width, 2 * depth),
-            GET_1D_IDX(i * 2 + 1, j * 2, d, 2 * width, 2 * depth),
-            GET_1D_IDX(i * 2 + 1, j * 2 + 1, d, 2 * width, 2 * depth),
+            GET_1D_IDX(i * 2, j * 2, d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2, j * 2 + 1, d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2 + 1, j * 2, d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2 + 1, j * 2 + 1, d, 2 * width, 2 * height),
           };
 
           for (int neighbor_idx : neighbors_idx)

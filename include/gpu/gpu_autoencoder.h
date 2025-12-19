@@ -1,8 +1,8 @@
 #ifndef GPU_AUTOENCODER_H
 #define GPU_AUTOENCODER_H
 
-#include "data_loader.h"
 #include "constants.h"
+#include "data_loader.h"
 #include "gpu_layers.h"
 #include "macro.h"
 #include "progress_bar.h"
@@ -15,6 +15,7 @@
 #include <filesystem>
 #include <fstream>
 #include <numeric>
+#include <random>
 #include <sstream>
 using namespace std;
 

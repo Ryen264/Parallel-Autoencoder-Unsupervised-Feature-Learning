@@ -1,15 +1,16 @@
 #include "gpu_autoencoder.h"
 
 /**
- * @brief Generate a random array with elements between -0.01 and 0.01
+ * @brief Generate a random array with elements using Kaiming initialization
  *
  * @param arr The array
  * @param n The number of elements
  */
-void generate_array(float *arr, int n) {
-  vector<float> tmp(n);
+void generate_array(float *arr, int n, mt19937 &rng) {
+  vector<float>              tmp(n);
+  normal_distribution<float> d(0.0f, sqrt(2.0f / n));
   for (int i = 0; i < n; ++i)
-    tmp[i] = 0.2f * (rand() - RAND_MAX / 2) / RAND_MAX;
+    tmp[i] = d(rng);
   CUDA_CHECK(cudaMemcpy(arr, tmp.data(), n * sizeof(float), cudaMemcpyHostToDevice));
 }
 
@@ -41,24 +42,25 @@ void write_data(ostream &buffer, float *data, int size) {
 
 Gpu_Autoencoder::Gpu_Autoencoder() {
   _allocate_mem();
+  mt19937 rng(time(nullptr));
 
   // Random init
   srand(time(0));
 
-  generate_array(_encoder_filter_1, ENCODER_FILTER_1_SIZE);
-  generate_array(_encoder_bias_1, ENCODER_FILTER_1_DEPTH);
+  generate_array(_encoder_filter_1, ENCODER_FILTER_1_SIZE, rng);
+  CUDA_CHECK(cudaMemset(_encoder_bias_1, 0, ENCODER_FILTER_1_DEPTH * sizeof(float)));
 
-  generate_array(_encoder_filter_2, ENCODER_FILTER_2_SIZE);
-  generate_array(_encoder_bias_2, ENCODER_FILTER_2_DEPTH);
+  generate_array(_encoder_filter_2, ENCODER_FILTER_2_SIZE, rng);
+  CUDA_CHECK(cudaMemset(_encoder_bias_2, 0, ENCODER_FILTER_2_DEPTH * sizeof(float)));
 
-  generate_array(_decoder_filter_1, DECODER_FILTER_1_SIZE);
-  generate_array(_decoder_bias_1, DECODER_FILTER_1_DEPTH);
+  generate_array(_decoder_filter_1, DECODER_FILTER_1_SIZE, rng);
+  CUDA_CHECK(cudaMemset(_decoder_bias_1, 0, DECODER_FILTER_1_DEPTH * sizeof(float)));
 
-  generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE);
-  generate_array(_decoder_bias_2, DECODER_FILTER_2_DEPTH);
+  generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE, rng);
+  CUDA_CHECK(cudaMemset(_decoder_bias_2, 0, DECODER_FILTER_2_DEPTH * sizeof(float)));
 
-  generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE);
-  generate_array(_decoder_bias_2, DECODER_FILTER_2_DEPTH);
+  generate_array(_decoder_filter_3, DECODER_FILTER_3_SIZE, rng);
+  CUDA_CHECK(cudaMemset(_decoder_bias_3, 0, DECODER_FILTER_3_DEPTH * sizeof(float)));
 }
 
 Gpu_Autoencoder::Gpu_Autoencoder(const char *filename) {
@@ -656,8 +658,12 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
                           int            checkpoint,
                           const char    *output_dir) {
   // Create minibatches
-  int n       = dataset.n;
-  int n_batch = (dataset.n - 1) / batch_size + 1;
+  int n          = dataset.n;
+  int width      = dataset.width;
+  int height     = dataset.height;
+  int depth      = dataset.depth;
+  int image_size = width * height * depth;
+  int n_batch    = (dataset.n - 1) / batch_size + 1;
 
   // Allocate memory for training
   _allocate_output_mem(batch_size, dataset.width, dataset.height);
@@ -666,6 +672,13 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
 
   Timer timer;
   float total_time = 0;
+
+  printf(
+      "Training GPU Autoencoder for %d epochs with batch size %d and learning rate "
+      "%.4f\n",
+      n_epoch,
+      batch_size,
+      learning_rate);
 
   puts("=======================TRAINING START=======================");
   for (int epoch = 1; epoch <= n_epoch; ++epoch) {
@@ -682,11 +695,11 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
       total              += cur_batch_size;
 
       timer.start();
-      float batch_loss = _fit_batch(dataset.get_data() + offset,
+      float batch_loss = _fit_batch(dataset.get_data() + offset * image_size,
                                     cur_batch_size,
-                                    dataset.width,
-                                    dataset.height,
-                                    dataset.depth,
+                                    width,
+                                    height,
+                                    depth,
                                     learning_rate);
       timer.stop();
 
@@ -718,7 +731,7 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
 
   // Save models param
   stringstream builder;
-  builder << output_dir << '/' << "gpu_autoencoder_.bin";
+  builder << output_dir << '/' << "gpu_autoencoder.bin";
   save_parameters(builder.str().c_str());
 
   printf("\nTotal time: %s (ms), Loss: %.4f\n",
@@ -729,12 +742,11 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
 Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const {
   // Encode by batches to use less memory
   int width = dataset.width, height = dataset.height, depth = dataset.depth,
-      n           = dataset.n;
-  int n_batch     = (n - 1) / ENCODE_BATCH_SIZE + 1;
-  int image_bytes = width * height * depth * sizeof(float);
-  int encoded_image_bytes =
-      width / 4 * height / 4 * ENCODER_FILTER_2_DEPTH * sizeof(float);
-  int out_offset = 0;
+      n                  = dataset.n;
+  int n_batch            = (n - 1) / ENCODE_BATCH_SIZE + 1;
+  int image_size         = width * height * depth;
+  int encoded_image_size = width / 4 * height / 4 * ENCODER_FILTER_2_DEPTH;
+  int out_offset         = 0;
 
   Dataset res(n, width / 4, height / 4, ENCODER_FILTER_2_DEPTH);
 
@@ -750,8 +762,8 @@ Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const {
     int cur_batch_size = min(ENCODE_BATCH_SIZE, n - in_offset);
 
     CUDA_CHECK(cudaMemcpy(b,
-                          dataset.get_data() + in_offset,
-                          cur_batch_size * image_bytes,
+                          dataset.get_data() + in_offset * image_size,
+                          cur_batch_size * image_size * sizeof(float),
                           cudaMemcpyHostToDevice));
 
     // First conv2D
@@ -822,11 +834,11 @@ Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const {
                     _block_size_3D_3);
 
     // Copy batch
-    CUDA_CHECK(cudaMemcpy(res.get_data() + out_offset,
+    CUDA_CHECK(cudaMemcpy(res.get_data() + out_offset * encoded_image_size,
                           b,
-                          cur_batch_size * encoded_image_bytes,
+                          cur_batch_size * encoded_image_size * sizeof(float),
                           cudaMemcpyDeviceToHost));
-    out_offset += cur_batch_size * encoded_image_bytes;
+    out_offset += cur_batch_size;
   }
 
   // Free memory
@@ -840,29 +852,30 @@ Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const {
 
 Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
   int width = dataset.width, height = dataset.height, depth = dataset.depth,
-      n           = dataset.n;
-  int n_batch     = (n - 1) / ENCODE_BATCH_SIZE + 1;
-  int image_bytes = width * height * depth * sizeof(float);
-  int decoded_image_bytes =
-      4 * width * 4 * height * DECODER_FILTER_3_DEPTH * sizeof(float);
-  int out_offset = 0;
+      n                  = dataset.n;
+  int n_batch            = (n - 1) / ENCODE_BATCH_SIZE + 1;
+  int image_size         = width * height * depth;
+  int decoded_image_size = 4 * width * 4 * height * DECODER_FILTER_3_DEPTH;
+  int out_offset         = 0;
 
   Dataset res(dataset.n, width * 4, height * 4, DECODER_FILTER_3_DEPTH);
 
   // Placeholder, alternating
   float *a, *b;
   CUDA_CHECK(cudaMalloc(
-      &a, ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH * sizeof(float)));
+      &a,
+      ENCODE_BATCH_SIZE * 4 * width * 4 * height * MAX_FILTER_DEPTH * sizeof(float)));
   CUDA_CHECK(cudaMalloc(
-      &b, ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH * sizeof(float)));
+      &b,
+      ENCODE_BATCH_SIZE * 4 * width * 4 * height * MAX_FILTER_DEPTH * sizeof(float)));
 
   for (int i = 0; i < n_batch; ++i) {
     int in_offset      = i * ENCODE_BATCH_SIZE;
     int cur_batch_size = min(ENCODE_BATCH_SIZE, n - in_offset);
 
     CUDA_CHECK(cudaMemcpy(b,
-                          dataset.get_data() + in_offset,
-                          cur_batch_size * image_bytes,
+                          dataset.get_data() + in_offset * image_size,
+                          cur_batch_size * image_size * sizeof(float),
                           cudaMemcpyHostToDevice));
 
     // First conv2D
@@ -953,11 +966,11 @@ Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
                  _block_size_1D);
 
     // Copy batch
-    CUDA_CHECK(cudaMemcpy(res.get_data() + out_offset,
+    CUDA_CHECK(cudaMemcpy(res.get_data() + out_offset * decoded_image_size,
                           b,
-                          cur_batch_size * decoded_image_bytes,
+                          cur_batch_size * decoded_image_size * sizeof(float),
                           cudaMemcpyDeviceToHost));
-    out_offset += cur_batch_size * decoded_image_bytes;
+    out_offset += cur_batch_size;
   }
 
   CUDA_CHECK(cudaFree(a));

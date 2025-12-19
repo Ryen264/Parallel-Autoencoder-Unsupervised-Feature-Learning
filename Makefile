@@ -31,7 +31,7 @@ TARGET_DIR = bin
 GPU_AUTOENCODER_DEPS = $(OBJ_DIR)/data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_DIR)/timer.o $(OBJ_DIR)/utils.o $(GPU_OBJECTS)
 GPU_AUTOENCODER_TARGET = gpu_main
 OPT1_AUTOENCODER_DEPS = $(OBJ_DIR)/data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_DIR)/timer.o $(OBJ_DIR)/utils.o $(OPT1_OBJECTS)
-OPT1_AUTOENCODER_TARGET = gpu_main
+OPT1_AUTOENCODER_TARGET = opt1_main
 
 gpu_main: $(GPU_AUTOENCODER_DEPS)
 	@echo "Compiling gpu autoencoder..."

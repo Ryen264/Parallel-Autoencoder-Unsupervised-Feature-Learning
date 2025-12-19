@@ -42,7 +42,7 @@ int main() {
 
   encoded_dataset_size =
       dataset.n * dataset.width * dataset.height * dataset.depth * sizeof(float);
-  ofstream buffer(ENCODED_DATASET_FILE, ios::out | ios::binary);
+  buffer.open(ENCODED_DATASET_FILE, ios::out | ios::binary);
   buffer.write(reinterpret_cast<char *>(dataset.data), encoded_dataset_size);
   buffer.close();
 

@@ -5,7 +5,7 @@
 NVCC = nvcc
 CXX = g++
 NVCC_FLAGS = -std=c++20 -arch=sm_75 -O3 --expt-relaxed-constexpr -diag-suppress 3012
-INCLUDE_DIRS = -I./include -I./include/cpu -I./include/gpu
+INCLUDE_DIRS = -I./include -I./include/cpu -I./include/gpu -I./include/optimized1
 
 # Source files
 SRC_DIR = src

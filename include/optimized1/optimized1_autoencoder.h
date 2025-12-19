@@ -27,7 +27,7 @@ class Optimized1_Autoencoder {
   float *_out_encoder_bias_1;
 
   float *_out_encoder_relu_1;
-  float *_out_avg_pooling_1;
+  float *_out_max_pooling_1;
 
   float *_encoder_filter_2;
   float *_encoder_bias_2;
@@ -35,7 +35,7 @@ class Optimized1_Autoencoder {
   float *_out_encoder_bias_2;
 
   float *_out_encoder_relu_2;
-  float *_out_avg_pooling_2;
+  float *_out_max_pooling_2;
 
   float *_decoder_filter_1;
   float *_decoder_bias_1;

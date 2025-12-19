@@ -183,8 +183,8 @@ void Optimized1_Autoencoder::_forward_pass(
                   _block_size_1D);
 
   // First max pooling layer
-  optimized1_avg_pooling(_out_encoder_relu_1,
-                         _out_avg_pooling_1,
+  optimized1_max_pooling(_out_encoder_relu_1,
+                         _out_max_pooling_1,
                          n,
                          width,
                          height,
@@ -193,7 +193,7 @@ void Optimized1_Autoencoder::_forward_pass(
 
   // Dim: n * w/2 * w/2 * 256
   // Second conv2D layer
-  optimized1_conv2D(_out_avg_pooling_1,
+  optimized1_conv2D(_out_max_pooling_1,
                     _encoder_filter_2,
                     _out_encoder_filter_2,
                     n,
@@ -223,8 +223,8 @@ void Optimized1_Autoencoder::_forward_pass(
                   _block_size_1D);
 
   // Second max pooling layer
-  optimized1_avg_pooling(_out_encoder_relu_2,
-                         _out_avg_pooling_2,
+  optimized1_max_pooling(_out_encoder_relu_2,
+                         _out_max_pooling_2,
                          n,
                          width / 2,
                          height / 2,
@@ -232,7 +232,7 @@ void Optimized1_Autoencoder::_forward_pass(
                          _block_size_3D_3);
 
   // First conv2D layer
-  optimized1_conv2D(_out_avg_pooling_2,
+  optimized1_conv2D(_out_max_pooling_2,
                     _decoder_filter_1,
                     _out_decoder_filter_1,
                     n,
@@ -346,7 +346,7 @@ void Optimized1_Autoencoder::_allocate_output_mem(int n, int width, int height) 
                         n_pixel * ENCODER_FILTER_1_DEPTH * sizeof(float)));
   CUDA_CHECK(cudaMalloc(&_out_encoder_relu_1,
                         n_pixel * ENCODER_FILTER_1_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&_out_avg_pooling_1,
+  CUDA_CHECK(cudaMalloc(&_out_max_pooling_1,
                         n_pixel * ENCODER_FILTER_1_DEPTH * sizeof(float) / 4));
 
   CUDA_CHECK(cudaMalloc(&_out_encoder_filter_2,
@@ -355,7 +355,7 @@ void Optimized1_Autoencoder::_allocate_output_mem(int n, int width, int height) 
                         n_pixel * ENCODER_FILTER_2_DEPTH * sizeof(float) / 4));
   CUDA_CHECK(cudaMalloc(&_out_encoder_relu_2,
                         n_pixel * ENCODER_FILTER_2_DEPTH * sizeof(float) / 4));
-  CUDA_CHECK(cudaMalloc(&_out_avg_pooling_2,
+  CUDA_CHECK(cudaMalloc(&_out_max_pooling_2,
                         n_pixel * ENCODER_FILTER_2_DEPTH * sizeof(float) / 16));
 
   CUDA_CHECK(cudaMalloc(&_out_decoder_filter_1,
@@ -400,12 +400,12 @@ void Optimized1_Autoencoder::_deallocate_output_mem() {
   CUDA_CHECK(cudaFree(_out_encoder_filter_1));
   CUDA_CHECK(cudaFree(_out_encoder_bias_1));
   CUDA_CHECK(cudaFree(_out_encoder_relu_1));
-  CUDA_CHECK(cudaFree(_out_avg_pooling_1));
+  CUDA_CHECK(cudaFree(_out_max_pooling_1));
 
   CUDA_CHECK(cudaFree(_out_encoder_filter_2));
   CUDA_CHECK(cudaFree(_out_encoder_bias_2));
   CUDA_CHECK(cudaFree(_out_encoder_relu_2));
-  CUDA_CHECK(cudaFree(_out_avg_pooling_2));
+  CUDA_CHECK(cudaFree(_out_max_pooling_2));
 
   CUDA_CHECK(cudaFree(_out_decoder_filter_1));
   CUDA_CHECK(cudaFree(_out_decoder_bias_1));
@@ -471,7 +471,7 @@ float Optimized1_Autoencoder::_fit_batch(
                              height,
                              DECODER_FILTER_2_DEPTH,
                              DECODER_FILTER_3_DEPTH,
-                             _block_size_3D_1);
+                             _conv_block_size_1);
 
   // Swap d_out and d_in
   swap(d_out, d_in);
@@ -522,7 +522,7 @@ float Optimized1_Autoencoder::_fit_batch(
                              height / 2,
                              DECODER_FILTER_1_DEPTH,
                              DECODER_FILTER_2_DEPTH,
-                             _block_size_3D_2);
+                             _conv_block_size_2);
 
   swap(d_out, d_in);
   optimized1_update_weight(_decoder_filter_2,
@@ -552,7 +552,7 @@ float Optimized1_Autoencoder::_fit_batch(
   optimized1_update_weight(
       _decoder_bias_1, d_in, DECODER_FILTER_1_DEPTH, learning_rate, _block_size_1D);
 
-  optimized1_conv2D_grad(_out_avg_pooling_2,
+  optimized1_conv2D_grad(_out_max_pooling_2,
                          d_out,
                          d_filter,
                          n,
@@ -570,7 +570,7 @@ float Optimized1_Autoencoder::_fit_batch(
                              height / 4,
                              ENCODER_FILTER_2_DEPTH,
                              DECODER_FILTER_1_DEPTH,
-                             _block_size_3D_3);
+                             _conv_block_size_3);
 
   swap(d_out, d_in);
   optimized1_update_weight(_decoder_filter_1,
@@ -580,8 +580,8 @@ float Optimized1_Autoencoder::_fit_batch(
                            _block_size_1D);
 
   // Max pooling backwards (dim: n * w/2 * w/2 * 128)
-  optimized1_avg_pooling_backward(
-      d_out, d_in, n, width / 2, height / 2, ENCODER_FILTER_2_DEPTH, _block_size_3D_2);
+  optimized1_max_pooling_backward(
+      in, d_out, d_in, n, width / 2, height / 2, ENCODER_FILTER_2_DEPTH, _block_size_3D_2);
 
   optimized1_relu_backward(_out_encoder_bias_2,
                            d_in,
@@ -599,7 +599,7 @@ float Optimized1_Autoencoder::_fit_batch(
   optimized1_update_weight(
       _encoder_bias_2, d_in, ENCODER_FILTER_2_DEPTH, learning_rate, _block_size_1D);
 
-  optimized1_conv2D_grad(_out_avg_pooling_1,
+  optimized1_conv2D_grad(_out_max_pooling_1,
                          d_out,
                          d_filter,
                          n,
@@ -617,7 +617,7 @@ float Optimized1_Autoencoder::_fit_batch(
                              height / 2,
                              ENCODER_FILTER_1_DEPTH,
                              ENCODER_FILTER_2_DEPTH,
-                             _block_size_3D_2);
+                             _conv_block_size_3);
 
   swap(d_out, d_in);
   optimized1_update_weight(_encoder_filter_2,
@@ -626,8 +626,8 @@ float Optimized1_Autoencoder::_fit_batch(
                            learning_rate,
                            _block_size_1D);
 
-  optimized1_avg_pooling_backward(
-      d_out, d_in, n, width, height, ENCODER_FILTER_1_DEPTH, _block_size_3D_1);
+  optimized1_max_pooling_backward(
+      in, d_out, d_in, n, width, height, ENCODER_FILTER_1_DEPTH, _block_size_3D_1);
 
   optimized1_relu_backward(_out_encoder_bias_1,
                            d_in,
@@ -807,7 +807,7 @@ Optimized1_Autoencoder::encode(const Optimized_Dataset &dataset) const {
         b, a, cur_batch_size, width, height, ENCODER_FILTER_1_DEPTH, _block_size_1D);
 
     // Max pooling
-    optimized1_avg_pooling(
+    optimized1_max_pooling(
         a, b, cur_batch_size, width, height, ENCODER_FILTER_1_DEPTH, _block_size_3D_2);
 
     // Second conv2D
@@ -840,7 +840,7 @@ Optimized1_Autoencoder::encode(const Optimized_Dataset &dataset) const {
                     _block_size_1D);
 
     // Second max pooling
-    optimized1_avg_pooling(a,
+    optimized1_max_pooling(a,
                            b,
                            cur_batch_size,
                            width / 2,

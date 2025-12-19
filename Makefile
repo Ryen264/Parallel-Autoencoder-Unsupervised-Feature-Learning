@@ -10,8 +10,10 @@ INCLUDE_DIRS = -I./include -I./include/cpu -I./include/gpu
 # Source files
 SRC_DIR = src
 GPU_SRC_DIR = src/gpu
+OPT1_SRC_DIR = src/optimized1
 SRC := $(shell find $(SRC_DIR) -maxdepth 1 -name '*.cu')
 GPU_SRC := $(shell find $(GPU_SRC_DIR) -maxdepth 1 -name '*.cu')
+OPT1_SRC := $(shell find $(OPT1_SRC_DIR) -maxdepth 1 -name '*.cu')
 CONSTANTS = include/constants.h
 MACRO = include/macro.h
 
@@ -19,6 +21,7 @@ MACRO = include/macro.h
 OBJ_DIR = obj
 OBJECTS := $(patsubst $(SRC_DIR)/%.cu, $(OBJ_DIR)/%.o, $(SRC))
 GPU_OBJECTS := $(patsubst $(SRC_DIR)/%.cu, $(OBJ_DIR)/%.o, $(GPU_SRC))
+OPT1_OBJECTS := $(patsubst $(SRC_DIR)/%.cu, $(OBJ_DIR)/%.o, $(OPT1_SRC))
 
 # Dependancies
 DEPS := $(OBJECTS:.o=.d)
@@ -27,11 +30,18 @@ DEPS := $(OBJECTS:.o=.d)
 TARGET_DIR = bin
 GPU_AUTOENCODER_DEPS = $(OBJ_DIR)/data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_DIR)/timer.o $(OBJ_DIR)/utils.o $(GPU_OBJECTS)
 GPU_AUTOENCODER_TARGET = gpu_main
+OPT1_AUTOENCODER_DEPS = $(OBJ_DIR)/data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_DIR)/timer.o $(OBJ_DIR)/utils.o $(OPT1_OBJECTS)
+OPT1_AUTOENCODER_TARGET = gpu_main
 
 gpu_main: $(GPU_AUTOENCODER_DEPS)
 	@echo "Compiling gpu autoencoder..."
 	@mkdir -p $(TARGET_DIR)
 	$(NVCC) $(NVCC_FLAGS) -o $(TARGET_DIR)/$(GPU_AUTOENCODER_TARGET) $(GPU_AUTOENCODER_DEPS)
+
+opt1_main: %(OPT1_AUTOENCODER_DEPS)
+	@echo "Compiling optimized autoencoder..."
+	@mkdir -p $(TARGET_DIR)
+	$(NVCC) $(NVCC_FLAGS) -o $(TARGET_DIR)/$(OPT1_AUTOENCODER_TARGET) $(OPT1_AUTOENCODER_DEPS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu $(CONSTANTS) $(MACRO)
 	@echo "Compiling $<..."

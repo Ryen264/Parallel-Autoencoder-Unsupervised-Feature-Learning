@@ -1,46 +1,38 @@
 #include "model.h"
 
-SVMmodel::SVMmodel() : is_trained(false), n_features(0),
-    C(10.0f), kernel_type("RBF"), gamma_type("auto"),
+SVMmodel::SVMmodel() : C(10.0f), kernel_type("RBF"), gamma_type("auto"),
     tolerance(1e-3f), cache_size(200.0f), max_iter(100), nochange_steps(100), verbosity(0) {
-    
-    kernel = (kernel_type == "RBF") ? ML::SVM::KernelType::RBF : ML::SVM::KernelType::LINEAR;
-    gamma =  (gamma_type == "auto") ? 1.0 / n_features : std::stof(gamma_type);
+    kernel = (kernel_type == "RBF") ? RBF : LINEAR;
+    gamma  = 0.0f;
 
-    // Initialize model pointers
-    n_support = 0;
-    b = 0.0f;
-    dual_coefs = nullptr;
-    x_support = nullptr;
-    support_idx = nullptr;
-    n_classes = 0;
-    unique_labels = nullptr;
+    svm_model       = nullptr;
+    is_trained      = false;
+    n_features      = 0;
+
+    n_support       = 0;
+    bias            = 0.0f;
+    n_classes       = 0;
 }
 
 SVMmodel::SVMmodel(float C, string kernel_type, string gamma_type) : SVMmodel() {
-    this->C = C;
-    this->kernel_type = kernel_type;
-    this->kernel = (kernel_type == "RBF") ? ML::SVM::KernelType::RBF : ML::SVM::KernelType::LINEAR;
-    this->gamma_type = gamma_type;
-    this->gamma = (gamma_type == "auto") ? 1.0f / n_features : std::stof(gamma_type);
+    this->C             = C;
+    this->kernel_type   = kernel_type;
+    this->kernel        = (kernel_type == "RBF") ? RBF : LINEAR;
+    this->gamma_type    = gamma_type;
 }
 
-SVMmodel::SVMmodel(float C, string kernel_type, string gamma_type, float tolerance, float cache_size, int max_iter, int nochange_steps) : SVMmodel(C, kernel_type, gamma_type) {
-    this->tolerance = tolerance;
-    this->cache_size = cache_size;
-    this->max_iter = max_iter;
+SVMmodel::SVMmodel(float C, string kernel_type, string gamma_type,
+    float tolerance, float cache_size, int max_iter, int nochange_steps) : SVMmodel(C, kernel_type, gamma_type) {
+    this->tolerance    = tolerance;
+    this->cache_size   = cache_size;
+    this->max_iter     = max_iter;
     this->nochange_steps = nochange_steps;
 }
 
 SVMmodel::~SVMmodel() {
-    if (is_trained) {
-        // Free device memory
-        if (dual_coefs) cudaFree(dual_coefs);
-        if (x_support) cudaFree(x_support);
-        if (support_idx) cudaFree(support_idx);
-        if (unique_labels) cudaFree(unique_labels);
+    if (svm_model) {
+        svm_free_and_destroy_model(&svm_model);
     }
-    cumlDestroy(handle);
 }
 
 float* SVMmodel::convertToDeviceArray(const vector<vector<double>>& data, int& n_rows, int& n_cols) {
@@ -84,8 +76,111 @@ void SVMmodel::freeDeviceMemory(float* ptr) {
     }
 }
 
+// Custom LIBSVM output handler for progress tracking
+static string libsvm_buffer = "";
+static int libsvm_epoch_counter = 0;
+static Timer* libsvm_timer = nullptr;
+static bool capturing_raw = false;
+static vector<string> raw_lines;
+static string current_iter = "N/A";
+
+static void print_libsvm_progress(const char *s) {
+    // Append all incoming text
+    libsvm_buffer += s;
+    
+    // Process complete lines
+    size_t newline_pos = libsvm_buffer.find('\n');
+    while (newline_pos != string::npos) {
+        string line = libsvm_buffer.substr(0, newline_pos);
+        libsvm_buffer = libsvm_buffer.substr(newline_pos + 1);
+        
+        // Start capturing when optimization finished appears
+        if (line.find("optimization finished") != string::npos) {
+            capturing_raw = true;
+            raw_lines.clear();
+            raw_lines.push_back(line);
+            
+            // Extract #iter from this line
+            size_t iter_pos = line.find("#iter = ");
+            if (iter_pos != string::npos) {
+                size_t iter_end = line.find(",", iter_pos);
+                if (iter_end == string::npos) iter_end = line.length();
+                current_iter = line.substr(iter_pos + 8, iter_end - (iter_pos + 8));
+                while (!current_iter.empty() && isspace(current_iter.back())) current_iter.pop_back();
+            }
+        }
+        // Continue capturing subsequent lines (nu, obj, nSV, etc.)
+        else if (capturing_raw) {
+            // Check if this line contains useful information
+            bool is_data_line = (line.find("nu = ") != string::npos || 
+                                 line.find("obj = ") != string::npos || 
+                                 line.find("nSV") != string::npos || 
+                                 line.find("rho") != string::npos);
+            
+            if (is_data_line) {
+                // Continue capturing data lines
+                raw_lines.push_back(line);
+            } else if (line.find("*") != string::npos || 
+                       (line.empty() && raw_lines.size() > 1) ||
+                       line.find("....") != string::npos) {
+                // Stop capturing when we see separator or empty line after data
+                capturing_raw = false;
+                libsvm_epoch_counter++;
+                
+                // Parse obj from captured lines
+                string obj_str = "N/A";
+                for (const auto& raw_line : raw_lines) {
+                    size_t obj_pos = raw_line.find("obj = ");
+                    if (obj_pos != string::npos) {
+                        size_t obj_end = raw_line.find(",", obj_pos);
+                        if (obj_end == string::npos) obj_end = raw_line.length();
+                        obj_str = raw_line.substr(obj_pos + 6, obj_end - (obj_pos + 6));
+                        while (!obj_str.empty() && isspace(obj_str.back())) obj_str.pop_back();
+                        break;
+                    }
+                }
+                
+                // Get elapsed time
+                float elapsed_time = 0.0f;
+                if (libsvm_timer) {
+                    libsvm_timer->stop();
+                    elapsed_time = libsvm_timer->get();
+                }
+                
+                // Display formatted output
+                printf("Classifier %d: #iter = %s, loss = %s, time = %s\n", 
+                       libsvm_epoch_counter, 
+                       current_iter.c_str(), 
+                       obj_str.c_str(),
+                       format_time(elapsed_time).c_str());
+                
+                // Print all raw lines
+                printf("  [Raw Output:\n");
+                for (const auto& raw_line : raw_lines) {
+                    printf("    %s\n", raw_line.c_str());
+                }
+                printf("  ]\n");
+                fflush(stdout);
+                
+                raw_lines.clear();
+            }
+            // If not a data line and not a stop condition, just skip it
+        }
+        
+        newline_pos = libsvm_buffer.find('\n');
+    }
+}
+
 void SVMmodel::train(const vector<vector<double>>& data, const vector<int>& labels) {
-    cout << "Starting SVM training..." << endl;
+    // Use custom LIBSVM output handler to display progress
+    libsvm_buffer.clear();
+    svm_set_print_string_function(&print_libsvm_progress);
+    
+    puts("=======================TRAINING START=======================");
+    cout << "Starting SVM training with LIBSVM..." << endl;
+    
+    Timer timer;
+    timer.start();
     
     int n_samples = data.size();
     if (n_samples == 0) {
@@ -100,60 +195,127 @@ void SVMmodel::train(const vector<vector<double>>& data, const vector<int>& labe
     cout << "Number of samples: " << n_samples << endl;
     cout << "Number of features: " << n_features << endl;
     
-    // Flatten 2D vector and convert double to float
-    vector<float> flattened_data(n_samples * n_features);
+    // Set gamma if auto
+    if (gamma_type == "auto") {
+        gamma = 1.0f / n_features;
+    } else {
+        gamma = std::stof(gamma_type);
+    }
+    
+    // Prepare svm_problem structure
+    svm_problem prob;
+    prob.l = n_samples;
+    prob.y = new double[n_samples];
+    prob.x = new svm_node*[n_samples];
+    
+    // Convert data to libsvm format
     for (int i = 0; i < n_samples; i++) {
-        if (static_cast<int>(data[i].size()) != n_features) {
-            throw runtime_error("Inconsistent feature dimensions in training data!");
-        }
+        prob.y[i] = static_cast<double>(labels[i]);
+        
+        // Allocate nodes for this sample (n_features + 1 for terminating node)
+        prob.x[i] = new svm_node[n_features + 1];
+        
         for (int j = 0; j < n_features; j++) {
-            flattened_data[i * n_features + j] = static_cast<float>(data[i][j]);
+            prob.x[i][j].index = j + 1;  // libsvm uses 1-based indexing
+            prob.x[i][j].value = data[i][j];
         }
+        // Terminating node
+        prob.x[i][n_features].index = -1;
+        prob.x[i][n_features].value = 0;
     }
-    
-    // Allocate device memory for training data
-    rmm::device_uvector<float> d_train_data(n_samples * n_features, handle.get_stream());
-    rmm::device_uvector<float> d_train_labels(n_samples, handle.get_stream());
-    
-    // Copy flattened data to device
-    cudaMemcpy(d_train_data.data(), flattened_data.data(), 
-                n_samples * n_features * sizeof(float), cudaMemcpyHostToDevice);
-    
-    // Convert int labels to float for cuML
-    vector<float> float_labels(n_samples);
-    for (int i = 0; i < n_samples; i++) {
-        float_labels[i] = static_cast<float>(labels[i]);
-    }
-    cudaMemcpy(d_train_labels.data(), float_labels.data(), 
-                n_samples * sizeof(float), cudaMemcpyHostToDevice);
     
     // Set SVM parameters
-    ML::SVM::SvmParameter params;
-    params.C = C_PARAM;                                                                                 // C parameter
-    params.kernel = (KERNEL_PARAM == "rbf") ? ML::SVM::KernelType::RBF : ML::SVM::KernelType::LINEAR;   // Kernel type
-    params.gamma = (GAMMA_TYPE == "auto") ? (1.0 / n_features) : GAMMA_TYPE;                            // gamma parameter
-
-    params.tol = TOLERANCE;                 // Tolerance
-    params.cache_size = CACHE_SIZE;         // Cache size in MB
-    params.max_iter = MAX_ITER;             // No limit on iterations
-    params.nochange_steps = NOCHANGE_STEPS; // Early stopping
-    params.verbosity = VERBOSITY;           // Verbosity level
+    svm_parameter param;
+    param.svm_type = C_SVC;
+    param.kernel_type = (kernel_type == "RBF") ? RBF : LINEAR;
+    param.degree = 3;
+    param.gamma = gamma;
+    param.coef0 = 0;
+    param.nu = 0.5;
+    param.cache_size = cache_size;
+    param.C = C;
+    param.eps = tolerance;
+    param.p = 0.1;
+    param.shrinking = 1;
+    param.probability = 0;
+    param.nr_weight = 0;
+    param.weight_label = nullptr;
+    param.weight = nullptr;
     
-    cout << "Training with parameters:" << endl;
-    cout << "  C: " << params.C << endl;
-    cout << "  Kernel: " << params.kernel << " (" << KERNEL_PARAM << ")" << endl;
-    cout << "  Gamma: " << params.gamma << " (" << GAMMA_TYPE << ")" << endl;
+    cout << "\nTraining with parameters:" << endl;
+    cout << "  C: " << param.C << endl;
+    cout << "  Kernel: " << kernel_type << endl;
+    cout << "  Gamma: " << param.gamma << endl;
+    cout << "  Max iterations: " << max_iter << endl;
+    cout << "  Tolerance: " << tolerance << endl;
+    cout << "  Cache size: " << cache_size << " MB" << endl;
+    cout << "  Shrinking: " << (param.shrinking ? "enabled" : "disabled") << endl;
     
-    // Train the SVM model
-    svm_model.fit(handle, d_train_data.data(), n_samples, n_features,
-                    d_train_labels.data(), params);
+    // Count unique classes
+    set<int> unique_labels(labels.begin(), labels.end());
+    int n_unique_classes = unique_labels.size();
+    int n_binary_classifiers = (n_unique_classes * (n_unique_classes - 1)) / 2;
+    
+    cout << "\nTraining information:" << endl;
+    cout << "  Training samples: " << n_samples << endl;
+    cout << "  Features per sample: " << n_features << endl;
+    cout << "  Number of classes: " << n_unique_classes << endl;
+    cout << "  Binary classifiers (one-vs-one): " << n_binary_classifiers << endl;
+    cout << "  Batch size: " << n_samples << " (full dataset)" << endl;
+    cout << endl;
+    
+    cout << "Training Progress (optimizing " << n_binary_classifiers << " binary classifiers):" << endl;
+    
+    // Initialize epoch counter and timer for LIBSVM progress tracking
+    libsvm_epoch_counter = 0;
+    libsvm_timer = &timer;
+    
+    // Check parameters
+    const char* error_msg = svm_check_parameter(&prob, &param);
+    if (error_msg) {
+        // Clean up
+        for (int i = 0; i < n_samples; i++) {
+            delete[] prob.x[i];
+        }
+        delete[] prob.x;
+        delete[] prob.y;
+        throw runtime_error(string("SVM parameter error: ") + error_msg);
+    }
+    
+    // Train the model
+    if (svm_model) {
+        svm_free_and_destroy_model(&svm_model);
+    }
+    svm_model = svm_train(&prob, &param);
+    
+    timer.stop();
+    float training_time = timer.get();
+    libsvm_timer = nullptr;  // Clear timer reference
+    
+    // Store model information
+    n_support = svm_model->l;
+    n_classes = svm_model->nr_class;
+    bias = -svm_model->rho[0];  // Bias term
+    
+    // Clean up problem data
+    for (int i = 0; i < n_samples; i++) {
+        delete[] prob.x[i];
+    }
+    delete[] prob.x;
+    delete[] prob.y;
     
     is_trained = true;
+    
+    printf(" - Time = %s\n", format_time(training_time).c_str());
+    puts("\n========================TRAINING END========================");
     cout << "Training completed successfully!" << endl;
+    cout << "Number of support vectors: " << n_support << endl;
+    cout << "Number of classes: " << n_classes << endl;
+    printf("Total training time: %s\n\n", format_time(training_time).c_str());
 }
 
 vector<int> SVMmodel::predict(const vector<vector<double>>& samples) const {
-   if (!is_trained) {
+    if (!is_trained || !svm_model) {
         throw runtime_error("Model must be trained before testing!");
     }
     
@@ -166,41 +328,75 @@ vector<int> SVMmodel::predict(const vector<vector<double>>& samples) const {
         throw runtime_error("Test data feature dimensions don't match training data!");
     }
     
+    cout << "\n======================PREDICTION START======================" << endl;
     cout << "Predicting on " << n_samples << " test samples..." << endl;
     
-    // Flatten 2D vector and convert double to float
-    vector<float> flattened_data(n_samples * n_features);
-    for (int i = 0; i < n_samples; i++) {
-        if (static_cast<int>(samples[i].size()) != n_features) {
-            throw runtime_error("Inconsistent feature dimensions in test data!");
-        }
-        for (int j = 0; j < n_features; j++) {
-            flattened_data[i * n_features + j] = static_cast<float>(samples[i][j]);
-        }
-    }
+    cout << "\nPrediction information:" << endl;
+    cout << "  Test samples: " << n_samples << endl;
+    cout << "  Features per sample: " << n_features << endl;
+    cout << "  Number of classes: " << n_classes << endl;
+    cout << "  Number of support vectors: " << n_support << endl;
+    cout << endl;
     
-    // Allocate device memory for test data
-    rmm::device_uvector<float> d_test_data(n_samples * n_features, handle.get_stream());
-    rmm::device_uvector<float> d_predictions(n_samples, handle.get_stream());
+    cout << "Prediction Progress:" << endl;
     
-    // Copy flattened test data to device
-    cudaMemcpy(d_test_data.data(), flattened_data.data(), 
-                n_samples * n_features * sizeof(float), cudaMemcpyHostToDevice);
+    Timer timer;
+    timer.start();
     
-    // Predict
-    svm_model.predict(handle, d_test_data.data(), n_samples, n_features,
-                        d_predictions.data());
-    
-    // Copy predictions back to host
-    vector<float> float_predictions(n_samples);
-    cudaMemcpy(float_predictions.data(), d_predictions.data(), 
-                n_samples * sizeof(float), cudaMemcpyDeviceToHost);
-    
-    // Convert float predictions to int
     vector<int> predictions(n_samples);
+    
+    // Predict each sample
     for (int i = 0; i < n_samples; i++) {
-        predictions[i] = static_cast<int>(round(float_predictions[i]));
+        // Convert sample to libsvm format
+        svm_node* x = new svm_node[n_features + 1];
+        
+        for (int j = 0; j < n_features; j++) {
+            x[j].index = j + 1;  // libsvm uses 1-based indexing
+            x[j].value = samples[i][j];
+        }
+        x[n_features].index = -1;  // Terminating node
+        x[n_features].value = 0;
+        
+        // Predict
+        double pred = svm_predict(svm_model, x);
+        predictions[i] = static_cast<int>(pred);
+        
+        delete[] x;
+        
+        // Display progress at milestones
+        bool should_display = false;
+        
+        if ((i + 1) % 1000 == 0) {
+            should_display = true;
+        } else if (n_samples >= 4) {
+            // Show at 25%, 50%, 75%, 100%
+            if ((i + 1) == n_samples / 4 || (i + 1) == n_samples / 2 || 
+                (i + 1) == 3 * n_samples / 4 || (i + 1) == n_samples) {
+                should_display = true;
+            }
+        } else if ((i + 1) == n_samples) {
+            // Always show at end
+            should_display = true;
+        }
+        
+        if (should_display) {
+            float elapsed_time = timer.get();
+            float progress = ((i + 1) * 100.0f) / n_samples;
+            printf("Predicted %d/%d samples (%.1f%%), time = %s\n", 
+                   i + 1, n_samples, progress, format_time(elapsed_time).c_str());
+            fflush(stdout);
+        }
     }
+    
+    timer.stop();
+    float total_time = timer.get();
+    float avg_time_per_sample = total_time / n_samples;
+    
+    puts("");
+    cout << "=======================PREDICTION END=======================" << endl;
+    cout << "Prediction completed!" << endl;
+    printf("Total prediction time: %s\n", format_time(total_time).c_str());
+    printf("Average time per sample: %s\n\n", format_time(avg_time_per_sample).c_str());
     return predictions;
 }
 
@@ -217,6 +413,20 @@ double SVMmodel::calculateAccuracy(const vector<int>& predicted, const vector<in
         }
     }
     return static_cast<double>(correct) / actual.size();
+}
+
+vector<vector<int>> SVMmodel::calculateClassificationReport(const vector<int>& predicted, const vector<int>& actual, int numClasses) {
+    vector<vector<int>> report(numClasses, vector<int>(3, 0)); // TP, FP, FN for each class
+    
+    for (size_t i = 0; i < actual.size(); i++) {
+        if (predicted[i] == actual[i]) {
+            report[actual[i]][0]++; // True Positive
+        } else {
+            report[predicted[i]][1]++; // False Positive
+            report[actual[i]][2]++;    // False Negative
+        }
+    }
+    return report;
 }
 
 vector<vector<int>> SVMmodel::calculateConfusionMatrix(const vector<int>& predicted, const vector<int>& actual, int numClasses) {
@@ -274,128 +484,54 @@ void SVMmodel::printConfusionMatrix(const vector<vector<int>>& confusionMatrix) 
 }
 
 bool SVMmodel::save(const string& modelPath) const {
-    if (!is_trained) {
+    if (!is_trained || !svm_model) {
         cerr << "Error: Model not trained or invalid" << endl;
         return false;
     }
     
-    ofstream file(modelPath, ios::binary);
-    if (!file.is_open()) {
-        cerr << "Error: Could not open file for writing: " << modelPath << endl;
+    // Use libsvm's save function
+    if (svm_save_model(modelPath.c_str(), svm_model) == 0) {
+        cout << "Model saved successfully to " << modelPath << endl;
+        return true;
+    } else {
+        cerr << "Error: Could not save model to " << modelPath << endl;
         return false;
     }
-    
-    // Write scalar parameters
-    file.write(reinterpret_cast<const char*>(&n_features), sizeof(int));
-    file.write(reinterpret_cast<const char*>(&n_support), sizeof(int));
-    file.write(reinterpret_cast<const char*>(&n_classes), sizeof(int));
-    file.write(reinterpret_cast<const char*>(&b), sizeof(float));
-    file.write(reinterpret_cast<const char*>(&C), sizeof(float));
-    file.write(reinterpret_cast<const char*>(&gamma), sizeof(float));
-    file.write(reinterpret_cast<const char*>(&tolerance), sizeof(float));
-    file.write(reinterpret_cast<const char*>(&cache_size), sizeof(float));
-    file.write(reinterpret_cast<const char*>(&max_iter), sizeof(int));
-    file.write(reinterpret_cast<const char*>(&nochange_steps), sizeof(int));
-    file.write(reinterpret_cast<const char*>(&kernel_type), sizeof(cumlSvmKernelType));
-    
-    // Copy device arrays to host and write
-    if (n_support > 0) {
-        // dual_coefs: n_support elements
-        float* h_dual_coefs = new float[n_support];
-        cudaMemcpy(h_dual_coefs, dual_coefs, n_support * sizeof(float), cudaMemcpyDeviceToHost);
-        file.write(reinterpret_cast<const char*>(h_dual_coefs), n_support * sizeof(float));
-        delete[] h_dual_coefs;
-        
-        // x_support: n_support * n_features elements
-        float* h_x_support = new float[n_support * n_features];
-        cudaMemcpy(h_x_support, x_support, n_support * n_features * sizeof(float), cudaMemcpyDeviceToHost);
-        file.write(reinterpret_cast<const char*>(h_x_support), n_support * n_features * sizeof(float));
-        delete[] h_x_support;
-        
-        // support_idx: n_support elements
-        int* h_support_idx = new int[n_support];
-        cudaMemcpy(h_support_idx, support_idx, n_support * sizeof(int), cudaMemcpyDeviceToHost);
-        file.write(reinterpret_cast<const char*>(h_support_idx), n_support * sizeof(int));
-        delete[] h_support_idx;
-    }
-    
-    if (n_classes > 0) {
-        // unique_labels: n_classes elements
-        float* h_unique_labels = new float[n_classes];
-        cudaMemcpy(h_unique_labels, unique_labels, n_classes * sizeof(float), cudaMemcpyDeviceToHost);
-        file.write(reinterpret_cast<const char*>(h_unique_labels), n_classes * sizeof(float));
-        delete[] h_unique_labels;
-    }
-    
-    file.close();
-    cout << "Model saved successfully to " << modelPath << endl;
-    return true;
 }
 
 bool SVMmodel::load(const string& modelPath) {
-    ifstream file(modelPath, ios::binary);
-    if (!file.is_open()) {
-        cerr << "Error: Could not open file for reading: " << modelPath << endl;
+    // Free existing model if any
+    if (svm_model) {
+        svm_free_and_destroy_model(&svm_model);
+    }
+    
+    // Use libsvm's load function
+    svm_model = svm_load_model(modelPath.c_str());
+    
+    if (!svm_model) {
+        cerr << "Error: Could not load model from " << modelPath << endl;
         return false;
     }
     
-    // Free existing device memory if model was previously trained
-    if (is_trained) {
-        if (dual_coefs) cudaFree(dual_coefs);
-        if (x_support) cudaFree(x_support);
-        if (support_idx) cudaFree(support_idx);
-        if (unique_labels) cudaFree(unique_labels);
+    // Extract model information
+    n_support = svm_model->l;
+    n_classes = svm_model->nr_class;
+    n_features = svm_model->SV[0][0].index;  // Get number of features from first support vector
+    
+    // Count actual number of features
+    for (int i = 0; svm_model->SV[0][i].index != -1; i++) {
+        if (svm_model->SV[0][i].index > n_features) {
+            n_features = svm_model->SV[0][i].index;
+        }
     }
     
-    // Read scalar parameters
-    file.read(reinterpret_cast<char*>(&n_features), sizeof(int));
-    file.read(reinterpret_cast<char*>(&n_support), sizeof(int));
-    file.read(reinterpret_cast<char*>(&n_classes), sizeof(int));
-    file.read(reinterpret_cast<char*>(&b), sizeof(float));
-    file.read(reinterpret_cast<char*>(&C), sizeof(float));
-    file.read(reinterpret_cast<char*>(&gamma), sizeof(float));
-    file.read(reinterpret_cast<char*>(&tolerance), sizeof(float));
-    file.read(reinterpret_cast<char*>(&cache_size), sizeof(float));
-    file.read(reinterpret_cast<char*>(&max_iter), sizeof(int));
-    file.read(reinterpret_cast<char*>(&nochange_steps), sizeof(int));
-    file.read(reinterpret_cast<char*>(&kernel_type), sizeof(cumlSvmKernelType));
+    bias = -svm_model->rho[0];
     
-    // Read device arrays
-    if (n_support > 0) {
-        // dual_coefs
-        float* h_dual_coefs = new float[n_support];
-        file.read(reinterpret_cast<char*>(h_dual_coefs), n_support * sizeof(float));
-        cudaMalloc(&dual_coefs, n_support * sizeof(float));
-        cudaMemcpy(dual_coefs, h_dual_coefs, n_support * sizeof(float), cudaMemcpyHostToDevice);
-        delete[] h_dual_coefs;
-        
-        // x_support
-        float* h_x_support = new float[n_support * n_features];
-        file.read(reinterpret_cast<char*>(h_x_support), n_support * n_features * sizeof(float));
-        cudaMalloc(&x_support, n_support * n_features * sizeof(float));
-        cudaMemcpy(x_support, h_x_support, n_support * n_features * sizeof(float), cudaMemcpyHostToDevice);
-        delete[] h_x_support;
-        
-        // support_idx
-        int* h_support_idx = new int[n_support];
-        file.read(reinterpret_cast<char*>(h_support_idx), n_support * sizeof(int));
-        cudaMalloc(&support_idx, n_support * sizeof(int));
-        cudaMemcpy(support_idx, h_support_idx, n_support * sizeof(int), cudaMemcpyHostToDevice);
-        delete[] h_support_idx;
-    }
-    
-    if (n_classes > 0) {
-        // unique_labels
-        float* h_unique_labels = new float[n_classes];
-        file.read(reinterpret_cast<char*>(h_unique_labels), n_classes * sizeof(float));
-        cudaMalloc(&unique_labels, n_classes * sizeof(float));
-        cudaMemcpy(unique_labels, h_unique_labels, n_classes * sizeof(float), cudaMemcpyHostToDevice);
-        delete[] h_unique_labels;
-    }
-    
-    file.close();
     is_trained = true;
     cout << "Model loaded successfully from " << modelPath << endl;
+    cout << "Number of support vectors: " << n_support << endl;
+    cout << "Number of classes: " << n_classes << endl;
+    cout << "Number of features: " << n_features << endl;
     return true;
 }
 

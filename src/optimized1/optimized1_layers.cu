@@ -31,88 +31,99 @@ __global__ void optimized1_conv2D_kernel(float *in,
   float *filter_offset = filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;
   float  sum           = 0;
 
+  if (tid_x == 0 && tid_y == 0 && tid_z == 0)
+    memset(s_in, 0, shared_height * shared_width * sizeof(float));
+  __syncthreads();
+
   for (int d = 0; d < depth; ++d) {
-    if (tid_x == 0 && tid_y == 0 && tid_z == 0)
-      memset(s_in, 0, shared_height * shared_width);
-    __syncthreads();
-
-    s_in[GET_1D_IDX_2D(shared_y, shared_x, shared_width)] =
+    s_in[GET_1D_IDX(shared_y, shared_x, d, shared_width, shared_height)] =
         in[GET_1D_IDX(i, j, d, width, height)];
+  }
 
-    if (tid_y == 0) {
-      for (int f_i = 0; f_i < padding_y; ++f_i) {
-        int cur_row = i - padding_y + f_i;
-        if (cur_row >= 0)
-          s_in[GET_1D_IDX_2D(f_i, shared_x, shared_width)] =
+  if (tid_y == 0) {
+    for (int f_i = 0; f_i < padding_y; ++f_i) {
+      int cur_row = i - padding_y + f_i;
+      if (cur_row >= 0)
+        for (int d = 0; d < depth; ++d)
+          s_in[GET_1D_IDX(f_i, shared_x, d, shared_width, shared_height)] =
               in[GET_1D_IDX(cur_row, j, d, width, height)];
 
-        if (tid_x == 0) {
-          for (int f_j = 0; f_j < padding_x; ++f_j) {
-            int cur_col = j - padding_x + f_j;
-            if (cur_col >= 0)
-              s_in[GET_1D_IDX_2D(f_i, f_j, shared_width)] =
+      if (tid_x == 0) {
+        for (int f_j = 0; f_j < padding_x; ++f_j) {
+          int cur_col = j - padding_x + f_j;
+          if (cur_col >= 0)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(f_i, f_j, d, shared_width, shared_height)] =
                   in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-          }
         }
+      }
 
-        if (tid_x + 1 == dim_x) {
-          for (int f_j = 1; f_j <= padding_x; ++f_j) {
-            int cur_col = j + f_j;
-            if (cur_col < width)
-              s_in[GET_1D_IDX_2D(f_i, shared_x + f_j, shared_width)] =
+      if (tid_x + 1 == dim_x) {
+        for (int f_j = 1; f_j <= padding_x; ++f_j) {
+          int cur_col = j + f_j;
+          if (cur_col < width)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(f_i, shared_x + f_j, d, shared_width, shared_height)] =
                   in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-          }
         }
       }
     }
+  }
 
-    if (tid_y + 1 == dim_y) {
-      for (int f_i = 1; f_i <= padding_y; ++f_i) {
-        int cur_row = i + f_i;
-        if (cur_row < height)
-          s_in[GET_1D_IDX_2D(shared_y + f_i, shared_x, shared_width)] =
+  if (tid_y + 1 == dim_y) {
+    for (int f_i = 1; f_i <= padding_y; ++f_i) {
+      int cur_row = i + f_i;
+      if (cur_row < height)
+        for (int d = 0; d < depth; ++d)
+          s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
               in[GET_1D_IDX(cur_row, j, d, width, height)];
 
-        if (tid_x == 0) {
-          for (int f_j = 0; f_j < padding_x; ++f_j) {
-            int cur_col = j - padding_x + f_j;
-            if (cur_col >= 0)
-              s_in[GET_1D_IDX_2D(shared_y + f_i, f_j, shared_width)] =
+      if (tid_x == 0) {
+        for (int f_j = 0; f_j < padding_x; ++f_j) {
+          int cur_col = j - padding_x + f_j;
+          if (cur_col >= 0)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(shared_y + f_i, f_j, d, shared_width, shared_height)] =
                   in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-          }
-        }
-
-        if (tid_x + 1 == dim_x) {
-          for (int f_j = 1; f_j <= padding_x; ++f_j) {
-            int cur_col = j + f_j;
-            if (cur_col < width)
-              s_in[GET_1D_IDX_2D(shared_y + f_i, shared_x + f_j, shared_width)] =
-                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-          }
         }
       }
-    }
 
-    if (tid_x == 0) {
-      for (int f_j = 0; f_j < padding_x; ++f_j) {
-        int cur_col = j - padding_x + f_j;
-        if (cur_col >= 0)
-          s_in[GET_1D_IDX_2D(shared_y, f_j, shared_width)] =
-              in[GET_1D_IDX(i, cur_col, d, width, height)];
+      if (tid_x + 1 == dim_x) {
+        for (int f_j = 1; f_j <= padding_x; ++f_j) {
+          int cur_col = j + f_j;
+          if (cur_col < width)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(
+                  shared_y + f_i, shared_x + f_j, d, shared_width, shared_height)] =
+                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+        }
       }
     }
+  }
 
-    if (tid_x + 1 == dim_x) {
-      for (int f_j = 1; f_j <= padding_x; ++f_j) {
-        int cur_col = j + f_j;
-        if (cur_col < width)
-          s_in[GET_1D_IDX_2D(shared_y, shared_x + f_j, shared_width)] =
+  if (tid_x == 0) {
+    for (int f_j = 0; f_j < padding_x; ++f_j) {
+      int cur_col = j - padding_x + f_j;
+      if (cur_col >= 0)
+        for (int d = 0; d < depth; ++d)
+          s_in[GET_1D_IDX(shared_y, f_j, d, shared_width, shared_height)] =
               in[GET_1D_IDX(i, cur_col, d, width, height)];
-      }
     }
+  }
 
-    __syncthreads();
+  if (tid_x + 1 == dim_x) {
+    for (int f_j = 1; f_j <= padding_x; ++f_j) {
+      int cur_col = j + f_j;
+      if (cur_col < width)
+        for (int d = 0; d < depth; ++d)
+          s_in[GET_1D_IDX(shared_y, shared_x + f_j, d, shared_width, shared_height)] =
+              in[GET_1D_IDX(i, cur_col, d, width, height)];
+    }
+  }
 
+  __syncthreads();
+
+  for (int d = 0; d < depth; ++d) {
     for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
       for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
         sum += s_in[GET_1D_IDX_2D(tid_y + f_i, tid_x + f_j, shared_width)] *
@@ -121,6 +132,8 @@ __global__ void optimized1_conv2D_kernel(float *in,
       }
     }
   }
+
+  __syncthreads();
 
   out[GET_1D_IDX(i, j, f, width, height)] = sum;
 }
@@ -339,94 +352,106 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
       d_filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;
   float d_out_val = d_out[GET_1D_IDX(i, j, f, width, height)];
 
+  if (tid_x == 0 && tid_y == 0 && tid_z == 0)
+    memset(s_in, 0, shared_height * shared_width * depth * sizeof(float));
+  __syncthreads();
+
   for (int d = 0; d < depth; ++d) {
-    if (tid_x == 0 && tid_y == 0 && tid_z == 0)
-      memset(s_in, 0, shared_height * shared_width);
-    __syncthreads();
-
-    s_in[GET_1D_IDX_2D(shared_y, shared_x, shared_width)] =
+    s_in[GET_1D_IDX(shared_y, shared_x, d, shared_width, shared_height)] =
         in[GET_1D_IDX(i, j, d, width, height)];
+  }
 
-    if (tid_y == 0) {
-      for (int f_i = 0; f_i < padding_y; ++f_i) {
-        int cur_row = i - padding_y + f_i;
-        if (cur_row >= 0)
-          s_in[GET_1D_IDX_2D(f_i, shared_x, shared_width)] =
+  if (tid_y == 0) {
+    for (int f_i = 0; f_i < padding_y; ++f_i) {
+      int cur_row = i - padding_y + f_i;
+      if (cur_row >= 0)
+        for (int d = 0; d < depth; ++d)
+          s_in[GET_1D_IDX(f_i, shared_x, d, shared_width, shared_height)] =
               in[GET_1D_IDX(cur_row, j, d, width, height)];
 
-        if (tid_x == 0) {
-          for (int f_j = 0; f_j < padding_x; ++f_j) {
-            int cur_col = j - padding_x + f_j;
-            if (cur_col >= 0)
-              s_in[GET_1D_IDX_2D(f_i, f_j, shared_width)] =
+      if (tid_x == 0) {
+        for (int f_j = 0; f_j < padding_x; ++f_j) {
+          int cur_col = j - padding_x + f_j;
+          if (cur_col >= 0)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(f_i, f_j, d, shared_width, shared_height)] =
                   in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-          }
         }
+      }
 
-        if (tid_x + 1 == dim_x) {
-          for (int f_j = 1; f_j <= padding_x; ++f_j) {
-            int cur_col = j + f_j;
-            if (cur_col < width)
-              s_in[GET_1D_IDX_2D(f_i, shared_x + f_j, shared_width)] =
+      if (tid_x + 1 == dim_x) {
+        for (int f_j = 1; f_j <= padding_x; ++f_j) {
+          int cur_col = j + f_j;
+          if (cur_col < width)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(f_i, shared_x + f_j, d, shared_width, shared_height)] =
                   in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-          }
         }
       }
     }
+  }
 
-    if (tid_y + 1 == dim_y) {
-      for (int f_i = 1; f_i <= padding_y; ++f_i) {
-        int cur_row = i + f_i;
-        if (cur_row < height)
-          s_in[GET_1D_IDX_2D(shared_y + f_i, shared_x, shared_width)] =
+  if (tid_y + 1 == dim_y) {
+    for (int f_i = 1; f_i <= padding_y; ++f_i) {
+      int cur_row = i + f_i;
+      if (cur_row < height)
+        for (int d = 0; d < depth; ++d)
+          s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
               in[GET_1D_IDX(cur_row, j, d, width, height)];
 
-        if (tid_x == 0) {
-          for (int f_j = 0; f_j < padding_x; ++f_j) {
-            int cur_col = j - padding_x + f_j;
-            if (cur_col >= 0)
-              s_in[GET_1D_IDX_2D(shared_y + f_i, f_j, shared_width)] =
+      if (tid_x == 0) {
+        for (int f_j = 0; f_j < padding_x; ++f_j) {
+          int cur_col = j - padding_x + f_j;
+          if (cur_col >= 0)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(shared_y + f_i, f_j, d, shared_width, shared_height)] =
                   in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-          }
-        }
-
-        if (tid_x + 1 == dim_x) {
-          for (int f_j = 1; f_j <= padding_x; ++f_j) {
-            int cur_col = j + f_j;
-            if (cur_col < width)
-              s_in[GET_1D_IDX_2D(shared_y + f_i, shared_x + f_j, shared_width)] =
-                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-          }
         }
       }
-    }
 
-    if (tid_x == 0) {
-      for (int f_j = 0; f_j < padding_x; ++f_j) {
-        int cur_col = j - padding_x + f_j;
-        if (cur_col >= 0)
-          s_in[GET_1D_IDX_2D(shared_y, f_j, shared_width)] =
-              in[GET_1D_IDX(i, cur_col, d, width, height)];
+      if (tid_x + 1 == dim_x) {
+        for (int f_j = 1; f_j <= padding_x; ++f_j) {
+          int cur_col = j + f_j;
+          if (cur_col < width)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(
+                  shared_y + f_i, shared_x + f_j, d, shared_width, shared_height)] =
+                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+        }
       }
     }
+  }
 
-    if (tid_x + 1 == dim_x) {
-      for (int f_j = 1; f_j <= padding_x; ++f_j) {
-        int cur_col = j + f_j;
-        if (cur_col < width)
-          s_in[GET_1D_IDX_2D(shared_y, shared_x + f_j, shared_width)] =
+  if (tid_x == 0) {
+    for (int f_j = 0; f_j < padding_x; ++f_j) {
+      int cur_col = j - padding_x + f_j;
+      if (cur_col >= 0)
+        for (int d = 0; d < depth; ++d)
+          s_in[GET_1D_IDX(shared_y, f_j, d, shared_width, shared_height)] =
               in[GET_1D_IDX(i, cur_col, d, width, height)];
-      }
     }
+  }
 
-    __syncthreads();
+  if (tid_x + 1 == dim_x) {
+    for (int f_j = 1; f_j <= padding_x; ++f_j) {
+      int cur_col = j + f_j;
+      if (cur_col < width)
+        for (int d = 0; d < depth; ++d)
+          s_in[GET_1D_IDX(shared_y, shared_x + f_j, d, shared_width, shared_height)] =
+              in[GET_1D_IDX(i, cur_col, d, width, height)];
+    }
+  }
 
+  __syncthreads();
+
+  for (int d = 0; d < depth; ++d) {
     for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
       for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
-        atomicAdd(d_filter_offset +
-                      GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT),
-                  s_in[GET_1D_IDX_2D(tid_y + f_i, tid_x + f_j, shared_width)] *
-                      d_out_val);
+        atomicAdd(
+            d_filter_offset +
+                GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT),
+            s_in[GET_1D_IDX(tid_y + f_i, tid_x + f_j, d, shared_width, shared_height)] *
+                d_out_val);
       }
     }
   }
@@ -462,6 +487,7 @@ void optimized1_conv2D(float *in,
                  (n_filter - 1) / block_size.z + 1);
   int  shared_size = (block_size.x + CONV_FILTER_WIDTH - 1) *
                     (block_size.y + CONV_FILTER_HEIGHT - 1) *
+                    depth *
                     sizeof(float);
 
   for (int i = 0; i < n; ++i) {
@@ -644,6 +670,7 @@ void optimized1_conv2D_grad(float *in,
                  (depth - 1) / block_size.z + 1);
   int  shared_size = (block_size.x + CONV_FILTER_WIDTH - 1) *
                     (block_size.y + CONV_FILTER_HEIGHT - 1) *
+                    depth *
                     sizeof(float);
 
   CUDA_CHECK(cudaMemset(

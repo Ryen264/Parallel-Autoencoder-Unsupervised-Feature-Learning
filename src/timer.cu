@@ -21,5 +21,5 @@ float Timer::get() {
   float elapsed;
   cudaEventSynchronize(_stop);
   cudaEventElapsedTime(&elapsed, _start, _stop);
-  return elapsed;
+  return elapsed; 
 }

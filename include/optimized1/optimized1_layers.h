@@ -164,7 +164,8 @@ void optimized1_relu_backward(float *in,
  * @param depth The depth of the images
  * @param block_size The block size to call the kernel functions
  */
-void optimized1_max_pooling_backward(float *d_out,
+void optimized1_max_pooling_backward(float *in,
+                                     float *d_out,
                                      float *d_in,
                                      int    n,
                                      int    width,

@@ -580,8 +580,14 @@ float Optimized1_Autoencoder::_fit_batch(
                            _block_size_1D);
 
   // Max pooling backwards (dim: n * w/2 * w/2 * 128)
-  optimized1_max_pooling_backward(
-      in, d_out, d_in, n, width / 2, height / 2, ENCODER_FILTER_2_DEPTH, _block_size_3D_2);
+  optimized1_max_pooling_backward(_out_encoder_relu_2,
+                                  d_out,
+                                  d_in,
+                                  n,
+                                  width / 2,
+                                  height / 2,
+                                  ENCODER_FILTER_2_DEPTH,
+                                  _block_size_3D_2);
 
   optimized1_relu_backward(_out_encoder_bias_2,
                            d_in,
@@ -626,8 +632,14 @@ float Optimized1_Autoencoder::_fit_batch(
                            learning_rate,
                            _block_size_1D);
 
-  optimized1_max_pooling_backward(
-      in, d_out, d_in, n, width, height, ENCODER_FILTER_1_DEPTH, _block_size_3D_1);
+  optimized1_max_pooling_backward(_out_encoder_relu_1,
+                                  d_out,
+                                  d_in,
+                                  n,
+                                  width,
+                                  height,
+                                  ENCODER_FILTER_1_DEPTH,
+                                  _block_size_3D_1);
 
   optimized1_relu_backward(_out_encoder_bias_1,
                            d_in,

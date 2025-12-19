@@ -787,7 +787,7 @@ Optimized1_Autoencoder::encode(const Optimized_Dataset &dataset) const {
     int cur_batch_size = min(ENCODE_BATCH_SIZE, n - in_offset);
 
     CUDA_CHECK(cudaMemcpy(b,
-                          dataset.get_data() + in_offset * image_size,
+                          dataset.data + in_offset * image_size,
                           cur_batch_size * image_size * sizeof(float),
                           cudaMemcpyHostToDevice));
 
@@ -859,7 +859,7 @@ Optimized1_Autoencoder::encode(const Optimized_Dataset &dataset) const {
                            _block_size_3D_3);
 
     // Copy batch
-    CUDA_CHECK(cudaMemcpy(res.get_data() + out_offset * encoded_image_size,
+    CUDA_CHECK(cudaMemcpy(res.data + out_offset * encoded_image_size,
                           b,
                           cur_batch_size * encoded_image_size * sizeof(float),
                           cudaMemcpyDeviceToHost));
@@ -871,7 +871,7 @@ Optimized1_Autoencoder::encode(const Optimized_Dataset &dataset) const {
   CUDA_CHECK(cudaFree(b));
 
   // Copy labels
-  memcpy(res.get_labels(), dataset.get_labels(), n * sizeof(int));
+  memcpy(res.labels, dataset.labels, n * sizeof(int));
   return res;
 }
 
@@ -900,7 +900,7 @@ Optimized1_Autoencoder::decode(const Optimized_Dataset &dataset) const {
     int cur_batch_size = min(ENCODE_BATCH_SIZE, n - in_offset);
 
     CUDA_CHECK(cudaMemcpy(b,
-                          dataset.get_data() + in_offset * image_size,
+                          dataset.data + in_offset * image_size,
                           cur_batch_size * image_size * sizeof(float),
                           cudaMemcpyHostToDevice));
 

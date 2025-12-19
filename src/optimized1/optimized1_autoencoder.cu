@@ -75,7 +75,7 @@ Optimized1_Autoencoder::Optimized1_Autoencoder(const char *filename) {
   // Read from file
   ifstream buffer(filename, ios::in | ios::binary);
   if (!buffer.is_open()) {
-    printf("Unable to open the file %s\n, using random initialization.");
+    printf("Unable to open the file %s\n, using random initialization.", filename);
     return;
   }
 

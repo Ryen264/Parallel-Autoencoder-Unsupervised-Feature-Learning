@@ -747,7 +747,8 @@ void optimized1_relu_backward(float *in,
   optimized1_relu_backward_kernel<<<grid_size, block_size>>>(in, d_out, d_in, size);
 }
 
-void optimized1_max_pooling_backward(float *d_out,
+void optimized1_max_pooling_backward(float *in,
+                                     float *d_out,
                                      float *d_in,
                                      int    n,
                                      int    width,

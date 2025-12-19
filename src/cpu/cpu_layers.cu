@@ -103,20 +103,18 @@ void cpu_upsampling(float *in, float *out, int n, int width, int height, int dep
       for (int i = 0; i < height; ++i) {
         for (int j = 0; j < width; ++j) {
           // Get current in pixel index (depth 0)
-          float val = in_offset[GET_1D_IDX(i, j, d, width, depth)];
+          float val = in_offset[GET_1D_IDX(i, j, d, width, height)];
           // Get indices of filtered elements (depth 0)
           int neighbors_idx[] = {
-            GET_1D_IDX(i * 2, j * 2, d, 2 * width, 2 * depth),
-            GET_1D_IDX(i * 2, j * 2 + 1, d, 2 * width, 2 * depth),
-            GET_1D_IDX(i * 2 + 1, j * 2, d, 2 * width, 2 * depth),
-            GET_1D_IDX(i * 2 + 1, j * 2 + 1, d, 2 * width, 2 * depth),
+            GET_1D_IDX(i * 2, j * 2, d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2, j * 2 + 1, d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2 + 1, j * 2, d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2 + 1, j * 2 + 1, d, 2 * width, 2 * height),
           };
 
           // Apply for all depths
-          for (int neighbor_idx : neighbors_idx) {
-            for (int k = 0; k < depth; ++k)
-              out_offset[neighbor_idx] = val;
-          }
+          for (int neighbor_idx : neighbors_idx)
+            out_offset[neighbor_idx] = val;
         }
       }
     }
@@ -160,7 +158,7 @@ void cpu_avg_pooling_backward(
       for (int i = 0; i < height; ++i) {
         for (int j = 0; j < width; ++j) {
           d_in_offset[GET_1D_IDX(i, j, d, width, height)] =
-              d_out_offset[GET_1D_IDX(i / 2, j / 2, d, width / 2, height / 2)];
+              d_out_offset[GET_1D_IDX(i / 2, j / 2, d, width / 2, height / 2)] / 4.0f;
         }
       }
     }
@@ -177,10 +175,8 @@ void cpu_upsampling_backward(
       for (int i = 0; i < height; ++i) {
         for (int j = 0; j < width; ++j) {
           // Get current in pixel index (depth 0)
-          float  sum = 0;
-          float *cur = d_in_offset + GET_1D_IDX(i, j, 0, width, depth);
-          // Get indices of filtered elements (depth 0)
-          int neighbors_idx[] = {
+          float sum             = 0;
+          int   neighbors_idx[] = {
             GET_1D_IDX(i * 2, j * 2, d, 2 * width, 2 * depth),
             GET_1D_IDX(i * 2, j * 2 + 1, d, 2 * width, 2 * depth),
             GET_1D_IDX(i * 2 + 1, j * 2, d, 2 * width, 2 * depth),

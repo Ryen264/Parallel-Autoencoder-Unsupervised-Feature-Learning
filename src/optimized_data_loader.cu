@@ -204,7 +204,7 @@ Optimized_Dataset load_dataset(const char *dataset_dir,
 
   Optimized_Dataset dataset(num_samples, IMAGE_WIDTH, IMAGE_DEPTH, IMAGE_DEPTH);
 
-  if (!images || !labels) {
+  if (!data || !labels) {
     fprintf(stderr, "Error: Memory allocation failed\n");
     exit(EXIT_FAILURE);
   }
@@ -264,7 +264,7 @@ Optimized_Dataset load_dataset(const char *dataset_dir,
   return dataset;
 }
 
-void shuffle_dataset(Dataset &dataset) {
+void shuffle_dataset(Optimized_Dataset &dataset) {
   int    n           = dataset.n;
   int    image_size  = dataset.width * dataset.height * dataset.depth;
   int    image_bytes = image_size * sizeof(float);

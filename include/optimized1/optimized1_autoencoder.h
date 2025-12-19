@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <random>
+#include <vector>
 
 #include "optimized1_layer.h"
 #include "optimized_data_loader.h"

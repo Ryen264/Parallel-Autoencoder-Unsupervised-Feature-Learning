@@ -1,6 +1,7 @@
 #ifndef OPT_DATASET_H
 #define OPT_DATASET_H
 
+#include <random>
 #include <stdio.h>
 #include <stdlib.h>
 

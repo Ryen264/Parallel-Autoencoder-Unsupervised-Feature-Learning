@@ -743,7 +743,7 @@ void Optimized1_Autoencoder::fit(const Optimized_Dataset &dataset,
     // Save at checkpoints
     if (checkpoint > 0 && epoch % checkpoint == 0) {
       stringstream builder;
-      builder << output_dir << '/' << "optimized1_autoencoder" << epoch << ".bin";
+      builder << output_dir << '/' << "optimized1_autoencoder_" << epoch << ".bin";
       save_parameters(builder.str().c_str());
     }
   }

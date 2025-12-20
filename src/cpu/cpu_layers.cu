@@ -12,6 +12,7 @@ void cpu_conv2D(float *in, float *filter, float *out, int n, int width, int heig
           for (int f = 0; f < n_filter; ++f) {
             float sum = 0;
             float *filter_offset = filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
+            
             for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
               // If the row needs padding, we skip since we pad with 0
               int row = i + f_i - CONV_FILTER_HEIGHT / 2;
@@ -39,7 +40,7 @@ void cpu_conv2D(float *in, float *filter, float *out, int n, int width, int heig
 void cpu_add_bias(float *in, float *bias, float *out, int n, int width, int height, int depth) {
   for (int image = 0; image < n; ++image) {
     for (int d = 0; d < depth; ++d) {
-      int   offset = image * width * height * depth + d * width * height;
+      int offset = image * width * height * depth + d * width * height;
       float bias_val = bias[d];
       float *in_offset = in + offset;
       float *out_offset = out + offset;
@@ -57,7 +58,7 @@ void cpu_relu(float *in, float *out, int n, int width, int height, int depth) {
 
 void cpu_avg_pooling(float *in, float *out, int n, int width, int height, int depth) {
   for (int image = 0; image < n; ++image) {
-    int    offset     = image * width * height * depth;
+    int offset = image * width * height * depth;
     float *in_offset  = in + offset;
     float *out_offset = out + offset / 4;
     for (int d = 0; d < depth; ++d) {
@@ -67,10 +68,10 @@ void cpu_avg_pooling(float *in, float *out, int n, int width, int height, int de
           float sum = 0;
           // Get indices of filtered elements (depth 0)
           int neighbors_idx[] = {
-            GET_1D_IDX(i * 2, j * 2, d, width, height),
-            GET_1D_IDX(i * 2, j * 2 + 1, d, width, height),
-            GET_1D_IDX(i * 2 + 1, j * 2, d, width, height),
-            GET_1D_IDX(i * 2 + 1, j * 2 + 1, d, width, height),
+            GET_1D_IDX(i * 2,      j * 2,      d, width, height),
+            GET_1D_IDX(i * 2,      j * 2 + 1,  d, width, height),
+            GET_1D_IDX(i * 2 + 1,  j * 2,      d, width, height),
+            GET_1D_IDX(i * 2 + 1,  j * 2 + 1,  d, width, height),
           };
 
           // Apply for all depths
@@ -95,10 +96,10 @@ void cpu_upsampling(float *in, float *out, int n, int width, int height, int dep
           float val = in_offset[GET_1D_IDX(i, j, d, width, height)];
           // Get indices of filtered elements (depth 0)
           int neighbors_idx[] = {
-            GET_1D_IDX(i * 2, j * 2, d, 2 * width, 2 * height),
-            GET_1D_IDX(i * 2, j * 2 + 1, d, 2 * width, 2 * height),
-            GET_1D_IDX(i * 2 + 1, j * 2, d, 2 * width, 2 * height),
-            GET_1D_IDX(i * 2 + 1, j * 2 + 1, d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2,     j * 2,      d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2,     j * 2 + 1,  d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2 + 1, j * 2,      d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2 + 1, j * 2 + 1,  d, 2 * width, 2 * height),
           };
 
           // Apply for all depths
@@ -137,8 +138,7 @@ void cpu_avg_pooling_backward(float *d_out, float *d_in, int n, int width, int h
     for (int d = 0; d < depth; ++d) {
       for (int i = 0; i < height; ++i) {
         for (int j = 0; j < width; ++j) {
-          d_in_offset[GET_1D_IDX(i, j, d, width, height)] =
-              d_out_offset[GET_1D_IDX(i / 2, j / 2, d, width / 2, height / 2)] / 4.0f;
+          d_in_offset[GET_1D_IDX(i, j, d, width, height)] = d_out_offset[GET_1D_IDX(i / 2, j / 2, d, width / 2, height / 2)] / 4.0f;
         }
       }
     }
@@ -154,12 +154,12 @@ void cpu_upsampling_backward(float *d_out, float *d_in, int n, int width, int he
       for (int i = 0; i < height; ++i) {
         for (int j = 0; j < width; ++j) {
           // Get current in pixel index (depth 0)
-          float sum             = 0;
+          float sum = 0.0f;
           int neighbors_idx[] = {
-            GET_1D_IDX(i * 2, j * 2, d, 2 * width, 2 * height),
-            GET_1D_IDX(i * 2, j * 2 + 1, d, 2 * width, 2 * height),
-            GET_1D_IDX(i * 2 + 1, j * 2, d, 2 * width, 2 * height),
-            GET_1D_IDX(i * 2 + 1, j * 2 + 1, d, 2 * width, 2 * height)
+            GET_1D_IDX(i * 2,     j * 2,      d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2,     j * 2 + 1,  d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2 + 1, j * 2,      d, 2 * width, 2 * height),
+            GET_1D_IDX(i * 2 + 1, j * 2 + 1,  d, 2 * width, 2 * height)
           };
 
           for (int neighbor_idx : neighbors_idx)
@@ -172,7 +172,7 @@ void cpu_upsampling_backward(float *d_out, float *d_in, int n, int width, int he
   }
 }
 
-void cpu_bias_grad(float *d_out, float *grad_bias, int n, int width, int height, int depth) {
+void cpu_bias_grad(float *d_out, float *d_bias, int n, int width, int height, int depth) {
   for (int d = 0; d < depth; ++d) {
     // Sum of all d_out in the corresponding depth
     float sum = 0;
@@ -181,25 +181,25 @@ void cpu_bias_grad(float *d_out, float *grad_bias, int n, int width, int height,
       for (int i = 0; i < width * height; ++i)
         sum += d_out_offset[i];
     }
-    grad_bias[d] = sum;
+    d_bias[d] = sum;
   }
 }
 
-void cpu_conv2D_grad(float *in, float *d_out, float *grad_filter, int n, int width, int height, int depth, int n_filter) {
+void cpu_conv2D_grad(float *in, float *d_out, float *d_filter, int n, int width, int height, int depth, int n_filter) {
   // Set all value of grad to 0
-  memset(grad_filter, 0, CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth * n_filter * sizeof(float));
+  memset(d_filter, 0, CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth * n_filter * sizeof(float));
 
   // Calculate gradient
   for (int image = 0; image < n; ++image) {
     int image_offset = image * width * height;
-    float *in_offset    = in + image_offset * depth;
+    float *in_offset = in + image_offset * depth;
     float *d_out_offset = d_out + image_offset * n_filter;
 
     for (int d = 0; d < depth; ++d) {
       for (int i = 0; i < height; ++i) {
         for (int j = 0; j < width; ++j) {
           for (int f = 0; f < n_filter; ++f) {
-            float *d_filter_offset = grad_filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
+            float *d_filter_offset = d_filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
 
             for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
               // If the row needs padding, we skip since we pad with 0
@@ -224,7 +224,7 @@ void cpu_conv2D_grad(float *in, float *d_out, float *grad_filter, int n, int wid
   }
 }
 
-void cpu_update_weight(float *in, float *grad, int size, float learning_rate) {
+void cpu_update_weight(float *weight, float *gradient, int size, float learning_rate) {
   for (int i = 0; i < size; ++i)
-    in[i] -= learning_rate * grad[i];
+    weight[i] -= learning_rate * gradient[i];
 }

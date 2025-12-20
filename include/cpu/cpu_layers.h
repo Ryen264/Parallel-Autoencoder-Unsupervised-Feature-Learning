@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cstring>
+#include <filesystem>
 using namespace std;
 
 /**
@@ -100,39 +101,38 @@ void cpu_mse_grad(float *expected, float *actual, float *d_out, int n, int width
  * @brief           ReLU layer backwards pass
  *
  * @param in        The input from the forward pass
+ * @param d_out     The output gradient 
  * @param d_in      The incoming gradient
- * @param d_out     The output gradient
  * @param n         The number of images
  * @param width     The width of the images
  * @param height    The height of the images
  * @param depth     The depth of the images
  */
-void cpu_relu_backward(float *in, float *d_in, float *d_out, int n, int width, int height, int depth);
+void cpu_relu_backward(float *in, float *d_out, float *d_in, int n, int width, int height, int depth);
 
 /**
  * @brief           Avg pooling backwards pass
  *
- * @param in        The input from the forward pass
- * @param d_in      The incoming gradient
  * @param d_out     The output gradient
+ * @param d_in      The incoming gradient
  * @param n         The number of images
  * @param width     The width of the images
  * @param height    The height of the images
  * @param depth     The depth of the images
  */
-void cpu_avg_pooling_backward(float *in, float *d_in, float *d_out, int n, int width, int height, int depth);
+void cpu_avg_pooling_backward(float *d_out, float *d_in, int n, int width, int height, int depth);
 
 /**
  * @brief           Upsampling backwards pass
  *
- * @param d_in      The incoming gradient
  * @param d_out     The output gradient
+ * @param d_in      The incoming gradient
  * @param n         The number of images
  * @param width     The width of the images
  * @param height    The height of the images
  * @param depth     The depth of the images
  */
-void cpu_upsampling_backward(float *d_in, float *d_out, int n, int width, int height, int depth);
+void cpu_upsampling_backward(float *d_out, float *d_in, int n, int width, int height, int depth);
 
 /**
  * @brief           Bias gradient calculation

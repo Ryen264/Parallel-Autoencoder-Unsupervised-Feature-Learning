@@ -1,6 +1,7 @@
 #ifndef CPU_AUTOENCODER_H
 #define CPU_AUTOENCODER_H
 
+#include "constants.h"
 #include "data_loader.h"
 #include "constants.h"
 #include "cpu_layers.h"
@@ -15,6 +16,7 @@
 #include <fstream>
 #include <sstream>
 #include <utility>
+#include <filesystem>
 using namespace std;
 
 /**

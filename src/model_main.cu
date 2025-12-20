@@ -89,6 +89,12 @@ int main(int argc, char *argv[]) {
         // Use dummy data for phase 2
         cout << "Using dummy data for Phase 2" << endl;
         int num_samples = NUM_TRAIN_SAMPLES + NUM_TEST_SAMPLES;
+
+        // actual dataset
+        int num_train_samples = 50000;
+        int num_test_samples = 10000;
+        num_samples = num_train_samples + num_test_samples;
+
         encoded_dataset = dummy_dataset(num_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
         
         // Create dummy labels
@@ -137,6 +143,10 @@ int main(int argc, char *argv[]) {
 
     // Train SVM on encoded data
     float train_ratio = NUM_TRAIN_SAMPLES / static_cast<float>(NUM_TRAIN_SAMPLES + NUM_TEST_SAMPLES);
+
+    // actual ratio
+    train_ratio = 50000 / static_cast<float>(50000 + 10000);
+
     double accuracy = phase_2(encoded_dataset, labels, train_ratio, IS_SAVE_MODEL);
     return 0;
 }

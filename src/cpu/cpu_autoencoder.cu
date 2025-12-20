@@ -366,26 +366,31 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
   Dataset res = _decode_save_output(_encode_save_output(batch));
 
   // Calculate loss before backprop
-  float loss = cpu_mse_loss(batch.get_data(), res.get_data(), n, width, height, depth);
+  float loss = cpu_mse_loss(batch.get_data(), //expected
+                          res.get_data(),     //actual
+                          n, width, height, depth);
 
   // Get loss gradient
-  cpu_mse_grad(batch.get_data(), res.get_data(), d_out, n, width, height, depth);
+  cpu_mse_grad(batch.get_data(),  //expected
+              res.get_data(),     //actual
+              d_out,              //d_out
+              n, width, height, depth);
 
   // Update weight for the last conv2D layer
   // Update bias
-  cpu_bias_grad(d_out, d_in, n, width, height, DECODER_FILTER_3_DEPTH);
+  cpu_bias_grad(d_out,  //d_out
+                d_in,   //d_bias
+                n, width, height, DECODER_FILTER_3_DEPTH);
 
-  cpu_update_weight(_decoder_bias_3.get(), d_in, DECODER_FILTER_3_DEPTH, learning_rate);
+  cpu_update_weight(_decoder_bias_3.get(),  //weight
+                    d_in,                   //gradient
+                    DECODER_FILTER_3_DEPTH, learning_rate);
 
   // Update filter
-  cpu_conv2D_grad(_out_upsampling_2.get(),
-                  d_out,
-                  d_filter,
-                  n,
-                  width,
-                  height,
-                  DECODER_FILTER_2_DEPTH,
-                  DECODER_FILTER_3_DEPTH);
+  cpu_conv2D_grad(_out_upsampling_2.get(),  //in
+                  d_out,                    //d_out
+                  d_filter,                 //d_filter
+                  n, width, height, DECODER_FILTER_2_DEPTH, DECODER_FILTER_3_DEPTH);
 
   // Pass delta backwards
   cpu_conv2D(d_out,

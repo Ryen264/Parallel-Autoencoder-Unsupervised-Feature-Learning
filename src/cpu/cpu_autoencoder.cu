@@ -1,7 +1,5 @@
 #include "cpu_autoencoder.h"
 
-string AUTOENCODER_FILENAME = "autoencoder.bin";
-
 /**
  * @brief Generate a random array with elements between -0.01 and 0.01
  *
@@ -102,6 +100,72 @@ void Cpu_Autoencoder::_allocate_mem() {
 
   _decoder_filter_3 = make_unique<float[]>(DECODER_FILTER_3_SIZE);
   _decoder_bias_3   = make_unique<float[]>(DECODER_FILTER_3_DEPTH);
+}
+
+void Cpu_Autoencoder::_allocate_output_mem(int n, int width, int height) {
+  int n_pixel = n * width * height;
+  _out_encoder_filter_1 = make_unique<float[]>(n_pixel * ENCODER_FILTER_1_DEPTH);
+  _out_encoder_bias_1   = make_unique<float[]>(n_pixel * ENCODER_FILTER_1_DEPTH);
+  _out_encoder_relu_1   = make_unique<float[]>(n_pixel * ENCODER_FILTER_1_DEPTH);
+  _out_avg_pooling_1    = make_unique<float[]>(n_pixel * ENCODER_FILTER_1_DEPTH / 4);
+
+  _out_encoder_filter_2 = make_unique<float[]>(n_pixel * ENCODER_FILTER_2_DEPTH / 4);
+  _out_encoder_bias_2   = make_unique<float[]>(n_pixel * ENCODER_FILTER_2_DEPTH / 4);
+  _out_encoder_relu_2   = make_unique<float[]>(n_pixel * ENCODER_FILTER_2_DEPTH / 4);
+  _out_avg_pooling_2    = make_unique<float[]>(n_pixel * ENCODER_FILTER_2_DEPTH / 16);
+
+  _out_decoder_filter_1 = make_unique<float[]>(n_pixel * DECODER_FILTER_1_DEPTH / 16);
+  _out_decoder_bias_1   = make_unique<float[]>(n_pixel * DECODER_FILTER_1_DEPTH / 16);
+  _out_decoder_relu_1   = make_unique<float[]>(n_pixel * DECODER_FILTER_1_DEPTH / 16);
+  _out_upsampling_1     = make_unique<float[]>(n_pixel * DECODER_FILTER_1_DEPTH / 4);
+
+  _out_decoder_filter_2 = make_unique<float[]>(n_pixel * DECODER_FILTER_2_DEPTH / 4);
+  _out_decoder_bias_2   = make_unique<float[]>(n_pixel * DECODER_FILTER_2_DEPTH / 4);
+  _out_decoder_relu_2   = make_unique<float[]>(n_pixel * DECODER_FILTER_2_DEPTH / 4);
+  _out_upsampling_2     = make_unique<float[]>(n_pixel * DECODER_FILTER_2_DEPTH);
+
+  _out_decoder_filter_3 = make_unique<float[]>(n_pixel * DECODER_FILTER_3_DEPTH);
+  _out_decoder_bias_3   = make_unique<float[]>(n_pixel * DECODER_FILTER_3_DEPTH);
+
+  static constexpr int FILTER_SIZES[]  = { ENCODER_FILTER_1_SIZE,
+                                           ENCODER_FILTER_2_SIZE,
+                                           DECODER_FILTER_1_SIZE,
+                                           DECODER_FILTER_2_SIZE,
+                                           DECODER_FILTER_3_SIZE };
+  constexpr int MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
+
+  _d_in = make_unique<float[]>(n * width * height * MAX_FILTER_DEPTH);
+  _d_out    = make_unique<float[]>(n * width * height * MAX_FILTER_DEPTH);
+  _d_filter = make_unique<float[]>(MAX_FILTER_SIZE);
+}
+
+void Cpu_Autoencoder::_deallocate_output_mem() {
+  _out_encoder_filter_1 = 0;
+  _out_encoder_bias_1   = 0;
+  _out_encoder_relu_1   = 0;
+  _out_avg_pooling_1    = 0;
+
+  _out_encoder_filter_2 = 0;
+  _out_encoder_bias_2   = 0;
+  _out_encoder_relu_2   = 0;
+  _out_avg_pooling_2    = 0;
+
+  _out_decoder_filter_1 = 0;
+  _out_decoder_bias_1   = 0;
+  _out_decoder_relu_1   = 0;
+  _out_upsampling_1     = 0;
+
+  _out_decoder_filter_2 = 0;
+  _out_decoder_bias_2   = 0;
+  _out_decoder_relu_2   = 0;
+  _out_upsampling_2     = 0;
+
+  _out_decoder_filter_3 = 0;
+  _out_decoder_bias_3   = 0;
+
+  _d_in     = 0;
+  _d_out    = 0;
+  _d_filter = 0;
 }
 
 Dataset Cpu_Autoencoder::_encode_save_output(const Dataset &dataset) {
@@ -291,74 +355,6 @@ Dataset Cpu_Autoencoder::_decode_save_output(const Dataset &dataset) {
   return res;
 }
 
-void Cpu_Autoencoder::_allocate_output_mem(int n, int width, int height) {
-  int n_pixel = n * width * height;
-
-  _out_encoder_filter_1 = make_unique<float[]>(n_pixel * ENCODER_FILTER_1_DEPTH);
-  _out_encoder_bias_1   = make_unique<float[]>(n_pixel * ENCODER_FILTER_1_DEPTH);
-  _out_encoder_relu_1   = make_unique<float[]>(n_pixel * ENCODER_FILTER_1_DEPTH);
-  _out_avg_pooling_1    = make_unique<float[]>(n_pixel * ENCODER_FILTER_1_DEPTH / 4);
-
-  _out_encoder_filter_2 = make_unique<float[]>(n_pixel * ENCODER_FILTER_2_DEPTH);
-  _out_encoder_bias_2   = make_unique<float[]>(n_pixel * ENCODER_FILTER_2_DEPTH);
-  _out_encoder_relu_2   = make_unique<float[]>(n_pixel * ENCODER_FILTER_2_DEPTH);
-  _out_avg_pooling_2    = make_unique<float[]>(n_pixel * ENCODER_FILTER_2_DEPTH / 16);
-
-  _out_decoder_filter_1 = make_unique<float[]>(n_pixel * DECODER_FILTER_1_DEPTH / 16);
-  _out_decoder_bias_1   = make_unique<float[]>(n_pixel * DECODER_FILTER_1_DEPTH / 16);
-  _out_decoder_relu_1   = make_unique<float[]>(n_pixel * DECODER_FILTER_1_DEPTH / 16);
-  _out_upsampling_1     = make_unique<float[]>(n_pixel * DECODER_FILTER_1_DEPTH / 4);
-
-  _out_decoder_filter_2 = make_unique<float[]>(n_pixel * DECODER_FILTER_2_DEPTH / 4);
-  _out_decoder_bias_2   = make_unique<float[]>(n_pixel * DECODER_FILTER_2_DEPTH / 4);
-  _out_decoder_relu_2   = make_unique<float[]>(n_pixel * DECODER_FILTER_2_DEPTH / 4);
-  _out_upsampling_2     = make_unique<float[]>(n_pixel * DECODER_FILTER_2_DEPTH);
-
-  _out_decoder_filter_3 = make_unique<float[]>(n_pixel * DECODER_FILTER_3_DEPTH);
-  _out_decoder_bias_3   = make_unique<float[]>(n_pixel * DECODER_FILTER_3_DEPTH);
-
-  static constexpr int FILTER_SIZES[]  = { ENCODER_FILTER_1_SIZE,
-                                           ENCODER_FILTER_2_SIZE,
-                                           DECODER_FILTER_1_SIZE,
-                                           DECODER_FILTER_2_SIZE,
-                                           DECODER_FILTER_3_SIZE };
-  constexpr int        MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
-
-  _d_in = make_unique<float[]>(n * width * height * MAX_FILTER_DEPTH);
-
-  _d_out    = make_unique<float[]>(n * width * height * MAX_FILTER_DEPTH);
-  _d_filter = make_unique<float[]>(MAX_FILTER_SIZE);
-}
-
-void Cpu_Autoencoder::_deallocate_output_mem() {
-  _out_encoder_filter_1 = 0;
-  _out_encoder_bias_1   = 0;
-  _out_encoder_relu_1   = 0;
-  _out_avg_pooling_1    = 0;
-
-  _out_encoder_filter_2 = 0;
-  _out_encoder_bias_2   = 0;
-  _out_encoder_relu_2   = 0;
-  _out_avg_pooling_2    = 0;
-
-  _out_decoder_filter_1 = 0;
-  _out_decoder_bias_1   = 0;
-  _out_decoder_relu_1   = 0;
-  _out_upsampling_1     = 0;
-
-  _out_decoder_filter_2 = 0;
-  _out_decoder_bias_2   = 0;
-  _out_decoder_relu_2   = 0;
-  _out_upsampling_2     = 0;
-
-  _out_decoder_filter_3 = 0;
-  _out_decoder_bias_3   = 0;
-
-  _d_in     = 0;
-  _d_out    = 0;
-  _d_filter = 0;
-}
-
 float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
   // Get the result after autoencoding
   int     n = batch.n, width = batch.width, height = batch.height, depth = batch.depth;
@@ -367,20 +363,21 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
 
   // Calculate loss before backprop
   float loss = cpu_mse_loss(batch.get_data(), //expected
-                          res.get_data(),     //actual
-                          n, width, height, depth);
+                            res.get_data(),     //actual
+                            n, width, height, depth);
 
   // Get loss gradient
   cpu_mse_grad(batch.get_data(),  //expected
-              res.get_data(),     //actual
-              d_out,              //d_out
-              n, width, height, depth);
+               res.get_data(),     //actual
+               d_out,              //d_out
+               n, width, height, depth);
 
   // Update weight for the last conv2D layer
   // Update bias
   cpu_bias_grad(d_out,  //d_out
                 d_in,   //d_bias
-                n, width, height, DECODER_FILTER_3_DEPTH);
+                n, width, height,
+                DECODER_FILTER_3_DEPTH);
 
   cpu_update_weight(_decoder_bias_3.get(),  //weight
                     d_in,                   //gradient
@@ -390,175 +387,178 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
   cpu_conv2D_grad(_out_upsampling_2.get(),  //in
                   d_out,                    //d_out
                   d_filter,                 //d_filter
-                  n, width, height, DECODER_FILTER_2_DEPTH, DECODER_FILTER_3_DEPTH);
+                  n, width, height,
+                  DECODER_FILTER_2_DEPTH, DECODER_FILTER_3_DEPTH);
 
   // Pass delta backwards
   cpu_conv2D(d_out,
              _decoder_filter_3.get(),
              d_in,
-             n,
-             width,
-             height,
-             DECODER_FILTER_2_DEPTH,
-             DECODER_FILTER_3_DEPTH);
+             n, width, height,
+             DECODER_FILTER_2_DEPTH, DECODER_FILTER_3_DEPTH);
 
-  // Swap d_out and d_in
   swap(d_out, d_in);
-
-  // Update weight
-  cpu_update_weight(
-      _decoder_filter_3.get(), d_filter, DECODER_FILTER_3_SIZE, learning_rate);
+  cpu_update_weight(_decoder_filter_3.get(),
+                    d_filter,
+                    DECODER_FILTER_3_SIZE, learning_rate);
 
   // Pass through upsampling (dim: n * w/2 * w/2 * 256)
-  cpu_upsampling_backward(
-      d_out, d_in, n, width / 2, height / 2, DECODER_FILTER_2_DEPTH);
+  cpu_upsampling_backward(d_out,
+                          d_in,
+                          n, width / 2, height / 2,
+                          DECODER_FILTER_2_DEPTH);
 
   // Pass through ReLU (d_in and d_out swapped)
   cpu_relu_backward(_out_decoder_bias_2.get(),
                     d_in,
                     d_out,
-                    n,
-                    width / 2,
-                    height / 2,
+                    n, width / 2, height / 2,
                     DECODER_FILTER_2_DEPTH);
 
   // Second conv2D layer
-  cpu_bias_grad(d_out, d_in, n, width / 2, height / 2, DECODER_FILTER_2_DEPTH);
+  cpu_bias_grad(d_out,
+                d_in,
+                n, width / 2, height / 2,
+                DECODER_FILTER_2_DEPTH);
 
-  cpu_update_weight(_decoder_bias_2.get(), d_in, DECODER_FILTER_2_DEPTH, learning_rate);
+  cpu_update_weight(_decoder_bias_2.get(),
+                    d_in,
+                    DECODER_FILTER_2_DEPTH, learning_rate);
 
   cpu_conv2D_grad(_out_upsampling_1.get(),
                   d_out,
                   d_filter,
-                  n,
-                  width / 2,
-                  height / 2,
-                  DECODER_FILTER_1_DEPTH,
-                  DECODER_FILTER_2_DEPTH);
+                  n, width / 2, height / 2,
+                  DECODER_FILTER_1_DEPTH, DECODER_FILTER_2_DEPTH);
 
   cpu_conv2D(d_out,
              _decoder_filter_2.get(),
              d_in,
-             n,
-             width / 2,
-             height / 2,
-             DECODER_FILTER_1_DEPTH,
-             DECODER_FILTER_2_DEPTH);
+             n, width / 2, height / 2,
+             DECODER_FILTER_1_DEPTH, DECODER_FILTER_2_DEPTH);
 
   swap(d_out, d_in);
-  cpu_update_weight(
-      _decoder_filter_2.get(), d_filter, DECODER_FILTER_2_SIZE, learning_rate);
+  cpu_update_weight(_decoder_filter_2.get(),
+                    d_filter,
+                    DECODER_FILTER_2_SIZE, learning_rate);
 
   // Upsampling (dim: n * w/4 * w/4 * 128)
-  cpu_upsampling_backward(
-      d_out, d_in, n, width / 4, height / 4, DECODER_FILTER_1_DEPTH);
+  cpu_upsampling_backward(d_out,
+                          d_in,
+                          n, width / 4, height / 4,
+                          DECODER_FILTER_1_DEPTH);
 
   // ReLU
   cpu_relu_backward(_out_decoder_bias_1.get(),
                     d_in,
                     d_out,
-                    n,
-                    width / 4,
-                    height / 4,
+                    n, width / 4, height / 4,
                     DECODER_FILTER_1_DEPTH);
 
   // Third Conv2D
-  cpu_bias_grad(d_out, d_in, n, width / 4, height / 4, DECODER_FILTER_1_DEPTH);
+  cpu_bias_grad(d_out,
+                d_in,
+                n, width / 4, height / 4,
+                DECODER_FILTER_1_DEPTH);
 
-  cpu_update_weight(_decoder_bias_1.get(), d_in, DECODER_FILTER_1_DEPTH, learning_rate);
+  cpu_update_weight(_decoder_bias_1.get(),
+                    d_in,
+                    DECODER_FILTER_1_DEPTH, learning_rate);
 
   cpu_conv2D_grad(_out_avg_pooling_2.get(),
                   d_out,
                   d_filter,
-                  n,
-                  width / 4,
-                  height / 4,
-                  ENCODER_FILTER_2_DEPTH,
-                  DECODER_FILTER_1_DEPTH);
+                  n, width / 4, height / 4,
+                  ENCODER_FILTER_2_DEPTH, DECODER_FILTER_1_DEPTH);
 
   cpu_conv2D(d_out,
              _decoder_filter_1.get(),
              d_in,
-             n,
-             width / 4,
-             height / 4,
-             ENCODER_FILTER_2_DEPTH,
-             DECODER_FILTER_1_DEPTH);
+             n, width / 4, height / 4,
+             ENCODER_FILTER_2_DEPTH, DECODER_FILTER_1_DEPTH);
 
   swap(d_out, d_in);
-  cpu_update_weight(
-      _decoder_filter_1.get(), d_filter, DECODER_FILTER_1_SIZE, learning_rate);
+  cpu_update_weight(_decoder_filter_1.get(),
+                    d_filter,
+                    DECODER_FILTER_1_SIZE, learning_rate);
 
   // Max pooling backwards (dim: n * w/2 * w/2 * 128)
-  cpu_avg_pooling_backward(
-      d_out, d_in, n, width / 2, height / 2, ENCODER_FILTER_2_DEPTH);
+  cpu_avg_pooling_backward(d_out,
+                           d_in,
+                           n, width / 2, height / 2,
+                           ENCODER_FILTER_2_DEPTH);
 
   cpu_relu_backward(_out_encoder_bias_2.get(),
                     d_in,
                     d_out,
-                    n,
-                    width / 2,
-                    height / 2,
+                    n, width / 2, height / 2,
                     ENCODER_FILTER_2_DEPTH);
 
   // Forth conv2D
-  cpu_bias_grad(d_out, d_in, n, width / 2, height / 2, ENCODER_FILTER_2_DEPTH);
+  cpu_bias_grad(d_out,
+                d_in,
+                n, width / 2, height / 2,
+                ENCODER_FILTER_2_DEPTH);
 
-  cpu_update_weight(_encoder_bias_2.get(), d_in, ENCODER_FILTER_2_DEPTH, learning_rate);
+  cpu_update_weight(_encoder_bias_2.get(),
+                    d_in,
+                    ENCODER_FILTER_2_DEPTH, learning_rate);
 
   cpu_conv2D_grad(_out_avg_pooling_1.get(),
                   d_out,
                   d_filter,
-                  n,
-                  width / 2,
-                  height / 2,
-                  ENCODER_FILTER_1_DEPTH,
-                  ENCODER_FILTER_2_DEPTH);
+                  n, width / 2, height / 2,
+                  ENCODER_FILTER_1_DEPTH, ENCODER_FILTER_2_DEPTH);
 
   cpu_conv2D(d_out,
              _encoder_filter_2.get(),
              d_in,
-             n,
-             width / 2,
-             height / 2,
+             n, width / 2, height / 2,
              ENCODER_FILTER_1_DEPTH,
              ENCODER_FILTER_2_DEPTH);
 
   swap(d_out, d_in);
-  cpu_update_weight(
-      _encoder_filter_2.get(), d_filter, ENCODER_FILTER_2_SIZE, learning_rate);
+  cpu_update_weight(_encoder_filter_2.get(),
+                    d_filter,
+                    ENCODER_FILTER_2_SIZE, learning_rate);
 
-  cpu_avg_pooling_backward(d_out, d_in, n, width, height, ENCODER_FILTER_1_DEPTH);
+  cpu_avg_pooling_backward(d_out,
+                           d_in,
+                           n, width, height,
+                           ENCODER_FILTER_1_DEPTH);
 
-  cpu_relu_backward(
-      _out_encoder_bias_1.get(), d_in, d_out, n, width, height, ENCODER_FILTER_1_DEPTH);
+  cpu_relu_backward(_out_encoder_bias_1.get(),
+                    d_in,
+                    d_out,
+                    n, width, height,
+                    ENCODER_FILTER_1_DEPTH);
 
   // Fifth conv2D
-  cpu_bias_grad(d_out, d_in, n, width, height, ENCODER_FILTER_1_DEPTH);
+  cpu_bias_grad(d_out,
+                d_in,
+                n, width, height,
+                ENCODER_FILTER_1_DEPTH);
 
-  cpu_update_weight(_encoder_bias_1.get(), d_in, ENCODER_FILTER_1_DEPTH, learning_rate);
+  cpu_update_weight(_encoder_bias_1.get(),
+                    d_in,
+                    ENCODER_FILTER_1_DEPTH, learning_rate);
 
   cpu_conv2D_grad(batch.get_data(),
                   d_out,
                   d_filter,
-                  n,
-                  width,
-                  height,
-                  depth,
+                  n, width, height,depth,
                   ENCODER_FILTER_1_DEPTH);
 
   cpu_conv2D(d_out,
              _encoder_filter_1.get(),
              d_in,
-             n,
-             width,
-             height,
-             depth,
+             n, width, height, depth,
              ENCODER_FILTER_1_DEPTH);
 
   swap(d_out, d_in);
-  cpu_update_weight(
-      _encoder_filter_1.get(), d_filter, ENCODER_FILTER_1_SIZE, learning_rate);
+  cpu_update_weight(_encoder_filter_1.get(),
+                    d_filter,
+                    ENCODER_FILTER_1_SIZE, learning_rate);
 
   return loss;
 }
@@ -579,6 +579,7 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
   Timer timer;
   float total_time = 0;
 
+  printf("Training CPU Autoencoder for %d epochs with batch size %d and learning rate %.4f\n", n_epoch, batch_size, learning_rate);
   puts("=======================TRAINING START=======================");
   for (int epoch = 1; epoch <= n_epoch; ++epoch) {
     printf("Epoch %d:\n", epoch);
@@ -590,18 +591,17 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
     float epoch_time = 0;
     for (const Dataset &batch : batches) {
       total += batch.n;
+
       timer.start();
       float batch_loss = _fit_batch(batch, learning_rate);
       timer.stop();
       total_loss += batch_loss * batch.n;
       epoch_time += timer.get();
       bar.update();
-      printf(" - Loss = %.4f - Time = %s",
-             total_loss / total,
-             format_time(epoch_time).c_str());
+
+      printf(" - Loss = %.4f - Time = %s", total_loss / total, format_time(epoch_time).c_str());
       fflush(stdout);
     }
-
     total_time += epoch_time;
     puts("\n");
 
@@ -612,7 +612,6 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
       save_parameters(builder.str().c_str());
     }
   }
-
   puts("========================TRAINING END========================");
 
   // Deallocate memory to remove unused memory
@@ -631,18 +630,15 @@ void Cpu_Autoencoder::fit(const Dataset &dataset,
 Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
   // Encode by batches to use less memory
   int width = dataset.width, height = dataset.height, depth = dataset.depth;
-  int encoded_image_bytes =
-      (width / 4) * (height / 4) * ENCODER_FILTER_2_DEPTH * sizeof(float);
+  int encoded_image_bytes = (width / 4) * (height / 4) * ENCODER_FILTER_2_DEPTH * sizeof(float);
   int offset = 0;
 
   vector<Dataset> batches = create_minibatches(dataset, ENCODE_BATCH_SIZE);
   Dataset         res(dataset.n, width / 4, height / 4, ENCODER_FILTER_2_DEPTH);
 
   // Placeholder, alternating
-  unique_ptr<float[]> a =
-      make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
-  unique_ptr<float[]> b =
-      make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
+  unique_ptr<float[]> a = make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
+  unique_ptr<float[]> b = make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
 
   for (int i = 0; i < batches.size(); ++i) {
     int n = batches[i].n;
@@ -708,18 +704,15 @@ Dataset Cpu_Autoencoder::encode(const Dataset &dataset) const {
 
 Dataset Cpu_Autoencoder::decode(const Dataset &dataset) const {
   int width = dataset.width, height = dataset.height, depth = dataset.depth;
-  int encoded_image_bytes =
-      4 * width * 4 * height * DECODER_FILTER_3_DEPTH * sizeof(float);
+  int encoded_image_bytes = 4 * width * 4 * height * DECODER_FILTER_3_DEPTH * sizeof(float);
   int offset = 0;
 
   vector<Dataset> batches = create_minibatches(dataset, ENCODE_BATCH_SIZE);
-  Dataset         res(dataset.n, width * 4, height * 4, DECODER_FILTER_3_DEPTH);
+  Dataset res(dataset.n, width * 4, height * 4, DECODER_FILTER_3_DEPTH);
 
   // Placeholder, alternating
-  unique_ptr<float[]> a =
-      make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
-  unique_ptr<float[]> b =
-      make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
+  unique_ptr<float[]> a = make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
+  unique_ptr<float[]> b = make_unique<float[]>(ENCODE_BATCH_SIZE * width * height * MAX_FILTER_DEPTH);
 
   for (int i = 0; i < batches.size(); ++i) {
     int n = batches[i].n;

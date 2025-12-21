@@ -169,4 +169,6 @@ void cpu_conv2D_grad(float *in, float *d_out, float *d_filter, int n, int width,
  * @param learning_rate The learning rate
  */
 void cpu_update_weight(float *weight, float *gradient, int size, float learning_rate);
+void cpu_conv2D_backward_input(float *d_out, float *filter, float *d_in, 
+                               int n, int width, int height, int depth, int n_filter);
 #endif

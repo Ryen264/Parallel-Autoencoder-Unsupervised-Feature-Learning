@@ -223,7 +223,47 @@ void cpu_conv2D_grad(float *in, float *d_out, float *d_filter, int n, int width,
     }
   }
 }
+void cpu_conv2D_backward_input(float *d_out, float *filter, float *d_in, 
+                               int n, int width, int height, int depth, int n_filter) {
+  memset(d_in, 0, n * width * height * depth * sizeof(float));
 
+  for (int image = 0; image < n; ++image) {
+    int image_offset = image * width * height;
+    float *d_out_offset = d_out + image_offset * n_filter; 
+    float *d_in_offset  = d_in  + image_offset * depth;    
+
+    for (int f = 0; f < n_filter; ++f) {
+      
+      for (int d = 0; d < depth; ++d) {
+        
+        float *filter_offset = filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
+
+        for (int i = 0; i < height; ++i) {
+          for (int j = 0; j < width; ++j) {
+            
+            float grad_val = d_out_offset[GET_1D_IDX(i, j, f, width, height)];
+
+            for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
+              int row = i + f_i - CONV_FILTER_HEIGHT / 2;
+              
+              if (row < 0 || row >= height) continue; 
+
+              for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
+                int col = j + f_j - CONV_FILTER_WIDTH / 2;
+                
+                if (col < 0 || col >= width) continue; 
+
+                float w = filter_offset[GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)];
+            
+                d_in_offset[GET_1D_IDX(row, col, d, width, height)] += grad_val * w;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
 void cpu_update_weight(float *weight, float *gradient, int size, float learning_rate) {
   for (int i = 0; i < size; ++i)
     weight[i] -= learning_rate * gradient[i];

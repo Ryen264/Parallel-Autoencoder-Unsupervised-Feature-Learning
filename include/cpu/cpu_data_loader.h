@@ -13,7 +13,9 @@
 #include <time.h>
 #include <utility>
 #include <memory>
-#include <cuda_runtime.h>
+#include <cstdio>
+#include <cstdlib>
+#include <ctime>
 using namespace std;
 
 /**

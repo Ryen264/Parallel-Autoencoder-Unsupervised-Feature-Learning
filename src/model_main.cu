@@ -14,7 +14,7 @@ using namespace std;
 
 // string RUN_MODE       = "phase_2";  // "phase_1", "phase_2", "all"
 // string HARDWARE_MODE  = "cpu";  // "cpu", "gpu"
-bool USE_DUMMY_DATA   = true;  // only for phase 2
+// bool USE_DUMMY_DATA   = true;  // only for phase 2
 bool IS_SAVE_MODEL    = true;
 
 // const string DATASET_DIR            = "./data/cifar-10-batches-bin";
@@ -26,12 +26,6 @@ const string ENCODED_DATASET_FILE   = "encoded_dataset.bin";
 const string LABELS_FILE            = "labels.bin";
 const string SVM_MODEL_FILE         = "svm_model.bin";
 
-const string VISUALIZATION_TRAINING_TIMES_SVG = "training_times.svg";
-const string VISUALIZATION_TRAINING_TIMES_CSV = "training_times.csv";
-const string VISUALIZATION_SPEEDUP_GRAPH_SVG  = "speedup_graph.svg";
-const string VISUALIZATION_SPEEDUP_GRAPH_CSV  = "speedup_data.csv";
-const string VISUALIZATION_HTML_DASHBOARD     = "performance_analysis.html";
-
 Dataset dummy_dataset(int n, int width, int height, int depth) {
     unique_ptr<float[]> data(new float[n * width * height * depth]);
     for (int i = 0; i < n * width * height * depth; ++i) {
@@ -40,7 +34,7 @@ Dataset dummy_dataset(int n, int width, int height, int depth) {
     return Dataset(data, n, width, height, depth);
 }
 
-double phase_2(const Dataset &encoded_dataset, const vector<int> &labels, float train_ratio = 0.8f, bool is_save_model = true) {
+SVMmodel phase_2_train(const Dataset &encoded_dataset, const vector<int> &labels, float train_ratio = 0.8f, bool is_save_model = true) {
     vector<vector<double>> data;
     for (int i = 0; i < encoded_dataset.n; ++i) {
         vector<double> sample(encoded_dataset.width * encoded_dataset.height * encoded_dataset.depth);
@@ -76,77 +70,58 @@ double phase_2(const Dataset &encoded_dataset, const vector<int> &labels, float 
         svm_model.save(svm_model_path);
     }
 
+    return svm_model;
+}
+
+double phase_2_test(SVMmodel model, const Dataset &encoded_dataset, const vector<int> &labels) {
+    vector<vector<double>> data;
+    for (int i = 0; i < encoded_dataset.n; ++i) {
+        vector<double> sample(encoded_dataset.width * encoded_dataset.height * encoded_dataset.depth);
+        for (int j = 0; j < sample.size(); ++j) {
+            sample[j] = encoded_dataset.data[i * sample.size() + j];
+        }
+        data.push_back(sample);
+    }
+
+    // Predict using SVM model
+    vector<int> predictions = model.predict(data);
+    double accuracy = model.calculateAccuracy(predictions, labels, NUM_CLASSES);
+    vector<vector<int>> class_report = model.calculateClassificationReport(predictions, labels, NUM_CLASSES);
+    vector<vector<int>> conf_matrix = model.calculateConfusionMatrix(predictions, labels, NUM_CLASSES);
+
+    printf("SVM Test Accuracy: %.2f%%\n", accuracy * 100.0);
+    model.printClassificationReport(class_report);
+    model.printConfusionMatrix(conf_matrix);
+
     return accuracy;
 }
 
 int main(int argc, char *argv[]) {
     cout << "Phase 2: Training SVM on Encoded Data" << endl;
     
-    Dataset encoded_dataset;
-    vector<int> labels;
+    int num_train_samples = 50000;
+    int num_test_samples = 10000;
+
+    Dataset train_encoded_dataset, test_encoded_dataset;
+    vector<int> train_labels, test_labels;
     
-    if (USE_DUMMY_DATA) {
-        // Use dummy data for phase 2
-        cout << "Using dummy data for Phase 2" << endl;
-        int num_samples = NUM_TRAIN_SAMPLES + NUM_TEST_SAMPLES;
+    train_encoded_dataset = dummy_dataset(num_train_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
+    test_encoded_dataset = dummy_dataset(num_test_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
 
-        // actual dataset
-        int num_train_samples = 50000;
-        int num_test_samples = 10000;
-        num_samples = num_train_samples + num_test_samples;
-
-        encoded_dataset = dummy_dataset(num_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
-        
-        // Create dummy labels
-        labels.resize(num_samples);
-        for (int i = 0; i < num_samples; ++i) {
-            labels[i] = rand() % NUM_CLASSES; // 10 classes
-        }
-    } else {
-        // Load encoded dataset from phase 1
-        cout << "Loading encoded dataset from phase 1" << endl;
-        FILE *f = fopen(ENCODED_DATASET_FILE.c_str(), "rb");
-        if (!f) {
-            cerr << "Error: Encoded dataset file not found!" << endl;
-            cerr << "To use real data, make sure to run Phase 1 first or set USE_DUMMY_DATA = true" << endl;
-            return -1;
-        }
-        
-        int num_samples = NUM_TRAIN_SAMPLES;  // Local variable for actual data size
-        unique_ptr<float[]> encoded_data(new float[num_samples * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH]);
-        size_t bytes_read = fread(encoded_data.get(), sizeof(float), num_samples * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH, f);
-        fclose(f);
-        
-        if (bytes_read != num_samples * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH) {
-            cerr << "Warning: Expected " << (num_samples * IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH) 
-                        << " elements, but read " << bytes_read << endl;
-            num_samples = bytes_read / (IMAGE_WIDTH * IMAGE_HEIGHT * IMAGE_DEPTH);
-        }
-        
-        encoded_dataset = Dataset(encoded_data, num_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
-
-        // Load labels from phase 1
-        labels.resize(NUM_TRAIN_SAMPLES);
-        string labels_path = DATASET_DIR + "/" + LABELS_FILE;
-        FILE *lf = fopen(labels_path.c_str(), "rb");
-        if (lf) {
-            size_t labels_read = fread(labels.data(), sizeof(int), NUM_TRAIN_SAMPLES, lf);
-            if (labels_read != NUM_TRAIN_SAMPLES) {
-                cerr << "Warning: Expected " << NUM_TRAIN_SAMPLES << " labels, but read " << labels_read << endl;
-            }
-            fclose(lf);
-        } else {
-            cerr << "Warning: Labels file not found, using random labels" << endl;
-            return -1;
-        }
+    // Create dummy labels
+    train_labels.resize(num_train_samples);
+    for (int i = 0; i < num_train_samples; ++i) {
+        train_labels[i] = rand() % NUM_CLASSES; // 10 classes
+    }
+    test_labels.resize(num_test_samples);
+    for (int i = 0; i < num_test_samples; ++i) {
+        test_labels[i] = rand() % NUM_CLASSES; // 10 classes
     }
 
     // Train SVM on encoded data
-    float train_ratio = NUM_TRAIN_SAMPLES / static_cast<float>(NUM_TRAIN_SAMPLES + NUM_TEST_SAMPLES);
+    SVMmodel svm_model = phase_2_train(train_encoded_dataset, train_labels, TRAIN_RATIO, IS_SAVE_MODEL);
 
-    // actual ratio
-    train_ratio = 50000 / static_cast<float>(50000 + 10000);
-
-    double accuracy = phase_2(encoded_dataset, labels, train_ratio, IS_SAVE_MODEL);
+    // Test SVM on encoded data
+    double test_accuracy = phase_2_test(svm_model, test_encoded_dataset, test_labels);
     return 0;
 }

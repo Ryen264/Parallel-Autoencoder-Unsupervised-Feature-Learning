@@ -74,15 +74,14 @@ struct Optimized_Dataset {
 };
 
 /**
- * @brief Load CIFAR-10 dataset from binary files with options
+ * @brief Read CIFAR-10 dataset from binary files with options
  *
  * @param dataset_dir The path to the CIFAR-10 dataset directory
  * @param n_batches The number of batches to read
  * @param is_train True for training set, false for test set
  * @return Dataset The loaded and normalized dataset
  */
-Optimized_Dataset
-load_dataset(const char *dataset_dir, int n_batches, bool is_train = true);
+Optimized_Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_train = true);
 
 /**
  * @brief Shuffle the dataset

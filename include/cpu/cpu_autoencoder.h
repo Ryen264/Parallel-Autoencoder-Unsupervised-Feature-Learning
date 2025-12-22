@@ -2,21 +2,22 @@
 #define CPU_AUTOENCODER_H
 
 #include "constants.h"
-#include "data_loader.h"
-#include "constants.h"
 #include "cpu_layers.h"
+#include "data_loader.h"
 #include "progress_bar.h"
 #include "timer.h"
 #include "utils.h"
 
-#include <algorithm>
 #include <chrono>
 #include <cstdio>
-#include <cstring>
 #include <fstream>
 #include <sstream>
 #include <utility>
-#include <filesystem>
+#include <memory>     // Thêm thư viện memory cho unique_ptr
+#include <algorithm>  // max_element
+#include <random>     // normal_distribution
+#include <cmath>      // sqrt
+#include <cstring>    // memset
 using namespace std;
 
 /**
@@ -33,7 +34,9 @@ class Cpu_Autoencoder {
   unique_ptr<float[]> _out_encoder_bias_1;
 
   unique_ptr<float[]> _out_encoder_relu_1;
-  unique_ptr<float[]> _out_avg_pooling_1;
+  
+  // [UPDATED] Đổi tên biến từ avg -> max cho đúng logic Max Pooling
+  unique_ptr<float[]> _out_max_pooling_1; 
 
   unique_ptr<float[]> _encoder_filter_2;
   unique_ptr<float[]> _encoder_bias_2;
@@ -41,7 +44,9 @@ class Cpu_Autoencoder {
   unique_ptr<float[]> _out_encoder_bias_2;
 
   unique_ptr<float[]> _out_encoder_relu_2;
-  unique_ptr<float[]> _out_avg_pooling_2;
+  
+  // [UPDATED] Đổi tên biến từ avg -> max cho đúng logic Max Pooling
+  unique_ptr<float[]> _out_max_pooling_2;
 
   unique_ptr<float[]> _decoder_filter_1;
   unique_ptr<float[]> _decoder_bias_1;
@@ -186,6 +191,8 @@ public:
    * @param filename The file to write the model's parameter
    */
   void save_parameters(const char *filename) const;
+
+  void load_parameters(const char *filename);
 };
 
 #endif

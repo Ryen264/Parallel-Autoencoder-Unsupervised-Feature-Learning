@@ -1,24 +1,19 @@
-#include "data_loader.h"
+#include "cpu_data_loader.h"
 
-// Error checking macro
-#define CUDA_CHECK(call)                                                               \
-  do {                                                                                 \
-    cudaError_t error = call;                                                          \
-    if (error != cudaSuccess) {                                                        \
-      fprintf(stderr,                                                                  \
-              "CUDA error at %s:%d: %s\n",                                             \
-              __FILE__,                                                                \
-              __LINE__,                                                                \
-              cudaGetErrorString(error));                                              \
-      exit(EXIT_FAILURE);                                                              \
-    }                                                                                  \
-  } while (0)
+// Thay thế parseAndNormalize bằng triển khai CPU thuần túy
+static void parseAndNormalize(unsigned char *raw_data,
+                              float         *images,
+                              int           *labels,
+                              int            num_samples) {
+  int record_size = 1 + IMAGE_SIZE;
 
-// CUDA kernel for normalization: convert uint8 [0, 255] to float [0, 1]
-__global__ void normalizeKernel(unsigned char *input, float *output, int size) {
-  int idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if (idx < size)
-    output[idx] = input[idx] / 255.0f;
+  // Extract labels and CPU normalization
+  for (int i = 0; i < num_samples; i++) {
+    labels[i] = (int)raw_data[i * record_size];
+    for (int j = 0; j < IMAGE_SIZE; j++)
+      // Normalize: convert uint8 [0, 255] to float [0, 1]
+      images[i * IMAGE_SIZE + j] = raw_data[i * record_size + 1 + j] / 255.0f;
+  }
 }
 
 // Read a single CIFAR-10 binary file
@@ -42,75 +37,14 @@ static void readBinaryFile(const char *filepath, unsigned char **raw_data, int n
   size_t read_size = fread(*raw_data, 1, total_size, file);
   if (read_size != total_size) {
     fprintf(stderr, "Error: Could not read complete file %s\n", filepath);
-    if (raw_data)
-      free((void *)*raw_data);
-    else {
-      fprintf(stderr, "Error: Memory deallocation failed\n");
-    }
+    if (*raw_data)
+      free(*raw_data);
     fclose(file);
     exit(EXIT_FAILURE);
   }
   fclose(file);
 }
 
-// Parse raw data and normalize using CUDA
-static void parseAndNormalize(unsigned char *raw_data,
-                              float         *images,
-                              int           *labels,
-                              int            num_samples,
-                              bool           use_cuda) {
-  int record_size = 1 + IMAGE_SIZE;
-
-  // Extract labels
-  for (int i = 0; i < num_samples; i++)
-    labels[i] = (int)raw_data[i * record_size];
-
-  if (use_cuda) {
-    // Allocate device memory for raw image data
-    unsigned char *d_raw_images;
-    float         *d_images;
-    int            image_data_size = num_samples * IMAGE_SIZE;
-
-    CUDA_CHECK(cudaMalloc(&d_raw_images, image_data_size * sizeof(unsigned char)));
-    CUDA_CHECK(cudaMalloc(&d_images, image_data_size * sizeof(float)));
-
-    // Copy raw image data to device (skip labels)
-    unsigned char *raw_images = (unsigned char *)malloc(image_data_size);
-    for (int i = 0; i < num_samples; i++)
-      memcpy(raw_images + i * IMAGE_SIZE, raw_data + i * record_size + 1, IMAGE_SIZE);
-
-    CUDA_CHECK(cudaMemcpy(d_raw_images,
-                          raw_images,
-                          image_data_size * sizeof(unsigned char),
-                          cudaMemcpyHostToDevice));
-
-    // Launch normalization kernel
-    int threadsPerBlock = 256;
-    int blocksPerGrid   = (image_data_size + threadsPerBlock - 1) / threadsPerBlock;
-
-    normalizeKernel<<<blocksPerGrid, threadsPerBlock>>>(
-        d_raw_images, d_images, image_data_size);
-    CUDA_CHECK(cudaGetLastError());
-    CUDA_CHECK(cudaDeviceSynchronize());
-
-    // Copy normalized data back to host
-    CUDA_CHECK(cudaMemcpy(images, d_images, image_data_size * sizeof(float), cudaMemcpyDeviceToHost));
-
-    // Cleanup
-    if (raw_images)
-      free((void *)raw_images);
-    else {
-      fprintf(stderr, "Error: Memory deallocation failed\n");
-    }
-    CUDA_CHECK(cudaFree((void *)d_raw_images));
-    CUDA_CHECK(cudaFree((void *)d_images));
-  } else {
-    // CPU normalization
-    for (int i = 0; i < num_samples; i++)
-      for (int j = 0; j < IMAGE_SIZE; j++)
-        images[i * IMAGE_SIZE + j] = raw_data[i * record_size + 1 + j] / 255.0f;
-  }
-}
 
 Dataset::Dataset()
     : data(nullptr), labels(nullptr), n(0), width(0), height(0), depth(0) {};
@@ -124,7 +58,7 @@ Dataset::Dataset(int n, int width, int height, int depth)
     , depth(depth) {};
 
 Dataset::Dataset(unique_ptr<float[]> &data, int n, int width, int height, int depth)
-    : data(move(data))
+    : data(std::move(data))
     , labels(make_unique<int[]>(n))
     , n(n)
     , width(width)
@@ -137,8 +71,8 @@ Dataset::Dataset(unique_ptr<float[]> &data,
                  int                  width,
                  int                  height,
                  int                  depth)
-    : data(move(data))
-    , labels(move(labels))
+    : data(std::move(data))
+    , labels(std::move(labels))
     , n(n)
     , width(width)
     , height(height)
@@ -150,14 +84,9 @@ int *Dataset::get_labels() const { return labels.get(); }
 
 // Read CIFAR-10 dataset from binary files
 Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_train) {
-  // Check if CUDA is available
-  int  deviceCount;
-  bool use_cuda = (cudaGetDeviceCount(&deviceCount) == cudaSuccess && deviceCount > 0);
-
   int num_samples = is_train ? n_batches * NUM_PER_BATCH : NUM_TEST_SAMPLES;
 
   // Allocate memory for images and labels
-  // Use new[] because unique_ptr uses delete[] by default
   float *images = new float[num_samples * IMAGE_SIZE];
   int   *labels = new int[num_samples];
 
@@ -167,6 +96,7 @@ Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_train) {
   }
 
   if (is_train) {
+    // Load training data (n_batches batches)
     printf("Loading training data from %s...\n", dataset_dir);
     for (int batch = 1; batch <= n_batches; batch++) {
       char filepath[512];
@@ -179,14 +109,9 @@ Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_train) {
       parseAndNormalize(raw_data,
                         images + offset * IMAGE_SIZE,
                         labels + offset,
-                        NUM_TRAIN_SAMPLES / NUM_BATCHES,
-                        use_cuda);
+                        NUM_TRAIN_SAMPLES / NUM_BATCHES);
 
-      if (raw_data)
-        free((void *)raw_data);
-      else {
-        fprintf(stderr, "Error: Memory deallocation failed\n");
-      }
+      if (raw_data) free(raw_data);
       printf("  ✓ Loaded batch %d/%d\n", batch, n_batches);
     }
     printf("✓ Training data loaded: %d samples\n", num_samples);
@@ -198,12 +123,8 @@ Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_train) {
 
     unsigned char *raw_data;
     readBinaryFile(filepath, &raw_data, NUM_TEST_SAMPLES);
-    parseAndNormalize(raw_data, images, labels, NUM_TEST_SAMPLES, use_cuda);
-    if (raw_data)
-      free((void *)raw_data);
-    else {
-      fprintf(stderr, "Error: Memory deallocation failed\n");
-    }
+    parseAndNormalize(raw_data, images, labels, NUM_TEST_SAMPLES);
+    if (raw_data) free(raw_data);
     printf("✓ Test data loaded: %d samples\n", num_samples);
   }
 
@@ -251,8 +172,8 @@ void shuffle_dataset(Dataset &dataset) {
   }
 
   // Change the pointers of the original dataset
-  dataset.data   = move(new_data);
-  dataset.labels = move(new_labels);
+  dataset.data   = std::move(new_data);
+  dataset.labels = std::move(new_labels);
 }
 
 vector<Dataset> create_minibatches(const Dataset &dataset, int batch_size) {
@@ -278,7 +199,7 @@ vector<Dataset> create_minibatches(const Dataset &dataset, int batch_size) {
            current_batch_image_bytes);
     memcpy(batch.get_labels(), labels + i * batch_size, current_batch_labels_bytes);
 
-    batches.push_back(move(batch));
+    batches.push_back(std::move(batch));
   }
   return batches;
 }

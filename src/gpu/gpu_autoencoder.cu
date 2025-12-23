@@ -847,3 +847,31 @@ void Gpu_Autoencoder::save_parameters(const char *filename) const {
   write_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
   write_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
 }
+
+void Gpu_Autoencoder::load_parameters(const char *filename) {
+  ifstream buffer(filename, ios::in | ios::binary);
+  if (!buffer.is_open()) {
+      printf("Error: Cannot open file %s\n", filename);
+      return;
+  }
+
+  // Read first encoder conv2D layer
+  read_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
+  read_data(buffer, _encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float));
+
+  // Read second encoder conv2D layer
+  read_data(buffer, _encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float));
+  read_data(buffer, _encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float));
+
+  // Read first decoder conv2D layer
+  read_data(buffer, _decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float));
+
+  // Read second decoder conv2D layer
+  read_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
+
+  // Read third encoder conv2D layer
+  read_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
+}

@@ -9,7 +9,7 @@ constexpr int NUM_BATCHES       = 1;
 constexpr int NUM_PER_BATCH     = 10000;
 constexpr int NUM_TRAIN_SAMPLES = NUM_BATCHES * NUM_PER_BATCH;
 constexpr int NUM_CLASSES       = 10;
-constexpr int NUM_TEST_SAMPLES  = NUM_PER_BATCH;
+constexpr int NUM_TEST_SAMPLES  = 10000;
 
 constexpr int   N_EPOCH       = 20;
 constexpr int   BATCH_SIZE    = 32;

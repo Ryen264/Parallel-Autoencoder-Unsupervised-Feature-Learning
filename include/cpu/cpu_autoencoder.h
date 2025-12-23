@@ -192,6 +192,11 @@ public:
    */
   void save_parameters(const char *filename) const;
 
+  /**
+   * @brief Load the model's parameters from a file
+   *
+   * @param filename The file containing the model's parameters
+   */
   void load_parameters(const char *filename);
 };
 

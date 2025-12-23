@@ -146,12 +146,12 @@ __global__ void gpu_mse_loss_kernel(float *expected,
   if (tid < 32) {
     volatile float *vmem = elem;
 
-    *vmem += vmem[32];
-    *vmem += vmem[16];
-    *vmem += vmem[8];
-    *vmem += vmem[4];
-    *vmem += vmem[2];
-    *vmem += vmem[1];
+    *vmem = *vmem + vmem[32];
+    *vmem = *vmem + vmem[16];
+    *vmem = *vmem + vmem[8];
+    *vmem = *vmem + vmem[4];
+    *vmem = *vmem + vmem[2];
+    *vmem = *vmem + vmem[1];
   }
 
   // Copy to output

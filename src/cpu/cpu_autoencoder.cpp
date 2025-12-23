@@ -459,16 +459,19 @@ void Cpu_Autoencoder::save_parameters(const char *filename) const {
   ofstream buffer(filename, ios::out | ios::binary);
   write_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
   write_data(buffer, _encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float));
+
   write_data(buffer, _encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float));
   write_data(buffer, _encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float));
+
   write_data(buffer, _decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float));
   write_data(buffer, _decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float));
+
   write_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
   write_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
+  
   write_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
   write_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
 }
-// Thêm vào cuối file cpu_autoencoder.cpp
 
 void Cpu_Autoencoder::load_parameters(const char *filename) {
   ifstream buffer(filename, ios::in | ios::binary);
@@ -492,6 +495,4 @@ void Cpu_Autoencoder::load_parameters(const char *filename) {
 
   read_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
   read_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
-  
-  printf("Model loaded from %s\n", filename);
 }

@@ -32,7 +32,7 @@ class Gpu_Autoencoder {
   float *_out_encoder_bias_1;
 
   float *_out_encoder_relu_1;
-  float *_out_avg_pooling_1;
+  float *_out_max_pooling_1;
 
   float *_encoder_filter_2;
   float *_encoder_bias_2;
@@ -40,7 +40,7 @@ class Gpu_Autoencoder {
   float *_out_encoder_bias_2;
 
   float *_out_encoder_relu_2;
-  float *_out_avg_pooling_2;
+  float *_out_max_pooling_2;
 
   float *_decoder_filter_1;
   float *_decoder_bias_1;
@@ -74,9 +74,9 @@ class Gpu_Autoencoder {
 
   // Block sizes
   static constexpr dim3 _block_size_1D   = dim3(1024);
-  static constexpr dim3 _block_size_3D_1 = dim3(1, 32, 32);
-  static constexpr dim3 _block_size_3D_2 = dim3(4, 16, 16);
-  static constexpr dim3 _block_size_3D_3 = dim3(16, 8, 8);
+  static constexpr dim3 _block_size_3D_1 = dim3(32, 32, 1);
+  static constexpr dim3 _block_size_3D_2 = dim3(16, 16, 4);
+  static constexpr dim3 _block_size_3D_3 = dim3(8, 8, 16);
 
   /**
    * @brief Perform a formward pass

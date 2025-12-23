@@ -25,7 +25,12 @@ using namespace std;
 void gpu_conv2D(float *in,
                 float *filter,
                 float *out,
-                int n, int width, int height, int depth, int n_filter, dim3 block_size);
+                int    n,
+                int    width,
+                int    height,
+                int    depth,
+                int    n_filter,
+                dim3   block_size);
 
 /**
  * @brief           Apply bias into images
@@ -42,7 +47,11 @@ void gpu_conv2D(float *in,
 void gpu_add_bias(float *in,
                   float *bias,
                   float *out,
-                  int n, int width, int height, int depth, dim3 block_size);
+                  int    n,
+                  int    width,
+                  int    height,
+                  int    depth,
+                  dim3   block_size);
 
 /**
  * @brief           ReLU layer
@@ -55,9 +64,8 @@ void gpu_add_bias(float *in,
  * @param depth     The depth of the input array
  * @param block_size The block size to call the kernel functions
  */
-void gpu_relu(float *in,
-              float *out,
-              int n, int width, int height, int depth, dim3 block_size);
+void gpu_relu(
+    float *in, float *out, int n, int width, int height, int depth, dim3 block_size);
 
 /**
  * @brief           Avg pooling layer to downsample by half
@@ -70,9 +78,8 @@ void gpu_relu(float *in,
  * @param depth     The depth of the input array
  * @param block_size The block size to call the kernel functions
  */
-void gpu_avg_pooling(float *in,
-                     float *out,
-                     int n, int width, int height, int depth, dim3 block_size);
+void gpu_max_pooling(
+    float *in, float *out, int n, int width, int height, int depth, dim3 block_size);
 
 /**
  * @brief           Upsampling layer to upsample by twice
@@ -85,9 +92,8 @@ void gpu_avg_pooling(float *in,
  * @param depth     The depth of the input array
  * @param block_size The block size to call the kernel functions
  */
-void gpu_upsampling(float *in,
-                    float *out,
-                    int n, int width, int height, int depth, dim3 block_size);
+void gpu_upsampling(
+    float *in, float *out, int n, int width, int height, int depth, dim3 block_size);
 
 /**
  * @brief           Mean squared error loss
@@ -102,7 +108,11 @@ void gpu_upsampling(float *in,
  */
 float gpu_mse_loss(float *expected,
                    float *actual,
-                   int n, int width, int height, int depth, dim3 block_size);
+                   int    n,
+                   int    width,
+                   int    height,
+                   int    depth,
+                   dim3   block_size);
 
 /**
  * @brief           Mean squared error gradient
@@ -119,7 +129,11 @@ float gpu_mse_loss(float *expected,
 void gpu_mse_grad(float *expected,
                   float *actual,
                   float *d_out,
-                  int n, int width, int height, int depth, dim3 block_size);
+                  int    n,
+                  int    width,
+                  int    height,
+                  int    depth,
+                  dim3   block_size);
 
 /**
  * @brief           ReLU layer backwards pass
@@ -136,7 +150,11 @@ void gpu_mse_grad(float *expected,
 void gpu_relu_backward(float *in,
                        float *d_out,
                        float *d_in,
-                       int n, int width, int height, int depth, dim3 block_size);
+                       int    n,
+                       int    width,
+                       int    height,
+                       int    depth,
+                       dim3   block_size);
 
 /**
  * @brief           Avg pooling backwards pass
@@ -149,9 +167,14 @@ void gpu_relu_backward(float *in,
  * @param depth     The depth of the images
  * @param block_size The block size to call the kernel functions
  */
-void gpu_avg_pooling_backward(float *d_out,
+void gpu_max_pooling_backward(float *in,
+                              float *d_out,
                               float *d_in,
-                              int n, int width, int height, int depth, dim3 block_size);
+                              int    n,
+                              int    width,
+                              int    height,
+                              int    depth,
+                              dim3   block_size);
 
 /**
  * @brief           Upsampling backwards pass
@@ -166,7 +189,11 @@ void gpu_avg_pooling_backward(float *d_out,
  */
 void gpu_upsampling_backward(float *d_out,
                              float *d_in,
-                             int n, int width, int height, int depth, dim3 block_size);
+                             int    n,
+                             int    width,
+                             int    height,
+                             int    depth,
+                             dim3   block_size);
 
 /**
  * @brief           Bias gradient calculation
@@ -181,7 +208,11 @@ void gpu_upsampling_backward(float *d_out,
  */
 void gpu_bias_grad(float *d_out,
                    float *d_bias,
-                   int n, int width, int height, int depth, dim3 block_size);
+                   int    n,
+                   int    width,
+                   int    height,
+                   int    depth,
+                   dim3   block_size);
 
 /**
  * @brief           Conv2D gradient calculation
@@ -199,7 +230,22 @@ void gpu_bias_grad(float *d_out,
 void gpu_conv2D_grad(float *in,
                      float *d_out,
                      float *d_filter,
-                     int n, int width, int height, int depth, int n_filter, dim3 block_size);
+                     int    n,
+                     int    width,
+                     int    height,
+                     int    depth,
+                     int    n_filter,
+                     dim3   block_size);
+
+void gpu_conv2D_backward(float *d_out,
+                         float *filter,
+                         float *d_in,
+                         int    n,
+                         int    width,
+                         int    height,
+                         int    depth,
+                         int    n_filter,
+                         dim3   block_size);
 
 /**
  * @brief               Update weights using gradient descent
@@ -210,7 +256,6 @@ void gpu_conv2D_grad(float *in,
  * @param learning_rate The learning rate
  * @param block_size    The block size to call the kernel functions
  */
-void gpu_update_weight(float *weight,
-                       float *gradient,
-                       int size, float learning_rate, dim3 block_size);
+void gpu_update_weight(
+    float *weight, float *gradient, int size, float learning_rate, dim3 block_size);
 #endif

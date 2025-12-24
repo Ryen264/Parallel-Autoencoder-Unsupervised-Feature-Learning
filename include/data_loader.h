@@ -34,6 +34,20 @@ struct Dataset {
   Dataset();
 
   /**
+   * @brief Copy constructor
+   *
+   * @param other The source dataset to copy from
+   */
+  Dataset(const Dataset &other);
+
+  /**
+   * @brief Move constructor
+   *
+   * @param other The source dataset to move from
+   */
+  Dataset(Dataset &&other) noexcept;
+
+  /**
    * @brief Create an unitialized dataset
    *
    * @param n The number of images
@@ -84,6 +98,22 @@ struct Dataset {
    * @return int* The list of labels
    */
   int *get_labels() const;
+
+  /**
+   * @brief Copy assignment operator overload
+   *
+   * @param other The source dataset to assign from
+   * @return Dataset& Reference to this dataset after assignment
+   */
+  Dataset &operator=(const Dataset &other);
+
+  /**
+   * @brief Move assignment operator overload
+   *
+   * @param other The source dataset to move from
+   * @return Dataset& Reference to this dataset after assignment
+   */
+  Dataset &operator=(Dataset &&other) noexcept;
 };
 
 /**
@@ -119,6 +149,14 @@ vector<Dataset> create_minibatches(const Dataset &dataset, int batch_size);
  * @param filepath The output file path
  * @return bool True if successful, false otherwise
  */
-bool write_data(const Dataset &dataset, const char *filepath);
+bool write_binary(const Dataset &dataset, const char *filepath);
+
+/**
+ * @brief Read dataset from a binary file
+ *
+ * @param filepath The input file path
+ * @return Dataset The loaded dataset
+ */
+Dataset read_binary(const char *filepath);
 
 #endif

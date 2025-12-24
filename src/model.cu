@@ -29,10 +29,92 @@ SVMmodel::SVMmodel(float C, string kernel_type, string gamma_type,
     this->nochange_steps = nochange_steps;
 }
 
+SVMmodel::SVMmodel(const SVMmodel &other)
+    : is_trained(other.is_trained), n_features(other.n_features), svm_model(other.svm_model),
+      C(other.C), kernel_type(other.kernel_type), kernel(other.kernel),
+      gamma_type(other.gamma_type), gamma(other.gamma), tolerance(other.tolerance),
+      cache_size(other.cache_size), max_iter(other.max_iter), nochange_steps(other.nochange_steps),
+      verbosity(other.verbosity), n_support(other.n_support), bias(other.bias),
+      n_classes(other.n_classes) {}
+
+SVMmodel::SVMmodel(SVMmodel &&other) noexcept
+    : is_trained(other.is_trained), n_features(other.n_features), svm_model(other.svm_model),
+      C(other.C), kernel_type(move(other.kernel_type)), kernel(other.kernel),
+      gamma_type(move(other.gamma_type)), gamma(other.gamma), tolerance(other.tolerance),
+      cache_size(other.cache_size), max_iter(other.max_iter), nochange_steps(other.nochange_steps),
+      verbosity(other.verbosity), n_support(other.n_support), bias(other.bias),
+      n_classes(other.n_classes) {
+    other.svm_model = nullptr;
+}
+
 SVMmodel::~SVMmodel() {
     if (svm_model) {
         svm_free_and_destroy_model(&svm_model);
     }
+}
+
+SVMmodel &SVMmodel::operator=(const SVMmodel &other) {
+    if (this != &other) {
+        // Clean up existing resources
+        if (svm_model) {
+            svm_free_and_destroy_model(&svm_model);
+            svm_model = nullptr;
+        }
+
+        // Copy members
+        is_trained     = other.is_trained;
+        n_features     = other.n_features;
+        C              = other.C;
+        kernel_type    = other.kernel_type;
+        kernel         = other.kernel;
+        gamma_type     = other.gamma_type;
+        gamma          = other.gamma;
+        tolerance      = other.tolerance;
+        cache_size     = other.cache_size;
+        max_iter       = other.max_iter;
+        nochange_steps = other.nochange_steps;
+        verbosity      = other.verbosity;
+        n_support      = other.n_support;
+        bias           = other.bias;
+        n_classes      = other.n_classes;
+
+        // Note: Deep copy of svm_model would require custom libsvm copying logic
+        // For now, just copy the pointer reference (shallow copy)
+        // This is a limitation of libsvm - it doesn't provide a copy function
+        svm_model = other.svm_model;
+    }
+    return *this;
+}
+
+SVMmodel &SVMmodel::operator=(SVMmodel &&other) noexcept {
+    if (this != &other) {
+        // Clean up existing resources
+        if (svm_model) {
+            svm_free_and_destroy_model(&svm_model);
+        }
+
+        // Move members
+        is_trained     = other.is_trained;
+        n_features     = other.n_features;
+        svm_model      = other.svm_model;
+        C              = other.C;
+        kernel_type    = move(other.kernel_type);
+        kernel         = other.kernel;
+        gamma_type     = move(other.gamma_type);
+        gamma          = other.gamma;
+        tolerance      = other.tolerance;
+        cache_size     = other.cache_size;
+        max_iter       = other.max_iter;
+        nochange_steps = other.nochange_steps;
+        verbosity      = other.verbosity;
+        n_support      = other.n_support;
+        bias           = other.bias;
+        n_classes      = other.n_classes;
+
+        // Prevent other from deleting the moved model
+        other.svm_model = nullptr;
+    }
+    return *this;
 }
 
 float* SVMmodel::convertToDeviceArray(const vector<vector<double>>& data, int& n_rows, int& n_cols) {
@@ -504,29 +586,49 @@ bool SVMmodel::load(const string& modelPath) {
     if (svm_model) {
         svm_free_and_destroy_model(&svm_model);
     }
-    
+
     // Use libsvm's load function
     svm_model = svm_load_model(modelPath.c_str());
-    
+
     if (!svm_model) {
         cerr << "Error: Could not load model from " << modelPath << endl;
         return false;
     }
-    
-    // Extract model information
+
+    // Extract model information safely
     n_support = svm_model->l;
     n_classes = svm_model->nr_class;
-    n_features = svm_model->SV[0][0].index;  // Get number of features from first support vector
-    
-    // Count actual number of features
-    for (int i = 0; svm_model->SV[0][i].index != -1; i++) {
-        if (svm_model->SV[0][i].index > n_features) {
-            n_features = svm_model->SV[0][i].index;
+
+    // Determine feature count by scanning all support vectors
+    n_features = 0;
+    if (n_support > 0 && svm_model->SV) {
+        for (int sv = 0; sv < n_support; ++sv) {
+            const svm_node* node = svm_model->SV[sv];
+            for (int i = 0; node && node[i].index != -1; ++i) {
+                if (node[i].index > n_features) n_features = node[i].index;
+            }
         }
     }
-    
-    bias = -svm_model->rho[0];
-    
+
+    // Bias (rho) — for multi-class there are multiple rhos; use first for info
+    if (svm_model->rho)
+        bias = -svm_model->rho[0];
+    else
+        bias = 0.0f;
+
+    // Populate parameters from loaded model
+    switch (svm_model->param.kernel_type) {
+        case LINEAR:   kernel_type = "LINEAR"; kernel = LINEAR; break;
+        case POLY:     kernel_type = "POLY";   kernel = POLY;   break;
+        case RBF:      kernel_type = "RBF";    kernel = RBF;    break;
+        case SIGMOID:  kernel_type = "SIGMOID";kernel = SIGMOID;break;
+        case PRECOMPUTED: kernel_type = "PRECOMPUTED"; kernel = PRECOMPUTED; break;
+        default:       kernel_type = "UNKNOWN"; kernel = RBF; break;
+    }
+    C = static_cast<float>(svm_model->param.C);
+    gamma = static_cast<float>(svm_model->param.gamma);
+    gamma_type = "value";
+
     is_trained = true;
     cout << "Model loaded successfully from " << modelPath << endl;
     cout << "Number of support vectors: " << n_support << endl;
@@ -553,4 +655,48 @@ void SVMmodel::printModelInfo() const {
     cout << "C parameter: " << C << endl;
     cout << "Gamma: " << gamma << endl;
     cout << "============================\n" << endl;
+}
+
+bool SVMmodel::save_evaluation(double accuracy, const vector<vector<int>>& class_report, 
+                              const vector<vector<int>>& conf_matrix, const string& eval_path) const {
+    // Check if directory exists, if not create it
+    size_t found = eval_path.find_last_of("/\\");
+    if (found != string::npos) {
+        string dir_path = eval_path.substr(0, found);
+        struct stat info;
+        if (stat(dir_path.c_str(), &info) != 0) {
+            cout << "Creating directory: " << dir_path << endl;
+            #ifdef _WIN32
+                _mkdir(dir_path.c_str());
+            #else 
+                mkdir(dir_path.c_str(), 0777);
+            #endif
+        }
+    }
+
+    // Save evaluation results to file
+    ofstream ofs(eval_path);
+    if (ofs.is_open()) {
+        ofs << "SVM Test Accuracy: " << accuracy * 100.0 << "%\n";
+        ofs << "Classification Report:\n";
+        for (const auto& row : class_report) {
+            for (const auto& val : row) {
+                ofs << val << " ";
+            }
+            ofs << "\n";
+        }
+        ofs << "Confusion Matrix:\n";
+        for (const auto& row : conf_matrix) {
+            for (const auto& val : row) {
+                ofs << val << " ";
+            }
+            ofs << "\n";
+        }
+        ofs.close();
+        cout << "SVM evaluation results saved to " << eval_path << endl;
+        return true;
+    } else {
+        cerr << "Error: Cannot open file " << eval_path << " for writing." << endl;
+        return false;
+    }
 }

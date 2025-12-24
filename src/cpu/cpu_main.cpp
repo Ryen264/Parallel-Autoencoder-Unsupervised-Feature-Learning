@@ -1,5 +1,5 @@
 #include "cpu_autoencoder.h"
-#include "cpu_data_loader.h"
+#include "data_loader.h"
 
 #include <iostream>
 #include <cstdlib>

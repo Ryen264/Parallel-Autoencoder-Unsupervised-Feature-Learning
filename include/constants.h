@@ -3,8 +3,6 @@
 #include <string>
 using namespace std;
 
-constexpr const char* AUTOENCODER_FILENAME = "autoencoder.bin";
-
 constexpr int NUM_BATCHES       = 1;
 constexpr int NUM_PER_BATCH     = 10000;
 constexpr int NUM_TRAIN_SAMPLES = NUM_BATCHES * NUM_PER_BATCH;

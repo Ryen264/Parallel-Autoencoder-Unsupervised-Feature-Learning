@@ -132,10 +132,24 @@ public:
   Gpu_Autoencoder(const char *filename);
 
   /**
+   * @brief Copy constructor
+   */
+  Gpu_Autoencoder(const Gpu_Autoencoder &other);
+
+  /**
+   * @brief Move constructor
+   */
+  Gpu_Autoencoder(Gpu_Autoencoder &&other) noexcept;
+
+  /**
    * @brief Destroy the Autoencoder object
    *
    */
   ~Gpu_Autoencoder();
+
+  // Assignment operators
+  Gpu_Autoencoder &operator=(const Gpu_Autoencoder &other);
+  Gpu_Autoencoder &operator=(Gpu_Autoencoder &&other) noexcept;
 
   /**
    * @brief Encodes a dataset

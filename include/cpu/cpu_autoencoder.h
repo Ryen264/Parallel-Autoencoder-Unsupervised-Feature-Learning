@@ -136,10 +136,24 @@ public:
   Cpu_Autoencoder(const char *filename);
 
   /**
+   * @brief Copy constructor
+   */
+  Cpu_Autoencoder(const Cpu_Autoencoder &other);
+
+  /**
+   * @brief Move constructor
+   */
+  Cpu_Autoencoder(Cpu_Autoencoder &&other) noexcept;
+
+  /**
    * @brief Destroy the Autoencoder object
    *
    */
   ~Cpu_Autoencoder() = default;
+
+  // Assignment operators
+  Cpu_Autoencoder &operator=(const Cpu_Autoencoder &other);
+  Cpu_Autoencoder &operator=(Cpu_Autoencoder &&other) noexcept;
 
   /**
    * @brief Encodes a dataset

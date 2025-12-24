@@ -79,6 +79,164 @@ Cpu_Autoencoder::Cpu_Autoencoder(const char *filename) {
   read_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
 };
 
+Cpu_Autoencoder::Cpu_Autoencoder(const Cpu_Autoencoder &other) {
+  // Deep copy parameters
+  _encoder_filter_1 = make_unique<float[]>(ENCODER_FILTER_1_SIZE);
+  memcpy(_encoder_filter_1.get(), other._encoder_filter_1.get(), ENCODER_FILTER_1_SIZE * sizeof(float));
+  _encoder_bias_1 = make_unique<float[]>(ENCODER_FILTER_1_DEPTH);
+  memcpy(_encoder_bias_1.get(), other._encoder_bias_1.get(), ENCODER_FILTER_1_DEPTH * sizeof(float));
+
+  _encoder_filter_2 = make_unique<float[]>(ENCODER_FILTER_2_SIZE);
+  memcpy(_encoder_filter_2.get(), other._encoder_filter_2.get(), ENCODER_FILTER_2_SIZE * sizeof(float));
+  _encoder_bias_2 = make_unique<float[]>(ENCODER_FILTER_2_DEPTH);
+  memcpy(_encoder_bias_2.get(), other._encoder_bias_2.get(), ENCODER_FILTER_2_DEPTH * sizeof(float));
+
+  _decoder_filter_1 = make_unique<float[]>(DECODER_FILTER_1_SIZE);
+  memcpy(_decoder_filter_1.get(), other._decoder_filter_1.get(), DECODER_FILTER_1_SIZE * sizeof(float));
+  _decoder_bias_1 = make_unique<float[]>(DECODER_FILTER_1_DEPTH);
+  memcpy(_decoder_bias_1.get(), other._decoder_bias_1.get(), DECODER_FILTER_1_DEPTH * sizeof(float));
+
+  _decoder_filter_2 = make_unique<float[]>(DECODER_FILTER_2_SIZE);
+  memcpy(_decoder_filter_2.get(), other._decoder_filter_2.get(), DECODER_FILTER_2_SIZE * sizeof(float));
+  _decoder_bias_2 = make_unique<float[]>(DECODER_FILTER_2_DEPTH);
+  memcpy(_decoder_bias_2.get(), other._decoder_bias_2.get(), DECODER_FILTER_2_DEPTH * sizeof(float));
+
+  _decoder_filter_3 = make_unique<float[]>(DECODER_FILTER_3_SIZE);
+  memcpy(_decoder_filter_3.get(), other._decoder_filter_3.get(), DECODER_FILTER_3_SIZE * sizeof(float));
+  _decoder_bias_3 = make_unique<float[]>(DECODER_FILTER_3_DEPTH);
+  memcpy(_decoder_bias_3.get(), other._decoder_bias_3.get(), DECODER_FILTER_3_DEPTH * sizeof(float));
+
+  // Transient buffers remain null (will be allocated on demand)
+}
+
+Cpu_Autoencoder::Cpu_Autoencoder(Cpu_Autoencoder &&other) noexcept
+    : _encoder_filter_1(std::move(other._encoder_filter_1)),
+      _encoder_bias_1(std::move(other._encoder_bias_1)),
+      _encoder_filter_2(std::move(other._encoder_filter_2)),
+      _encoder_bias_2(std::move(other._encoder_bias_2)),
+      _decoder_filter_1(std::move(other._decoder_filter_1)),
+      _decoder_bias_1(std::move(other._decoder_bias_1)),
+      _decoder_filter_2(std::move(other._decoder_filter_2)),
+      _decoder_bias_2(std::move(other._decoder_bias_2)),
+      _decoder_filter_3(std::move(other._decoder_filter_3)),
+      _decoder_bias_3(std::move(other._decoder_bias_3)),
+      _out_encoder_filter_1(std::move(other._out_encoder_filter_1)),
+      _out_encoder_bias_1(std::move(other._out_encoder_bias_1)),
+      _out_encoder_relu_1(std::move(other._out_encoder_relu_1)),
+      _out_max_pooling_1(std::move(other._out_max_pooling_1)),
+      _out_encoder_filter_2(std::move(other._out_encoder_filter_2)),
+      _out_encoder_bias_2(std::move(other._out_encoder_bias_2)),
+      _out_encoder_relu_2(std::move(other._out_encoder_relu_2)),
+      _out_max_pooling_2(std::move(other._out_max_pooling_2)),
+      _out_decoder_filter_1(std::move(other._out_decoder_filter_1)),
+      _out_decoder_bias_1(std::move(other._out_decoder_bias_1)),
+      _out_decoder_relu_1(std::move(other._out_decoder_relu_1)),
+      _out_upsampling_1(std::move(other._out_upsampling_1)),
+      _out_decoder_filter_2(std::move(other._out_decoder_filter_2)),
+      _out_decoder_bias_2(std::move(other._out_decoder_bias_2)),
+      _out_decoder_relu_2(std::move(other._out_decoder_relu_2)),
+      _out_upsampling_2(std::move(other._out_upsampling_2)),
+      _out_decoder_filter_3(std::move(other._out_decoder_filter_3)),
+      _out_decoder_bias_3(std::move(other._out_decoder_bias_3)),
+      _d_in(std::move(other._d_in)),
+      _d_out(std::move(other._d_out)),
+      _d_filter(std::move(other._d_filter)) {}
+
+Cpu_Autoencoder &Cpu_Autoencoder::operator=(const Cpu_Autoencoder &other) {
+  if (this == &other) return *this;
+
+  // Deep copy parameters
+  _encoder_filter_1 = make_unique<float[]>(ENCODER_FILTER_1_SIZE);
+  memcpy(_encoder_filter_1.get(), other._encoder_filter_1.get(), ENCODER_FILTER_1_SIZE * sizeof(float));
+  _encoder_bias_1 = make_unique<float[]>(ENCODER_FILTER_1_DEPTH);
+  memcpy(_encoder_bias_1.get(), other._encoder_bias_1.get(), ENCODER_FILTER_1_DEPTH * sizeof(float));
+
+  _encoder_filter_2 = make_unique<float[]>(ENCODER_FILTER_2_SIZE);
+  memcpy(_encoder_filter_2.get(), other._encoder_filter_2.get(), ENCODER_FILTER_2_SIZE * sizeof(float));
+  _encoder_bias_2 = make_unique<float[]>(ENCODER_FILTER_2_DEPTH);
+  memcpy(_encoder_bias_2.get(), other._encoder_bias_2.get(), ENCODER_FILTER_2_DEPTH * sizeof(float));
+
+  _decoder_filter_1 = make_unique<float[]>(DECODER_FILTER_1_SIZE);
+  memcpy(_decoder_filter_1.get(), other._decoder_filter_1.get(), DECODER_FILTER_1_SIZE * sizeof(float));
+  _decoder_bias_1 = make_unique<float[]>(DECODER_FILTER_1_DEPTH);
+  memcpy(_decoder_bias_1.get(), other._decoder_bias_1.get(), DECODER_FILTER_1_DEPTH * sizeof(float));
+
+  _decoder_filter_2 = make_unique<float[]>(DECODER_FILTER_2_SIZE);
+  memcpy(_decoder_filter_2.get(), other._decoder_filter_2.get(), DECODER_FILTER_2_SIZE * sizeof(float));
+  _decoder_bias_2 = make_unique<float[]>(DECODER_FILTER_2_DEPTH);
+  memcpy(_decoder_bias_2.get(), other._decoder_bias_2.get(), DECODER_FILTER_2_DEPTH * sizeof(float));
+
+  _decoder_filter_3 = make_unique<float[]>(DECODER_FILTER_3_SIZE);
+  memcpy(_decoder_filter_3.get(), other._decoder_filter_3.get(), DECODER_FILTER_3_SIZE * sizeof(float));
+  _decoder_bias_3 = make_unique<float[]>(DECODER_FILTER_3_DEPTH);
+  memcpy(_decoder_bias_3.get(), other._decoder_bias_3.get(), DECODER_FILTER_3_DEPTH * sizeof(float));
+
+  // Clear training/output buffers (they are transient)
+  _out_encoder_filter_1.reset();
+  _out_encoder_bias_1.reset();
+  _out_encoder_relu_1.reset();
+  _out_max_pooling_1.reset();
+  _out_encoder_filter_2.reset();
+  _out_encoder_bias_2.reset();
+  _out_encoder_relu_2.reset();
+  _out_max_pooling_2.reset();
+  _out_decoder_filter_1.reset();
+  _out_decoder_bias_1.reset();
+  _out_decoder_relu_1.reset();
+  _out_upsampling_1.reset();
+  _out_decoder_filter_2.reset();
+  _out_decoder_bias_2.reset();
+  _out_decoder_relu_2.reset();
+  _out_upsampling_2.reset();
+  _out_decoder_filter_3.reset();
+  _out_decoder_bias_3.reset();
+  _d_in.reset();
+  _d_out.reset();
+  _d_filter.reset();
+
+  return *this;
+}
+
+Cpu_Autoencoder &Cpu_Autoencoder::operator=(Cpu_Autoencoder &&other) noexcept {
+  if (this == &other) return *this;
+
+  _encoder_filter_1 = std::move(other._encoder_filter_1);
+  _encoder_bias_1   = std::move(other._encoder_bias_1);
+  _encoder_filter_2 = std::move(other._encoder_filter_2);
+  _encoder_bias_2   = std::move(other._encoder_bias_2);
+  _decoder_filter_1 = std::move(other._decoder_filter_1);
+  _decoder_bias_1   = std::move(other._decoder_bias_1);
+  _decoder_filter_2 = std::move(other._decoder_filter_2);
+  _decoder_bias_2   = std::move(other._decoder_bias_2);
+  _decoder_filter_3 = std::move(other._decoder_filter_3);
+  _decoder_bias_3   = std::move(other._decoder_bias_3);
+
+  // Move transient buffers
+  _out_encoder_filter_1 = std::move(other._out_encoder_filter_1);
+  _out_encoder_bias_1   = std::move(other._out_encoder_bias_1);
+  _out_encoder_relu_1   = std::move(other._out_encoder_relu_1);
+  _out_max_pooling_1    = std::move(other._out_max_pooling_1);
+  _out_encoder_filter_2 = std::move(other._out_encoder_filter_2);
+  _out_encoder_bias_2   = std::move(other._out_encoder_bias_2);
+  _out_encoder_relu_2   = std::move(other._out_encoder_relu_2);
+  _out_max_pooling_2    = std::move(other._out_max_pooling_2);
+  _out_decoder_filter_1 = std::move(other._out_decoder_filter_1);
+  _out_decoder_bias_1   = std::move(other._out_decoder_bias_1);
+  _out_decoder_relu_1   = std::move(other._out_decoder_relu_1);
+  _out_upsampling_1     = std::move(other._out_upsampling_1);
+  _out_decoder_filter_2 = std::move(other._out_decoder_filter_2);
+  _out_decoder_bias_2   = std::move(other._out_decoder_bias_2);
+  _out_decoder_relu_2   = std::move(other._out_decoder_relu_2);
+  _out_upsampling_2     = std::move(other._out_upsampling_2);
+  _out_decoder_filter_3 = std::move(other._out_decoder_filter_3);
+  _out_decoder_bias_3   = std::move(other._out_decoder_bias_3);
+  _d_in                 = std::move(other._d_in);
+  _d_out                = std::move(other._d_out);
+  _d_filter             = std::move(other._d_filter);
+
+  return *this;
+}
+
 void Cpu_Autoencoder::_allocate_mem() {
   _encoder_filter_1 = make_unique<float[]>(ENCODER_FILTER_1_SIZE);
   _encoder_bias_1   = make_unique<float[]>(ENCODER_FILTER_1_DEPTH);
@@ -457,6 +615,11 @@ float Cpu_Autoencoder::eval(const Dataset &dataset) {
 
 void Cpu_Autoencoder::save_parameters(const char *filename) const {
   ofstream buffer(filename, ios::out | ios::binary);
+  if (!buffer.is_open()) {
+      fprintf(stderr, "Error: Cannot open file %s for writing\n", filename);
+      return;
+  }
+
   write_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
   write_data(buffer, _encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float));
 
@@ -471,12 +634,15 @@ void Cpu_Autoencoder::save_parameters(const char *filename) const {
   
   write_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
   write_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
+
+  buffer.close();
+  printf("✓ CPU Autoencoder parameters saved successfully to %s\n", filename);
 }
 
 void Cpu_Autoencoder::load_parameters(const char *filename) {
   ifstream buffer(filename, ios::in | ios::binary);
   if (!buffer.is_open()) {
-      printf("Error: Cannot open file %s\n", filename);
+      fprintf(stderr, "Error: Cannot open file %s for reading\n", filename);
       return;
   }
 
@@ -495,4 +661,7 @@ void Cpu_Autoencoder::load_parameters(const char *filename) {
 
   read_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
   read_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
+
+  buffer.close();
+  printf("✓ CPU Autoencoder parameters loaded successfully from %s\n", filename);
 }

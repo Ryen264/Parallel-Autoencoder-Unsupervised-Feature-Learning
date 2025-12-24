@@ -1,49 +1,43 @@
 #include "constants.h"
 #include "data_loader.h"
-#include "cpu_data_loader.h"
+// #include "gpu_autoencoder.h"
 #include "cpu_autoencoder.h"
-#include "gpu_autoencoder.h"
 #include "model.h"
-#include "visualization.h"
 
 #include <iostream>
-#include <cstdio>
-#include <chrono>
-#include <fstream>
-#include <iomanip>
-#include <string>
-#include <vector>
-#include <memory>
 using namespace std;
 
-string RUN_MODE       = "phase_2";  // "phase_1", "phase_2", "all"
-string HARDWARE_MODE  = "cpu";  // "cpu", "gpu"
+//./main [hardware=cpu/gpu] [phase_1_mode=train/load] [phase_2_mode=train/load] \
+//       [n_batches] [n_epoch] [batch_size] [learning_rate] \
+//       [c_param] [kernel_type] [gamma_type]
 
-// NUM_BATCHES      = 1;  // CIFAR-10 has 5 training batches
-// N_EPOCH          = 20;
-// BATCH_SIZE       = 32;
-// LEARNING_RATE    = 0.001f;
-// VERBOSE          = false;
-// CHECKPOINT       = 0;
+// Test by just using some first samples
+int TRAIN_SAMPLES = 100;
+int TEST_SAMPLES = 20;
 
-const char *DATASET_DIR             = "./data/cifar-10-batches-bin";
-const char *AUTOENCODER_OUTPUT_DIR  = "./output";
-const char *CPU_AUTOENCODER_PATH    = "./cpu_autoencoder_model.bin";
-const char *GPU_AUTOENCODER_PATH    = "./gpu_autoencoder_model.bin";
-const char *ENCODED_DATASET_PATH    = "./encoded_dataset.bin";
+// const char *DATASET_DIR          = "./data/cifar-10-batches-bin";
+const char *DATASET_DIR             = "/content/drive/MyDrive/LapTrinhSongSong/Team Project/data/cifar-10-binary/cifar-10-batches-bin";
 
-const char *LABELS_FILE             = "labels.bin";
-const char *MODEL_OUTPUT_DIR        = "./model";
-const char *SVM_MODEL_FILE          = "svm_model.bin";
+// const char *OUTPUT_DIR           = "./output";
+const char *OUTPUT_DIR              = "/content/output";
 
-const char *VISUALIZATION_TRAINING_TIMES_SVG = "training_times.svg";
-const char *VISUALIZATION_TRAINING_TIMES_CSV = "training_times.csv";
-const char *VISUALIZATION_SPEEDUP_GRAPH_SVG  = "speedup_graph.svg";
-const char *VISUALIZATION_SPEEDUP_GRAPH_CSV  = "speedup_data.csv";
-const char *VISUALIZATION_HTML_DASHBOARD     = "performance_analysis.html";
+// const char *CPU_AUTOENCODER_PATH = "./model/cpu_autoencoder_model.bin";
+const char *CPU_AUTOENCODER_PATH    = "/content/model/cpu_autoencoder_model.bin";
+
+// const char *GPU_AUTOENCODER_PATH = "./model/gpu_autoencoder_model.bin";
+const char *GPU_AUTOENCODER_PATH    = "/content/model/gpu_autoencoder_model.bin";
+
+// const char *ENCODED_DATASET_PATH = "./output/encoded_dataset.bin";
+const char *ENCODED_DATASET_PATH    = "/content/output/encoded_dataset.bin";
+
+// const char *SVM_MODEL_PATH       = "./model/svm_model.bin";
+const char *SVM_MODEL_PATH          = "/content/model/svm_model.bin";
+
+// const char *SVM_EVAL_PATH        = "./eval/svm_evaluation.txt";
+const char *SVM_EVAL_PATH           = "/content/eval/svm_evaluation.txt";
 
 // Load and preprocess dataset
-Dataset load_dataset(const char *dataset_dir, int n_batches = NUM_BATCHES, bool is_train = true) {
+Dataset load_dataset(const char *dataset_dir = DATASET_DIR, int n_batches = NUM_BATCHES, bool is_train = true) {
     // Read dataset
     Dataset dataset = read_dataset(dataset_dir, n_batches, is_train);
 
@@ -52,98 +46,18 @@ Dataset load_dataset(const char *dataset_dir, int n_batches = NUM_BATCHES, bool 
     return dataset;
 }
 
-// Load labels from file
-vector<int> load_labels(const char *labels_path, int n_samples = NUM_TRAIN_SAMPLES) {
-    vector<int> labels(n_samples);
-    FILE *lf = fopen(labels_path, "rb");
-    if (lf) {
-        size_t labels_read = fread(labels.data(), sizeof(int), n_samples, lf);
-        if (labels_read != n_samples) {
-            cerr << "Warning: Expected " << n_samples << " labels, but read " << labels_read << endl;
-        }
-        fclose(lf);
-    } else {
-        cerr << "Warning: Labels file not found, using random labels" << endl;
-        for (int i = 0; i < n_samples; ++i) {
-            labels[i] = rand() % NUM_CLASSES;
-        }
-    }
-    return labels;
-}
-
-// Create a dummy dataset with random values for phase 2 testing
-Dataset dummy_dataset(int n = NUM_TEST_SAMPLES, int width = IMAGE_WIDTH, int height = IMAGE_HEIGHT, int depth = IMAGE_DEPTH) {
-    unique_ptr<float[]> data(new float[n * width * height * depth]);
-    for (int i = 0; i < n * width * height * depth; ++i) {
-        data[i] = static_cast<float>(rand()) / RAND_MAX;
-    }
-    return Dataset(data, n, width, height, depth);
-}
-
-// Create dummy labels for phase 2 testing
-vector<int> dummy_labels(int n = NUM_TEST_SAMPLES, int num_classes = NUM_CLASSES) {
-    vector<int> labels(n);
-    for (int i = 0; i < n; ++i) {
-        labels[i] = rand() % num_classes;
-    }
-    return labels;
-}
-
-// Phase 1: Train and encode by CPU autoencoder
-Dataset phase_1_cpu(const Dataset& dataset, const char *output_dir, const char *autoencoder_path, const char *encoded_dataset_path,
-                    int n_epoch = N_EPOCH, int batch_size = BATCH_SIZE, float learning_rate = LEARNING_RATE, bool verbose = VERBOSE, int checkpoint = CHECKPOINT,
-                    bool is_save_model = true, bool is_save_encoded = true) {
-    // Create and train model
-    Cpu_Autoencoder autoencoder;
-    printf("Training CPU Autoencoder for %d epochs with batch size %d and learning rate %.4f\n", 
-           n_epoch, batch_size, learning_rate);
-    autoencoder.fit(dataset, n_epoch, batch_size, learning_rate, verbose, checkpoint, output_dir);
-
-    // Eval
-    printf("CPU Autoencoder MSE = %.4f", autoencoder.eval(dataset));
-
-    // Save model
-    if (is_save_model)
-        autoencoder.save_parameters(autoencoder_path);
-
-    // Save encoded dataset
-    Dataset encoded_dataset = autoencoder.encode(dataset);
-    if (is_save_encoded)
-        write_data(encoded_dataset, encoded_dataset_path);
-
+Dataset load_encoded_dataset(const char *encoded_dataset_path = ENCODED_DATASET_PATH) {
+    Dataset encoded_dataset = read_binary(encoded_dataset_path);
     return encoded_dataset;
 }
 
-// Phase 1: Train and encode by GPU autoencoder
-Dataset phase_1_gpu(const Dataset& dataset, const char *output_dir, const char *autoencoder_path, const char *encoded_dataset_path,
-                    int n_epoch = N_EPOCH, int batch_size = BATCH_SIZE, float learning_rate = LEARNING_RATE, bool verbose = VERBOSE, int checkpoint = CHECKPOINT,
-                    bool is_save_model = true, bool is_save_encoded = true) {
-    // Create and train model
-    Gpu_Autoencoder autoencoder;
-    printf("Training GPU Autoencoder for %d epochs with batch size %d and learning rate %.4f\n", 
-           n_epoch, batch_size, learning_rate);
-    autoencoder.fit(dataset, n_epoch, batch_size, learning_rate, verbose, checkpoint, output_dir);
-
-    // Eval
-    printf("GPU Autoencoder MSE = %.4f", autoencoder.eval(dataset));
-
-    // Save model
-    if (is_save_model)
-        autoencoder.save_parameters(autoencoder_path);
-
-    // Save encoded dataset
-    Dataset encoded_dataset = autoencoder.encode(dataset);
-    if (is_save_encoded)
-        write_data(encoded_dataset, encoded_dataset_path);
-
-    return encoded_dataset;
-}
-
+// Phase 1: Train and evaluate Autoencoder on trainset
 template <typename AE>
-void phase_1_train(const Dataset& dataset, AE& autoencoder, const char *output_dir, const char *autoencoder_path,
+AE phase_1_train(const Dataset& dataset, const char *output_dir = OUTPUT_DIR, const char *autoencoder_path = CPU_AUTOENCODER_PATH,
                     int n_epoch = N_EPOCH, int batch_size = BATCH_SIZE, float learning_rate = LEARNING_RATE, bool verbose = VERBOSE, int checkpoint = CHECKPOINT,
                     bool is_save_model = true) {
     // Create and train model
+    AE autoencoder;
     printf("Training Autoencoder for %d epochs with batch size %d and learning rate %.4f\n", 
            n_epoch, batch_size, learning_rate);
     autoencoder.fit(dataset, n_epoch, batch_size, learning_rate, verbose, checkpoint, output_dir);
@@ -154,19 +68,31 @@ void phase_1_train(const Dataset& dataset, AE& autoencoder, const char *output_d
     // Save model
     if (is_save_model)
         autoencoder.save_parameters(autoencoder_path);
+
+    return autoencoder;
 }
 
 template <typename AE>
-Dataset phase_1_encode(const Dataset& dataset, const AE& autoencoder, const char *encoded_dataset_path,
+AE phase_1_load(const char *autoencoder_path = CPU_AUTOENCODER_PATH) {
+    AE autoencoder;
+    autoencoder.load_parameters(autoencoder_path);
+    return autoencoder;
+}
+
+// Phase 1: Encode dataset using trained Autoencoder
+template <typename AE>
+Dataset phase_1_encode(const Dataset& dataset, const AE& autoencoder, const char *encoded_dataset_path = ENCODED_DATASET_PATH,
                     bool is_save_encoded = true) {
     Dataset encoded_dataset = autoencoder.encode(dataset);
+
     if (is_save_encoded)
-        write_data(encoded_dataset, encoded_dataset_path);
+        write_binary(encoded_dataset, encoded_dataset_path);
+
     return encoded_dataset;
 }
 
-// Phase 2: Train and evaluate SVM on encoded dataset
-SVMmodel phase_2_train(const Dataset &encoded_dataset, const vector<int> &labels, const char* svm_model_path,
+// Phase 2: Train and evaluate SVM on trainset
+SVMmodel phase_2_train(const Dataset &encoded_dataset, const char* svm_model_path = SVM_MODEL_PATH,
                     float train_ratio = TRAIN_RATIO, float c_param = C_PARAM, string kernel_type = string(KERNEL_PARAM),
                     string gamma_type = string(GAMMA_PARAM), float tolerance = TOLERANCE, float cache_size = CACHE_SIZE,
                     int max_iter = MAX_ITER, int nochange_steps = NOCHANGE_STEPS, int num_classes = NUM_CLASSES,
@@ -179,26 +105,32 @@ SVMmodel phase_2_train(const Dataset &encoded_dataset, const vector<int> &labels
         }
         data.push_back(sample);
     }
+    vector<int> labels(encoded_dataset.labels.get(), encoded_dataset.labels.get() + encoded_dataset.n);
 
     // Split into train and test sets
     int train_size = static_cast<int>(train_ratio * encoded_dataset.n);
-    vector<vector<double>> trainData(data.begin(), data.begin() + train_size);
+
+    vector<vector<double>> trainset(data.begin(), data.begin() + train_size);
     vector<int> trainLabels(labels.begin(), labels.begin() + train_size);
-    vector<vector<double>> testData(data.begin() + train_size, data.end());
-    vector<int> testLabels(labels.begin() + train_size, labels.end());
+
+    vector<vector<double>> validset(data.begin() + train_size, data.end());
+    vector<int> validLabels(labels.begin() + train_size, labels.end());
 
     // Train SVM model
     SVMmodel svm_model(c_param, kernel_type, gamma_type, tolerance, cache_size, max_iter, nochange_steps);
-    svm_model.train(trainData, trainLabels);
+    svm_model.train(trainset, trainLabels);
 
     // Test SVM model
-    vector<int> predictions = svm_model.predict(testData);
-    double accuracy = svm_model.calculateAccuracy(predictions, testLabels, num_classes);
-    vector<vector<int>> class_report = svm_model.calculateClassificationReport(predictions, testLabels, num_classes);
-    vector<vector<int>> conf_matrix = svm_model.calculateConfusionMatrix(predictions, testLabels, num_classes);
+    vector<int> predictions = svm_model.predict(validset);
+    double accuracy = svm_model.calculateAccuracy(predictions, validLabels, num_classes);
+    printf("SVM Train Accuracy (on validation set): %.2f%%\n", accuracy * 100.0);
 
-    printf("SVM Train Accuracy: %.2f%%\n", accuracy * 100.0);
+    // Print classification report
+    vector<vector<int>> class_report = svm_model.calculateClassificationReport(predictions, validLabels, num_classes);
     svm_model.printClassificationReport(class_report);
+
+    // Print confusion matrix
+    vector<vector<int>> conf_matrix = svm_model.calculateConfusionMatrix(predictions, validLabels, num_classes);
     svm_model.printConfusionMatrix(conf_matrix);
 
     if (is_save_model) {
@@ -207,13 +139,15 @@ SVMmodel phase_2_train(const Dataset &encoded_dataset, const vector<int> &labels
     return svm_model;
 }
 
-SVMmodel phase_2_load(const char* svm_model_path) {
+// Phase 2: Load SVM model
+SVMmodel phase_2_load(const char* svm_model_path = SVM_MODEL_PATH) {
     SVMmodel svm_model;
     svm_model.load(svm_model_path);
     return svm_model;
 }
 
-double phase_2_test(SVMmodel& model, const Dataset &encoded_dataset, const vector<int> &labels,
+// Phase 2: Test SVM on testset
+double phase_2_test(SVMmodel& model, const Dataset &encoded_dataset, const char* eval_file = SVM_EVAL_PATH,
                     int num_classes = NUM_CLASSES,
                     bool is_save_eval = true) {
     vector<vector<double>> data;
@@ -224,149 +158,118 @@ double phase_2_test(SVMmodel& model, const Dataset &encoded_dataset, const vecto
         }
         data.push_back(sample);
     }
+    vector<int> labels(encoded_dataset.labels.get(), encoded_dataset.labels.get() + encoded_dataset.n);
 
     // Predict using SVM model
     vector<int> predictions = model.predict(data);
     double accuracy = model.calculateAccuracy(predictions, labels, num_classes);
-    vector<vector<int>> class_report = model.calculateClassificationReport(predictions, labels, num_classes);
-    vector<vector<int>> conf_matrix = model.calculateConfusionMatrix(predictions, labels, num_classes);
-
     printf("SVM Test Accuracy: %.2f%%\n", accuracy * 100.0);
+
+    // Print classification report
+    vector<vector<int>> class_report = model.calculateClassificationReport(predictions, labels, num_classes);
     model.printClassificationReport(class_report);
+
+    // Print confusion matrix
+    vector<vector<int>> conf_matrix = model.calculateConfusionMatrix(predictions, labels, num_classes);
     model.printConfusionMatrix(conf_matrix);
 
     if (is_save_eval) {
-        // Save evaluation results to file
-        const char *eval_file = "svm_evaluation.txt";
-        ofstream ofs(eval_file);
-        if (ofs.is_open()) {
-            ofs << "SVM Test Accuracy: " << accuracy * 100.0 << "%\n";
-            ofs << "Classification Report:\n";
-            for (const auto& row : class_report) {
-                for (const auto& val : row) {
-                    ofs << val << " ";
-                }
-                ofs << "\n";
-            }
-            ofs << "Confusion Matrix:\n";
-            for (const auto& row : conf_matrix) {
-                for (const auto& val : row) {
-                    ofs << val << " ";
-                }
-                ofs << "\n";
-            }
-            ofs.close();
-            cout << "SVM evaluation results saved to " << eval_file << endl;
-        } else {
-            cerr << "Error: Cannot open file " << eval_file << " for writing." << endl;
-        }
+        model.save_evaluation(accuracy, class_report, conf_matrix, eval_file);
     }
     return accuracy;
 }
 
-// Visualization: Save training times and speedup data to CSV files
-void save_bar_chart(const vector<string>& labels, const vector<double>& times, const string& filename) {
-    ofstream file(filename);
-    if (!file.is_open()) {
-        cerr << "Error: Cannot open file " << filename << endl;
-        return;
-    }
-    
-    file << "Phase,Time(seconds)\n";
-    for (size_t i = 0; i < labels.size(); ++i) {
-        file << labels[i] << "," << fixed << setprecision(3) << times[i] << "\n";
-    }
-    file.close();
-    cout << "Bar chart data saved to " << filename << endl;
-}
-
-void save_speedup_graph(const vector<string>& labels, const vector<double>& speedups, const string& filename) {
-    ofstream file(filename);
-    if (!file.is_open()) {
-        cerr << "Error: Cannot open file " << filename << endl;
-        return;
-    }
-    
-    file << "Phase,Speedup\n";
-    for (size_t i = 0; i < labels.size(); ++i) {
-        file << labels[i] << "," << fixed << setprecision(3) << speedups[i] << "\n";
-    }
-    file.close();
-    cout << "Speedup graph data saved to " << filename << endl;
-}
-
 int main(int argc, char *argv[]) {
-    // Usage: ./main [RUN_MODE] [HARDWARE_MODE] [n_batches] [n_epoch] [batch_size] [learning_rate]
+    bool use_gpu = false;
+    bool train_phase_1 = true;
+    bool train_phase_2 = true;
+
     int n_batches = NUM_BATCHES;
     int n_epoch = N_EPOCH;
     int batch_size = BATCH_SIZE;
     float learning_rate = LEARNING_RATE;
-    if (argc > 1)   RUN_MODE = argv[1];
-    if (argc > 2)   HARDWARE_MODE = argv[2];
-    if (argc > 3)   n_batches = atoi(argv[3]);
-    if (argc > 4)   n_epoch = atoi(argv[4]);
-    if (argc > 5)   batch_size = atoi(argv[5]);
-    if (argc > 6)   learning_rate = static_cast<float>(atof(argv[6]));
+    float c_param = C_PARAM;
+    const char* kernel_type = KERNEL_PARAM;
+    const char* gamma_type = GAMMA_PARAM;
 
-    bool    run_phase_1 = (string(RUN_MODE) == "phase_1" || string(RUN_MODE) == "all"),
-            run_phase_2 = (string(RUN_MODE) == "phase_2" || string(RUN_MODE) == "all");
+    if (argc > 1)   use_gpu = (string(argv[1]) == "gpu") ? true : false;
+    if (argc > 2)   train_phase_1 = (string(argv[2]) == "train") ? true : false;
+    if (argc > 3)   train_phase_2 = (string(argv[3]) == "train") ? true : false;
+    if (argc > 4)   n_batches = atoi(argv[4]);
+    if (argc > 5)   n_epoch = atoi(argv[5]);
+    if (argc > 6)   batch_size = atoi(argv[6]);
+    if (argc > 7)   learning_rate = atof(argv[7]);
+    if (argc > 8)   c_param = atof(argv[8]);
+    if (argc > 9)   kernel_type = argv[9];
+    if (argc > 10)  gamma_type = argv[10];
 
-    cout << "Loading and preprocessing dataset..." << endl;
-    Dataset dataset = load_dataset(DATASET_DIR, n_batches, true);
+    cout << "Loading and preprocessing datasets..." << endl;
+    Dataset trainset = load_dataset(DATASET_DIR, n_batches, true);
+    Dataset testset = load_dataset(DATASET_DIR, 1, false);
 
-    Dataset encoded_dataset;
-    if (run_phase_1) {
-        cout << "Phase 1: Training Autoencoder and encoding dataset" << endl;
-        if (HARDWARE_MODE == "cpu") {
-            Cpu_Autoencoder autoencoder;
-            phase_1_train<Cpu_Autoencoder>(dataset, autoencoder, AUTOENCODER_OUTPUT_DIR, CPU_AUTOENCODER_PATH,
-                                            n_epoch, batch_size, learning_rate, VERBOSE, CHECKPOINT);
-            encoded_dataset = phase_1_encode(dataset, autoencoder, ENCODED_DATASET_PATH);
+    // Test by just using some first samples
+    if (TRAIN_SAMPLES > 0)
+        trainset.n = TRAIN_SAMPLES;
+    if (TEST_SAMPLES > 0)
+        testset.n = TEST_SAMPLES;
+
+    Dataset encoded_trainset, encoded_testset;
+    // Phase 1: Train and evaluate Autoencoder on trainset
+    if (use_gpu) {
+        Gpu_Autoencoder gpu_autoencoder;
+        if (train_phase_1) {
+            gpu_autoencoder = phase_1_train<Gpu_Autoencoder>(trainset, OUTPUT_DIR, GPU_AUTOENCODER_PATH,
+                                                            n_epoch, batch_size, learning_rate, VERBOSE, CHECKPOINT,
+                                                            true);
         } else {
-            Gpu_Autoencoder autoencoder;
-            phase_1_train<Gpu_Autoencoder>(dataset, autoencoder, AUTOENCODER_OUTPUT_DIR, GPU_AUTOENCODER_PATH,
-                                            n_epoch, batch_size, learning_rate, VERBOSE, CHECKPOINT);
-            encoded_dataset = phase_1_encode(dataset, autoencoder, ENCODED_DATASET_PATH);
+            gpu_autoencoder = phase_1_load<Gpu_Autoencoder>(GPU_AUTOENCODER_PATH);
         }
+        // Phase 1: Encode trainset and testset
+        encoded_trainset = phase_1_encode<Gpu_Autoencoder>(trainset, gpu_autoencoder, ENCODED_DATASET_PATH,
+                                                        true);
+        encoded_testset = phase_1_encode<Gpu_Autoencoder>(testset, gpu_autoencoder, ENCODED_DATASET_PATH,
+                                                        false);
     } else {
-        cout << "Skipping Phase 1: Loading trained Autoencoder and encoding dataset" << endl;
-        if (HARDWARE_MODE == "cpu") {
-            Cpu_Autoencoder autoencoder;
-            autoencoder.load_parameters(CPU_AUTOENCODER_PATH);
-            encoded_dataset = phase_1_encode(dataset, autoencoder, ENCODED_DATASET_PATH);
+        Cpu_Autoencoder cpu_autoencoder;
+        if (train_phase_1) {
+            cpu_autoencoder = phase_1_train<Cpu_Autoencoder>(trainset, OUTPUT_DIR, CPU_AUTOENCODER_PATH,
+                                                            n_epoch, batch_size, learning_rate, VERBOSE, CHECKPOINT,
+                                                            true);
         } else {
-            Gpu_Autoencoder autoencoder;
-            autoencoder.load_parameters(GPU_AUTOENCODER_PATH);
-            encoded_dataset = phase_1_encode(dataset, autoencoder, ENCODED_DATASET_PATH);
+            cpu_autoencoder = phase_1_load<Cpu_Autoencoder>(CPU_AUTOENCODER_PATH);
         }
+        // Phase 1: Encode trainset and testset
+        encoded_trainset = phase_1_encode<Cpu_Autoencoder>(trainset, cpu_autoencoder, ENCODED_DATASET_PATH,
+                                                        true);
+        encoded_testset = phase_1_encode<Cpu_Autoencoder>(testset, cpu_autoencoder, ENCODED_DATASET_PATH,
+                                                        false);
     }
-    cout << "Encoded dataset has " << encoded_dataset.n << " samples, each of size "
-         << encoded_dataset.width << "x" << encoded_dataset.height << "x" << encoded_dataset.depth << endl;
+    // // Dummy for testing
+    // encoded_trainset = trainset;
+    // encoded_testset = testset;
 
-    vector<int> labels;
-    if (run_phase_1) {
-        cout << "Loading labels from file" << endl;
-        const char *labels_path = (string(DATASET_DIR) + "/" + string(LABELS_FILE)).c_str();
-        labels = load_labels(labels_path, NUM_TRAIN_SAMPLES);
-    } else {
-        cout << "Using dummy labels for testing" << endl;
-        labels = dummy_labels(NUM_TRAIN_SAMPLES, NUM_CLASSES);
-    }
+    // Test by just using some first samples
+    if (TRAIN_SAMPLES > 0)
+        trainset.n = TRAIN_SAMPLES;
+    if (TEST_SAMPLES > 0)
+        testset.n = TEST_SAMPLES;
 
+    // Phase 2: Train and evaluate SVM on encoded trainset
     SVMmodel svm_model;
-    if (run_phase_2) {
-        cout << "Phase 2: Training SVM on Encoded Data" << endl;
-        svm_model = phase_2_train(encoded_dataset, labels, SVM_MODEL_FILE,
-                      TRAIN_RATIO, C_PARAM, string(KERNEL_PARAM), string(GAMMA_PARAM),
-                      TOLERANCE, CACHE_SIZE, MAX_ITER, NOCHANGE_STEPS, NUM_CLASSES);
+    if (train_phase_2) {
+        svm_model = phase_2_train(encoded_trainset, SVM_MODEL_PATH,
+                                TRAIN_RATIO, c_param, string(kernel_type),
+                                string(gamma_type), TOLERANCE, CACHE_SIZE,
+                                MAX_ITER, NOCHANGE_STEPS, NUM_CLASSES,
+                                true);
     } else {
-        cout << "Skipping Phase 2: Loading trained SVM model" << endl;
-        svm_model = phase_2_load(SVM_MODEL_FILE);
+        svm_model = phase_2_load(SVM_MODEL_PATH);
     }
 
-    cout << "Testing SVM on Encoded Data" << endl;
-    double test_accuracy = phase_2_test(svm_model, encoded_dataset, labels, NUM_CLASSES);
-    cout << "SVM Test Accuracy on Encoded Data: " << test_accuracy * 100.0 << "%" << endl;
+    // Phase 2: Test SVM on encoded testset
+    double test_accuracy = phase_2_test(svm_model, encoded_testset, SVM_EVAL_PATH,
+                                       NUM_CLASSES,
+                                       true);    
 
     return 0;
 }

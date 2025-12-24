@@ -15,6 +15,13 @@
 #include <string>
 #include <fstream>
 #include <set>
+// mkdir/stat for cross-platform directory handling used in save_evaluation()
+#ifdef _WIN32
+#include <direct.h>
+#else
+#include <sys/types.h>
+#include <sys/stat.h>
+#endif
 using namespace std;
 
 // Forward declaration of libsvm structures
@@ -69,7 +76,20 @@ public:
     SVMmodel();
     SVMmodel(float C, string kernel_type, string gamma_type);
     SVMmodel(float C, string kernel_type, string gamma_type, float tolerance, float cache_size, int max_iter, int nochange_steps);
+    
+    // Copy constructor
+    SVMmodel(const SVMmodel &other);
+    
+    // Move constructor
+    SVMmodel(SVMmodel &&other) noexcept;
+    
     ~SVMmodel();
+
+    // Copy assignment operator overload
+    SVMmodel &operator=(const SVMmodel &other);
+
+    // Move assignment operator overload
+    SVMmodel &operator=(SVMmodel &&other) noexcept;
 
     // Training
     void train(const vector<vector<double>>& data, const vector<int>& labels);
@@ -87,6 +107,10 @@ public:
     // Model persistence
     bool save(const string& modelPath) const;
     bool load(const string& modelPath);
+    
+    // Evaluation persistence
+    bool save_evaluation(double accuracy, const vector<vector<int>>& class_report, 
+                        const vector<vector<int>>& conf_matrix, const string& eval_path) const;
     
     // Utility methods
     bool getIsTrained() const;

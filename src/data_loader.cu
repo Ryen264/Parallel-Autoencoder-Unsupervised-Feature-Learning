@@ -115,6 +115,28 @@ static void parseAndNormalize(unsigned char *raw_data,
 Dataset::Dataset()
     : data(nullptr), labels(nullptr), n(0), width(0), height(0), depth(0) {};
 
+Dataset::Dataset(const Dataset &other)
+    : n(other.n), width(other.width), height(other.height), depth(other.depth) {
+  if (other.data) {
+    int size = n * width * height * depth;
+    data = make_unique<float[]>(size);
+    memcpy(data.get(), other.data.get(), size * sizeof(float));
+  } else {
+    data = nullptr;
+  }
+
+  if (other.labels) {
+    labels = make_unique<int[]>(n);
+    memcpy(labels.get(), other.labels.get(), n * sizeof(int));
+  } else {
+    labels = nullptr;
+  }
+}
+
+Dataset::Dataset(Dataset &&other) noexcept
+    : data(move(other.data)), labels(move(other.labels)), n(other.n), width(other.width),
+      height(other.height), depth(other.depth) {};
+
 Dataset::Dataset(int n, int width, int height, int depth)
     : data(make_unique<float[]>(n * width * height * depth))
     , labels(make_unique<int[]>(n))
@@ -147,6 +169,45 @@ Dataset::Dataset(unique_ptr<float[]> &data,
 float *Dataset::get_data() const { return data.get(); }
 
 int *Dataset::get_labels() const { return labels.get(); }
+
+Dataset &Dataset::operator=(const Dataset &other) {
+  if (this != &other) {
+    // Copy data
+    if (other.data) {
+      int size = other.n * other.width * other.height * other.depth;
+      data = make_unique<float[]>(size);
+      memcpy(data.get(), other.data.get(), size * sizeof(float));
+    } else {
+      data = nullptr;
+    }
+
+    // Copy labels
+    if (other.labels) {
+      labels = make_unique<int[]>(other.n);
+      memcpy(labels.get(), other.labels.get(), other.n * sizeof(int));
+    } else {
+      labels = nullptr;
+    }
+
+    n      = other.n;
+    width  = other.width;
+    height = other.height;
+    depth  = other.depth;
+  }
+  return *this;
+}
+
+Dataset &Dataset::operator=(Dataset &&other) noexcept {
+  if (this != &other) {
+    data   = move(other.data);
+    labels = move(other.labels);
+    n      = other.n;
+    width  = other.width;
+    height = other.height;
+    depth  = other.depth;
+  }
+  return *this;
+}
 
 // Read CIFAR-10 dataset from binary files
 Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_train) {
@@ -220,8 +281,8 @@ Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_train) {
   // Convert to Dataset object
   unique_ptr<float[]> data_ptr(images);
   unique_ptr<int[]>   labels_ptr(labels);
-  return Dataset(
-      data_ptr, labels_ptr, num_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
+  return Dataset(data_ptr, labels_ptr,
+                num_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
 }
 
 void shuffle_dataset(Dataset &dataset) {
@@ -283,7 +344,22 @@ vector<Dataset> create_minibatches(const Dataset &dataset, int batch_size) {
   return batches;
 }
 
-bool write_data(const Dataset &dataset, const char *filepath) {
+bool write_binary(const Dataset &dataset, const char *filepath) {
+  // Check and create directory if needed
+  size_t found = string(filepath).find_last_of("/\\");
+  if (found != string::npos) {
+    string dir_path = string(filepath).substr(0, found);
+    struct stat info;
+    if (stat(dir_path.c_str(), &info) != 0) {
+      printf("Creating directory: %s\n", dir_path.c_str());
+      #ifdef _WIN32
+        _mkdir(dir_path.c_str());
+      #else
+        mkdir(dir_path.c_str(), 0777);
+      #endif
+    }
+  }
+
   FILE *file = fopen(filepath, "wb");
   if (!file) {
     fprintf(stderr, "Error: Cannot open file %s for writing\n", filepath);
@@ -322,4 +398,58 @@ bool write_data(const Dataset &dataset, const char *filepath) {
   printf("✓ Dataset saved to %s (%d samples, %dx%dx%d)\n",
          filepath, dataset.n, dataset.width, dataset.height, dataset.depth);
   return true;
+}
+
+Dataset read_binary(const char *filepath) {
+  FILE *file = fopen(filepath, "rb");
+  if (!file) {
+    fprintf(stderr, "Error: Cannot open file %s for reading\n", filepath);
+    exit(EXIT_FAILURE);
+  }
+
+  // Read metadata (dimensions)
+  int n, width, height, depth;
+  if (fread(&n, sizeof(int), 1, file) != 1 ||
+      fread(&width, sizeof(int), 1, file) != 1 ||
+      fread(&height, sizeof(int), 1, file) != 1 ||
+      fread(&depth, sizeof(int), 1, file) != 1) {
+    fprintf(stderr, "Error: Failed to read metadata from %s\n", filepath);
+    fclose(file);
+    exit(EXIT_FAILURE);
+  }
+
+  // Allocate and read image data
+  int image_size = width * height * depth;
+  int data_elements = n * image_size;
+  float *images = new float[data_elements];
+  if (fread(images, sizeof(float), data_elements, file) != data_elements) {
+    fprintf(stderr, "Error: Failed to read image data from %s\n", filepath);
+    delete[] images;
+    fclose(file);
+    exit(EXIT_FAILURE);
+  }
+
+  // Allocate and read labels
+  int *labels = new int[n];
+  size_t labels_read = fread(labels, sizeof(int), n, file);
+  
+  // Check if we reached EOF (labels might not be present)
+  bool has_labels = (labels_read == n);
+  if (!has_labels) {
+    delete[] labels;
+    labels = nullptr;
+  }
+
+  fclose(file);
+  printf("✓ Dataset loaded from %s (%d samples, %dx%dx%d)\n",
+         filepath, n, width, height, depth);
+
+  // Convert to Dataset object
+  unique_ptr<float[]> data_ptr(images);
+  if (has_labels) {
+    unique_ptr<int[]> labels_ptr(labels);
+    return Dataset(data_ptr, labels_ptr, n, width, height, depth);
+  } else {
+    return Dataset(data_ptr, n, width, height, depth);
+  }
 }

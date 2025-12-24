@@ -6,9 +6,9 @@
  * @param arr The array
  * @param n The number of elements
  */
-void generate_array(float *arr, int n, mt19937 &rng) {
+void generate_array(float *arr, int n, int fan_in, mt19937 &rng) {
   vector<float>              tmp(n);
-  normal_distribution<float> d(0.0f, sqrt(2.0f / n));
+  normal_distribution<float> d(0.0f, sqrt(2.0f / fan_in));
   for (int i = 0; i < n; ++i)
     tmp[i] = d(rng);
   CUDA_CHECK(cudaMemcpy(arr, tmp.data(), n * sizeof(float), cudaMemcpyHostToDevice));
@@ -43,23 +43,28 @@ void write_data(ostream &buffer, float *data, int size) {
 Gpu_Autoencoder::Gpu_Autoencoder() {
   _allocate_mem();
   mt19937 rng(time(nullptr));
+  int     n_in = CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT;
 
   // Random init
   srand(time(0));
 
-  generate_array(_encoder_filter_1, ENCODER_FILTER_1_SIZE, rng);
+  generate_array(_encoder_filter_1, ENCODER_FILTER_1_SIZE, n_in * IMAGE_SIZE, rng);
   CUDA_CHECK(cudaMemset(_encoder_bias_1, 0, ENCODER_FILTER_1_DEPTH * sizeof(float)));
 
-  generate_array(_encoder_filter_2, ENCODER_FILTER_2_SIZE, rng);
+  generate_array(
+      _encoder_filter_2, ENCODER_FILTER_2_SIZE, n_in * ENCODER_FILTER_1_DEPTH, rng);
   CUDA_CHECK(cudaMemset(_encoder_bias_2, 0, ENCODER_FILTER_2_DEPTH * sizeof(float)));
 
-  generate_array(_decoder_filter_1, DECODER_FILTER_1_SIZE, rng);
+  generate_array(
+      _decoder_filter_1, DECODER_FILTER_1_SIZE, n_in * ENCODER_FILTER_2_DEPTH, rng);
   CUDA_CHECK(cudaMemset(_decoder_bias_1, 0, DECODER_FILTER_1_DEPTH * sizeof(float)));
 
-  generate_array(_decoder_filter_2, DECODER_FILTER_2_SIZE, rng);
+  generate_array(
+      _decoder_filter_2, DECODER_FILTER_2_SIZE, n_in * DECODER_FILTER_1_DEPTH, rng);
   CUDA_CHECK(cudaMemset(_decoder_bias_2, 0, DECODER_FILTER_2_DEPTH * sizeof(float)));
 
-  generate_array(_decoder_filter_3, DECODER_FILTER_3_SIZE, rng);
+  generate_array(
+      _decoder_filter_3, DECODER_FILTER_3_SIZE, n_in * DECODER_FILTER_2_DEPTH, rng);
   CUDA_CHECK(cudaMemset(_decoder_bias_3, 0, DECODER_FILTER_3_DEPTH * sizeof(float)));
 }
 

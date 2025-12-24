@@ -54,7 +54,7 @@ __global__ void gpu_relu_kernel(float *in, float *out, int size) {
     out[idx] = max(0.0f, in[idx]);
 }
 
-// -------------------- Avg Pooling (2x down) --------------------
+// -------------------- max Pooling (2x down) --------------------
 __global__ void
 gpu_max_pooling_kernel(float *in, float *out, int width, int height, int depth) {
   int i          = blockIdx.y * blockDim.y + threadIdx.y; // y
@@ -174,7 +174,7 @@ gpu_relu_backward_kernel(float *in, float *d_out, float *d_in, int size) {
     d_in[idx] = in[idx] > 0 ? d_out[idx] : 0;
 }
 
-// -------------------- Avg Pooling Backward --------------------
+// -------------------- max Pooling Backward --------------------
 __global__ void gpu_max_pooling_backward_kernel(
     float *in, float *d_out, float *d_in, int width, int height, int depth) {
 
@@ -388,7 +388,7 @@ void gpu_max_pooling(
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * depth / 4;
 
-    gpu_avg_pooling_kernel<<<grid_size, block_size>>>(in + in_offset,   // in
+    gpu_max_pooling_kernel<<<grid_size, block_size>>>(in + in_offset,   // in
                                                       out + out_offset, // out
                                                       width,
                                                       height,
@@ -483,7 +483,7 @@ void gpu_max_pooling_backward(float *in,
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * depth / 4;
 
-    gpu_avg_pooling_backward_kernel<<<grid_size, block_size>>>(in + in_offset,
+    gpu_max_pooling_backward_kernel<<<grid_size, block_size>>>(in + in_offset,
                                                                d_out +
                                                                    out_offset, // d_out
                                                                d_in + in_offset, // d_in

@@ -560,23 +560,23 @@ float Gpu_Autoencoder::_fit_batch(
                     _block_size_1D);
 
   // Third Conv2D
-  gpu_bias_grad(d_out,                             // d_out
-                d_in,                              // d_bias
+  gpu_bias_grad(d_out,                   // d_out
+                d_in,                    // d_bias
                 n,
                 width / 4,
                 height / 4,
                 DECODER_FILTER_1_DEPTH,
                 _block_size_1D);
 
-  gpu_update_weight(_decoder_bias_1,               // weight
-                    d_in,                          // gradient
+  gpu_update_weight(_decoder_bias_1,     // weight
+                    d_in,                // gradient
                     DECODER_FILTER_1_DEPTH,
                     learning_rate,
                     _block_size_1D);
 
-  gpu_conv2D_grad(_out_max_pooling_2,              // in
-                  d_out,                           // d_out
-                  d_filter,                        // d_filter
+  gpu_conv2D_grad(_out_max_pooling_2,    // in
+                  d_out,                 // d_out
+                  d_filter,              // d_filter
                   n,
                   width / 4,
                   height / 4,
@@ -584,19 +584,19 @@ float Gpu_Autoencoder::_fit_batch(
                   DECODER_FILTER_1_DEPTH,
                   _block_size_3D_3);
 
-  gpu_cgpu_conv2D_backwardonv2D(d_out,             // in
-                                _decoder_filter_1, // filter
-                                d_in,              // out
-                                n,
-                                width / 4,
-                                height / 4,
-                                ENCODER_FILTER_2_DEPTH,
-                                DECODER_FILTER_1_DEPTH,
-                                _block_size_3D_3);
+  gpu_conv2D_backward(d_out,             // in
+                      _decoder_filter_1, // filter
+                      d_in,              // out
+                      n,
+                      width / 4,
+                      height / 4,
+                      ENCODER_FILTER_2_DEPTH,
+                      DECODER_FILTER_1_DEPTH,
+                      _block_size_3D_3);
 
   swap(d_out, d_in);
-  gpu_update_weight(_decoder_filter_1,             // weight
-                    d_filter,                      // gradient
+  gpu_update_weight(_decoder_filter_1,   // weight
+                    d_filter,            // gradient
                     DECODER_FILTER_1_SIZE,
                     learning_rate,
                     _block_size_1D);

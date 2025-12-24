@@ -14,7 +14,7 @@ constexpr const char *ENCODED_DATASET_FILE = "data/encoded/gpu_encoded_dataset.b
 constexpr const char *ENCODED_LABEL_FILE   = "data/encoded/gpu_label_dataset.bin";
 constexpr int         N_BATCHES            = 1;
 
-nt main() {
+int main() {
   Gpu_Autoencoder autoencoder;
   Dataset         dataset = read_dataset(DATASET_DIR, N_BATCHES, true);
 

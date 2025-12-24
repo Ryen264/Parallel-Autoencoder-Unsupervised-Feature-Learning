@@ -462,8 +462,8 @@ void gpu_relu_backward(float *in,
   dim3 grid_size((block_size.x - 1) / block_size.x + 1);
 
   gpu_relu_backward_kernel<<<grid_size, block_size>>>(in,    // in
-                                                      d_in,  // d_in
                                                       d_out, // d_out
+                                                      d_in,  // d_in
                                                       size);
 }
 

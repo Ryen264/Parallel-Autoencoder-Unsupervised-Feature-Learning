@@ -22,7 +22,8 @@ __global__ void normalizeKernel(unsigned char *input, float *output, int size) {
 }
 
 // Read a single CIFAR-10 binary file
-static void readBinaryFile(const char *filepath, unsigned char **raw_data, int num_samples) {
+static void
+readBinaryFile(const char *filepath, unsigned char **raw_data, int num_samples) {
   FILE *file = fopen(filepath, "rb");
   if (!file) {
     fprintf(stderr, "Error: Cannot open file %s\n", filepath);
@@ -94,7 +95,8 @@ static void parseAndNormalize(unsigned char *raw_data,
     CUDA_CHECK(cudaDeviceSynchronize());
 
     // Copy normalized data back to host
-    CUDA_CHECK(cudaMemcpy(images, d_images, image_data_size * sizeof(float), cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(
+        images, d_images, image_data_size * sizeof(float), cudaMemcpyDeviceToHost));
 
     // Cleanup
     if (raw_images)
@@ -287,7 +289,11 @@ Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_train) {
 
 void shuffle_dataset(Dataset &dataset) {
   int    n           = dataset.n;
-  int    image_size  = dataset.width * dataset.height * dataset.depth;
+  int    width       = dataset.width;
+  int    height      = dataset.height;
+  int    n_pixel     = width * height;
+  int    depth       = dataset.depth;
+  int    image_size  = n_pixel * depth;
   int    image_bytes = image_size * sizeof(float);
   float *data        = dataset.get_data();
   int   *labels      = dataset.get_labels();
@@ -306,8 +312,13 @@ void shuffle_dataset(Dataset &dataset) {
 
   // Copy data base on indices
   for (int i = 0; i < n; ++i) {
-    memcpy(
-        new_data.get() + i * image_size, data + indices[i] * image_size, image_bytes);
+    float *in_offset  = data + indices[i] * image_size;
+    float *out_offset = new_data.get() + i * image_size;
+
+    // Copy each color
+    for (int c = 0; c < depth; ++c)
+      memcpy(
+          out_offset + c * n_pixel, in_offset + c * n_pixel, n_pixel * sizeof(float));
     memcpy(new_labels.get() + i, labels + indices[i], sizeof(int));
   }
 
@@ -367,9 +378,12 @@ bool write_binary(const Dataset &dataset, const char *filepath) {
   }
 
   // Write metadata (dimensions)
-  if (fwrite(&dataset.n, sizeof(int), 1, file) != 1 ||
-      fwrite(&dataset.width, sizeof(int), 1, file) != 1 ||
-      fwrite(&dataset.height, sizeof(int), 1, file) != 1 ||
+  if (fwrite(&dataset.n, sizeof(int), 1, file) !=
+      1 ||
+      fwrite(&dataset.width, sizeof(int), 1, file) !=
+      1 ||
+      fwrite(&dataset.height, sizeof(int), 1, file) !=
+      1 ||
       fwrite(&dataset.depth, sizeof(int), 1, file) != 1) {
     fprintf(stderr, "Error: Failed to write metadata to %s\n", filepath);
     fclose(file);
@@ -377,7 +391,7 @@ bool write_binary(const Dataset &dataset, const char *filepath) {
   }
 
   // Write image data
-  int image_size = dataset.width * dataset.height * dataset.depth;
+  int image_size    = dataset.width * dataset.height * dataset.depth;
   int data_elements = dataset.n * image_size;
   if (fwrite(dataset.get_data(), sizeof(float), data_elements, file) != data_elements) {
     fprintf(stderr, "Error: Failed to write image data to %s\n", filepath);
@@ -396,7 +410,11 @@ bool write_binary(const Dataset &dataset, const char *filepath) {
 
   fclose(file);
   printf("✓ Dataset saved to %s (%d samples, %dx%dx%d)\n",
-         filepath, dataset.n, dataset.width, dataset.height, dataset.depth);
+         filepath,
+         dataset.n,
+         dataset.width,
+         dataset.height,
+         dataset.depth);
   return true;
 }
 

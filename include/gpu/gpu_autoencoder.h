@@ -36,6 +36,7 @@ class Gpu_Autoencoder {
 
   float *_encoder_filter_2;
   float *_encoder_bias_2;
+
   float *_out_encoder_filter_2;
   float *_out_encoder_bias_2;
 
@@ -46,7 +47,6 @@ class Gpu_Autoencoder {
   float *_decoder_bias_1;
   float *_out_decoder_filter_1;
   float *_out_decoder_bias_1;
-
   float *_out_decoder_relu_1;
   float *_out_upsampling_1;
 

@@ -13,6 +13,8 @@
 #include <time.h>
 #include <utility>
 #include <memory>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <cuda_runtime.h>
 using namespace std;
 

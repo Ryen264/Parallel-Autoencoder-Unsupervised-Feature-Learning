@@ -573,6 +573,13 @@ bool SVMmodel::save(const string& modelPath) const {
     
     // Use libsvm's save function
     if (svm_save_model(modelPath.c_str(), svm_model) == 0) {
+        // Save n_features to metadata file
+        string metaPath = modelPath + ".meta";
+        ofstream metaFile(metaPath, ios::binary);
+        if (metaFile.is_open()) {
+            metaFile.write(reinterpret_cast<const char*>(&n_features), sizeof(int));
+            metaFile.close();
+        }
         cout << "Model saved successfully to " << modelPath << endl;
         return true;
     } else {
@@ -599,15 +606,44 @@ bool SVMmodel::load(const string& modelPath) {
     n_support = svm_model->l;
     n_classes = svm_model->nr_class;
 
-    // Determine feature count by scanning all support vectors
-    n_features = 0;
-    if (n_support > 0 && svm_model->SV) {
-        for (int sv = 0; sv < n_support; ++sv) {
-            const svm_node* node = svm_model->SV[sv];
-            for (int i = 0; node && node[i].index != -1; ++i) {
-                if (node[i].index > n_features) n_features = node[i].index;
+    // Load n_features from metadata file
+    string metaPath = modelPath + ".meta";
+    ifstream metaFile(metaPath, ios::binary);
+    if (metaFile.is_open()) {
+        metaFile.read(reinterpret_cast<char*>(&n_features), sizeof(int));
+        metaFile.close();
+        cout << "Loaded feature count from metadata: " << n_features << endl;
+    } else {
+        // Fallback: determine feature count by scanning all support vectors
+        cerr << "Warning: Metadata file not found, scanning support vectors..." << endl;
+        n_features = 0;
+        if (n_support > 0 && svm_model->SV && svm_model->SV[0]) {
+            // Scan first few support vectors to find max index
+            int samples_to_check = min(n_support, 100);  // Check up to 100 samples
+            for (int sv = 0; sv < samples_to_check; ++sv) {
+                const svm_node* node = svm_model->SV[sv];
+                if (!node) continue;
+                
+                int max_iterations = 100000;  // Safety limit
+                for (int i = 0; i < max_iterations && node[i].index != -1; ++i) {
+                    if (node[i].index > n_features && node[i].index < 1000000) {
+                        n_features = node[i].index;
+                    }
+                }
             }
         }
+        
+        // Validate n_features
+        if (n_features <= 0 || n_features > 1000000) {
+            cerr << "Error: Invalid feature count detected (" << n_features 
+                 << "). Model may be corrupted or incompatible." << endl;
+            cerr << "Please retrain the model or provide a .meta file with the correct feature count." << endl;
+            svm_free_and_destroy_model(&svm_model);
+            svm_model = nullptr;
+            return false;
+        }
+        
+        cerr << "Estimated feature count from support vectors: " << n_features << endl;
     }
 
     // Bias (rho) — for multi-class there are multiple rhos; use first for info

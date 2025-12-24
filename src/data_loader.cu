@@ -294,7 +294,6 @@ void shuffle_dataset(Dataset &dataset) {
   int    n_pixel     = width * height;
   int    depth       = dataset.depth;
   int    image_size  = n_pixel * depth;
-  int    image_bytes = image_size * sizeof(float);
   float *data        = dataset.get_data();
   int   *labels      = dataset.get_labels();
 

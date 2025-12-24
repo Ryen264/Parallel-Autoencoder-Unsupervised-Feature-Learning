@@ -30,9 +30,9 @@ __global__ void gpu_conv2D_kernel(float *in,
         continue;
 
       for (int d = 0; d < depth; ++d)
-        sum += in[GET_1D_IDX(row, col, d, width, height)] *
-               filter_offset[GET_1D_IDX(
-                   f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)];
+
+      sum += in[GET_1D_IDX(row, col, d, width, height)]
+            * filter_offset[GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)];
     }
   }
 
@@ -55,8 +55,7 @@ __global__ void gpu_relu_kernel(float *in, float *out, int size) {
 }
 
 // -------------------- Avg Pooling (2x down) --------------------
-__global__ void
-gpu_max_pooling_kernel(float *in, float *out, int width, int height, int depth) {
+__global__ void gpu_max_pooling_kernel(float *in, float *out, int width, int height, int depth) {
   int i          = blockIdx.y * blockDim.y + threadIdx.y; // y
   int j          = blockIdx.x * blockDim.x + threadIdx.x; // x
   int d          = blockIdx.z * blockDim.z + threadIdx.z;
@@ -66,8 +65,8 @@ gpu_max_pooling_kernel(float *in, float *out, int width, int height, int depth) 
   if (j >= new_width || i >= new_height || d >= depth)
     return;
 
-  int in_x = x * 2;
-  int in_y = y * 2;
+  int in_x = j * 2;
+  int in_y = i * 2;
 
   out[GET_1D_IDX(i, j, d, new_width, new_height)] =
       fmaxf(fmaxf(in[GET_1D_IDX(in_y, in_x, d, width, height)],
@@ -77,8 +76,7 @@ gpu_max_pooling_kernel(float *in, float *out, int width, int height, int depth) 
 }
 
 // -------------------- Upsampling (2x up) --------------------
-__global__ void
-gpu_upsampling_kernel(float *in, float *out, int width, int height, int depth) {
+__global__ void gpu_upsampling_kernel(float *in, float *out, int width, int height, int depth) {
   int i          = blockIdx.y * blockDim.y + threadIdx.y; // y
   int j          = blockIdx.x * blockDim.x + threadIdx.x; // x
   int d          = blockIdx.z * blockDim.z + threadIdx.z;
@@ -90,13 +88,11 @@ gpu_upsampling_kernel(float *in, float *out, int width, int height, int depth) {
 
   int in_i = i / 2;
   int in_j = j / 2;
-  out[GET_1D_IDX(i, j, d, new_width, new_height)] =
-      in[GET_1D_IDX(in_i, in_j, d, width, height)];
+  out[GET_1D_IDX(i, j, d, new_width, new_height)] = in[GET_1D_IDX(in_i, in_j, d, width, height)];
 }
 
 // -------------------- MSE Loss & Gradient --------------------
-__global__ void
-gpu_mse_loss_kernel(float *expected, float *actual, float *out, int size) {
+__global__ void gpu_mse_loss_kernel(float *expected, float *actual, float *out, int size) {
   __shared__ float shared[MAX_BLOCK_SIZE];
 
   int    tid    = threadIdx.x;
@@ -159,24 +155,21 @@ gpu_mse_loss_kernel(float *expected, float *actual, float *out, int size) {
     atomicAdd(out, *elem / size);
 }
 
-__global__ void
-gpu_mse_grad_kernel(float *expected, float *actual, float *d_out, int size) {
+__global__ void gpu_mse_grad_kernel(float *expected, float *actual, float *d_out, int size) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < size)
     d_out[idx] = 2.0f * (actual[idx] - expected[idx]) / size;
 }
 
 // -------------------- ReLU Backward --------------------
-__global__ void
-gpu_relu_backward_kernel(float *in, float *d_out, float *d_in, int size) {
+__global__ void gpu_relu_backward_kernel(float *in, float *d_out, float *d_in, int size) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < size)
     d_in[idx] = in[idx] > 0 ? d_out[idx] : 0;
 }
 
 // -------------------- Avg Pooling Backward --------------------
-__global__ void gpu_max_pooling_backward_kernel(
-    float *in, float *d_out, float *d_in, int width, int height, int depth) {
+__global__ void gpu_max_pooling_backward_kernel(float *in, float *d_out, float *d_in, int width, int height, int depth) {
 
   int i = blockIdx.y * blockDim.y + threadIdx.y; // y
   int j = blockIdx.x * blockDim.x + threadIdx.x; // x
@@ -198,17 +191,40 @@ __global__ void gpu_max_pooling_backward_kernel(
     GET_1D_IDX(i * 2 + 1, j * 2 + 1, d, width, height),
   };
 
-  int max_idx = *max_element(
-      neighbors_idx, neighbors_idx + 4, [in](int a, int b) { return in[a] < in[b] };);
+  // Find max index manually
+  int max_idx = neighbors_idx[0];
+  float max_val = in[max_idx];
+  for (int k = 1; k < 4; ++k) {
+    if (in[neighbors_idx[k]] > max_val) {
+      max_val = in[neighbors_idx[k]];
+      max_idx = neighbors_idx[k];
+    }
+  }
 
-  d_in[idx] = (idx == max_idx)
-                  ? d_out[GET_1D_IDX(out_i, out_j, d, new_width, new_height)]
-                  : 0.0f;
+  d_in[idx] = (idx == max_idx) ? d_out[GET_1D_IDX(out_i, out_j, d, new_width, new_height)] : 0.0f;
+}
+
+// -------------------- Avg Pooling Backward --------------------
+__global__ void gpu_avg_pooling_backward_kernel(float *in, float *d_out, float *d_in, int width, int height, int depth) {
+  int i = blockIdx.y * blockDim.y + threadIdx.y; // y
+  int j = blockIdx.x * blockDim.x + threadIdx.x; // x
+  int d = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (j >= width || i >= height || d >= depth)
+    return;
+
+  int idx        = GET_1D_IDX(i, j, d, width, height);
+  int out_i      = i / 2;
+  int out_j      = j / 2;
+  int new_width  = width / 2;
+  int new_height = height / 2;
+
+  // For average pooling, gradient is distributed equally among all 4 inputs
+  d_in[idx] = d_out[GET_1D_IDX(out_i, out_j, d, new_width, new_height)] / 4.0f;
 }
 
 // -------------------- Upsampling Backward --------------------
-__global__ void gpu_upsampling_backward_kernel(
-    float *d_out, float *d_in, int width, int height, int depth) {
+__global__ void gpu_upsampling_backward_kernel(float *d_out, float *d_in, int width, int height, int depth) {
   int j = blockIdx.x * blockDim.x + threadIdx.x;
   int i = blockIdx.y * blockDim.y + threadIdx.y;
   int d = blockIdx.z * blockDim.z + threadIdx.z;
@@ -225,8 +241,7 @@ __global__ void gpu_upsampling_backward_kernel(
 }
 
 // -------------------- Bias Gradient --------------------
-__global__ void
-gpu_bias_grad_kernel(float *d_out, float *d_bias, int n, int img_size, int depth) {
+__global__ void gpu_bias_grad_kernel(float *d_out, float *d_bias, int n, int img_size, int depth) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n * img_size * depth)
     atomicAdd(d_bias + (idx % (img_size * depth) / img_size), d_out[idx]);
@@ -264,8 +279,7 @@ __global__ void gpu_conv2D_grad_kernel(float *in,
         continue;
 
       for (int d = 0; d < depth; ++d)
-        atomicAdd(d_filter_offset +
-                      GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT),
+        atomicAdd(d_filter_offset + GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT),
                   in[GET_1D_IDX(row, col, d, width, height)] * d_out_val);
     }
   }
@@ -288,8 +302,7 @@ __global__ void gpu_conv2D_backward_kernel(float *d_out,
   float d_sum = 0;
 
   for (int f = 0; f < n_filter; ++f) {
-    float *d_filter_offset =
-        d_filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
+    float *d_filter_offset = filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
 
     for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
       // If the row needs padding, we skip since we pad with 0
@@ -303,9 +316,8 @@ __global__ void gpu_conv2D_backward_kernel(float *d_out,
         if (col < 0 || col >= width)
           continue;
 
-        d_sum += d_filter_offset[GET_1D_IDX(
-                     f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)] *
-                 d_out[GET_1D_IDX(row, col, f, width, height)];
+        d_sum += d_filter_offset[GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)]
+              * d_out[GET_1D_IDX(row, col, f, width, height)];
       }
     }
   }
@@ -369,8 +381,7 @@ void gpu_add_bias(float *in,
                                                  depth);
 }
 
-void gpu_relu(
-    float *in, float *out, int n, int width, int height, int depth, dim3 block_size) {
+void gpu_relu(float *in, float *out, int n, int width, int height, int depth, dim3 block_size) {
   int  size = n * width * height * depth;
   dim3 grid_size((size - 1) / block_size.x + 1);
 
@@ -379,8 +390,7 @@ void gpu_relu(
                                              size);
 }
 
-void gpu_max_pooling(
-    float *in, float *out, int n, int width, int height, int depth, dim3 block_size) {
+void gpu_max_pooling(float *in, float *out, int n, int width, int height, int depth, dim3 block_size) {
   dim3 grid_size((width / 2 - 1) / block_size.x + 1,
                  (height / 2 - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
@@ -397,8 +407,7 @@ void gpu_max_pooling(
   }
 }
 
-void gpu_upsampling(
-    float *in, float *out, int n, int width, int height, int depth, dim3 block_size) {
+void gpu_upsampling(float *in, float *out, int n, int width, int height, int depth, dim3 block_size) {
   dim3 grid_size((2 * width - 1) / block_size.x + 1,
                  (2 * height - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
@@ -549,10 +558,7 @@ void gpu_conv2D_grad(float *in,
                  (height - 1) / block_size.y + 1,
                  (n_filter - 1) / block_size.z + 1);
 
-  CUDA_CHECK(cudaMemset(
-      d_filter,
-      0,
-      n_filter * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth * sizeof(float)));
+  CUDA_CHECK(cudaMemset(d_filter, 0, n_filter * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth * sizeof(float)));
 
   for (int i = 0; i < n; ++i) {
     int in_offset  = i * width * height * depth;
@@ -595,10 +601,8 @@ void gpu_conv2D_backward(float *d_out,
   }
 }
 
-void gpu_update_weight(
-    float *weight, float *gradient, int size, float learning_rate, dim3 block_size) {
+void gpu_update_weight(float *weight, float *gradient, int size, float learning_rate, dim3 block_size) {
   dim3 grid_size((size - 1) / block_size.x + 1);
 
-  gpu_update_weight_kernel<<<grid_size, block_size>>>(
-      weight, gradient, size, learning_rate);
+  gpu_update_weight_kernel<<<grid_size, block_size>>>(weight, gradient, size, learning_rate);
 }

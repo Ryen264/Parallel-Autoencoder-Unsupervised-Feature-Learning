@@ -1,4 +1,10 @@
 #include "cpu_autoencoder.h"
+#include <sys/stat.h>
+#include <sys/types.h>
+#ifdef _WIN32
+  #include <direct.h>
+  #define mkdir(path, mode) _mkdir(path)
+#endif
 
 // Khởi tạo trọng số theo He Initialization
 void init_weights_he(const unique_ptr<float[]> &arr, int n, int fan_in) {
@@ -614,6 +620,22 @@ float Cpu_Autoencoder::eval(const Dataset &dataset) {
 }
 
 void Cpu_Autoencoder::save_parameters(const char *filename) const {
+  // Create directory if it doesn't exist
+  string filepath_str(filename);
+  size_t found = filepath_str.find_last_of("/\\");
+  if (found != string::npos) {
+    string dir_path = filepath_str.substr(0, found);
+    struct stat info;
+    if (stat(dir_path.c_str(), &info) != 0) {
+      printf("Creating directory: %s\n", dir_path.c_str());
+      #ifdef _WIN32
+        _mkdir(dir_path.c_str());
+      #else
+        mkdir(dir_path.c_str(), 0777);
+      #endif
+    }
+  }
+
   ofstream buffer(filename, ios::out | ios::binary);
   if (!buffer.is_open()) {
       fprintf(stderr, "Error: Cannot open file %s for writing\n", filename);

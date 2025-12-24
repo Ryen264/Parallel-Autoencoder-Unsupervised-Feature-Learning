@@ -1,6 +1,6 @@
 #include "constants.h"
 #include "data_loader.h"
-// #include "gpu_autoencoder.h"
+#include "gpu_autoencoder.h"
 #include "cpu_autoencoder.h"
 #include "model.h"
 
@@ -12,8 +12,8 @@ using namespace std;
 //       [c_param] [kernel_type] [gamma_type]
 
 // Test by just using some first samples
-int TRAIN_SAMPLES = 100;
-int TEST_SAMPLES = 20;
+int TRAIN_SAMPLES = 50;
+int TEST_SAMPLES = 10;
 
 // const char *DATASET_DIR          = "./data/cifar-10-batches-bin";
 const char *DATASET_DIR             = "/content/drive/MyDrive/LapTrinhSongSong/Team Project/data/cifar-10-binary/cifar-10-batches-bin";
@@ -63,7 +63,7 @@ AE phase_1_train(const Dataset& dataset, const char *output_dir = OUTPUT_DIR, co
     autoencoder.fit(dataset, n_epoch, batch_size, learning_rate, verbose, checkpoint, output_dir);
 
     // Eval
-    printf("Autoencoder Train MSE = %.4f", autoencoder.eval(dataset));
+    printf("Autoencoder Train MSE = %.4f\n", autoencoder.eval(dataset));
 
     // Save model
     if (is_save_model)
@@ -76,6 +76,7 @@ template <typename AE>
 AE phase_1_load(const char *autoencoder_path = CPU_AUTOENCODER_PATH) {
     AE autoencoder;
     autoencoder.load_parameters(autoencoder_path);
+    printf("Loaded Autoencoder model from %s\n", autoencoder_path);
     return autoencoder;
 }
 
@@ -84,6 +85,8 @@ template <typename AE>
 Dataset phase_1_encode(const Dataset& dataset, const AE& autoencoder, const char *encoded_dataset_path = ENCODED_DATASET_PATH,
                     bool is_save_encoded = true) {
     Dataset encoded_dataset = autoencoder.encode(dataset);
+    printf("Encoded dataset: n=%d, width=%d, height=%d, depth=%d\n",
+           encoded_dataset.n, encoded_dataset.width, encoded_dataset.height, encoded_dataset.depth);
 
     if (is_save_encoded)
         write_binary(encoded_dataset, encoded_dataset_path);
@@ -143,6 +146,7 @@ SVMmodel phase_2_train(const Dataset &encoded_dataset, const char* svm_model_pat
 SVMmodel phase_2_load(const char* svm_model_path = SVM_MODEL_PATH) {
     SVMmodel svm_model;
     svm_model.load(svm_model_path);
+    printf("Loaded SVM model from %s\n", svm_model_path);
     return svm_model;
 }
 
@@ -225,6 +229,7 @@ int main(int argc, char *argv[]) {
             gpu_autoencoder = phase_1_load<Gpu_Autoencoder>(GPU_AUTOENCODER_PATH);
         }
         // Phase 1: Encode trainset and testset
+        printf("Encoding trainset and testset using GPU Autoencoder...\n");
         encoded_trainset = phase_1_encode<Gpu_Autoencoder>(trainset, gpu_autoencoder, ENCODED_DATASET_PATH,
                                                         true);
         encoded_testset = phase_1_encode<Gpu_Autoencoder>(testset, gpu_autoencoder, ENCODED_DATASET_PATH,
@@ -239,6 +244,7 @@ int main(int argc, char *argv[]) {
             cpu_autoencoder = phase_1_load<Cpu_Autoencoder>(CPU_AUTOENCODER_PATH);
         }
         // Phase 1: Encode trainset and testset
+        printf("Encoding trainset and testset using CPU Autoencoder...\n");
         encoded_trainset = phase_1_encode<Cpu_Autoencoder>(trainset, cpu_autoencoder, ENCODED_DATASET_PATH,
                                                         true);
         encoded_testset = phase_1_encode<Cpu_Autoencoder>(testset, cpu_autoencoder, ENCODED_DATASET_PATH,

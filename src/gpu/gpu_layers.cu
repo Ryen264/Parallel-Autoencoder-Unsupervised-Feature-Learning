@@ -66,8 +66,8 @@ gpu_max_pooling_kernel(float *in, float *out, int width, int height, int depth) 
   if (j >= new_width || i >= new_height || d >= depth)
     return;
 
-  int in_x = x * 2;
-  int in_y = y * 2;
+  int in_x = j * 2;
+  int in_y = i * 2;
 
   out[GET_1D_IDX(i, j, d, new_width, new_height)] =
       fmaxf(fmaxf(in[GET_1D_IDX(in_y, in_x, d, width, height)],
@@ -199,7 +199,7 @@ __global__ void gpu_max_pooling_backward_kernel(
   };
 
   int max_idx = *max_element(
-      neighbors_idx, neighbors_idx + 4, [in](int a, int b) { return in[a] < in[b] };);
+      neighbors_idx, neighbors_idx + 4, [in](int a, int b) { return in[a] < in[b]; });
 
   d_in[idx] = (idx == max_idx)
                   ? d_out[GET_1D_IDX(out_i, out_j, d, new_width, new_height)]
@@ -288,8 +288,7 @@ __global__ void gpu_conv2D_backward_kernel(float *d_out,
   float d_sum = 0;
 
   for (int f = 0; f < n_filter; ++f) {
-    float *d_filter_offset =
-        d_filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
+    float *filter_offset = filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
 
     for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
       // If the row needs padding, we skip since we pad with 0
@@ -303,7 +302,7 @@ __global__ void gpu_conv2D_backward_kernel(float *d_out,
         if (col < 0 || col >= width)
           continue;
 
-        d_sum += d_filter_offset[GET_1D_IDX(
+        d_sum += filter_offset[GET_1D_IDX(
                      f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)] *
                  d_out[GET_1D_IDX(row, col, f, width, height)];
       }

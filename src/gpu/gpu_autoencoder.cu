@@ -720,7 +720,6 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
                           int            n_epoch,
                           int            batch_size,
                           float          learning_rate,
-                          bool           verbose,
                           int            checkpoint,
                           const char    *output_dir) {
   // Create minibatches

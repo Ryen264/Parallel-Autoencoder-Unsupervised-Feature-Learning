@@ -16,7 +16,7 @@ constexpr int         N_BATCHES            = 1;
 
 nt main() {
   Gpu_Autoencoder autoencoder;
-  Dataset         dataset = load_dataset(DATASET_DIR, N_BATCHES, true);
+  Dataset         dataset = read_dataset(DATASET_DIR, N_BATCHES, true);
 
   autoencoder.fit(
       dataset, N_EPOCH, BATCH_SIZE, LEARNING_RATE, CHECKPOINT, MODEL_OUTPUT_DIR);
@@ -28,23 +28,23 @@ nt main() {
   int encoded_dataset_size =
       dataset.n * dataset.width * dataset.height * dataset.depth * sizeof(float);
   ofstream buffer(ENCODED_DATASET_FILE, ios::out | ios::binary);
-  buffer.write(reinterpret_cast<char *>(dataset.data), encoded_dataset_size);
+  buffer.write(reinterpret_cast<char *>(dataset.get_data()), encoded_dataset_size);
   buffer.close();
 
   buffer.open(ENCODED_LABEL_FILE, ios::out | ios::binary);
-  buffer.write(reinterpret_cast<char *>(dataset.labels), dataset.n * sizeof(int));
+  buffer.write(reinterpret_cast<char *>(dataset.get_labels()), dataset.n * sizeof(int));
   buffer.close();
 
   puts("\n=======================ENCODING TEST DATASET=======================");
-  dataset = autoencoder.encode(load_dataset(DATASET_DIR, 1, false));
+  dataset = autoencoder.encode(read_dataset(DATASET_DIR, 1, false));
 
   encoded_dataset_size =
       dataset.n * dataset.width * dataset.height * dataset.depth * sizeof(float);
   buffer.open(ENCODED_DATASET_FILE, ios::out | ios::binary);
-  buffer.write(reinterpret_cast<char *>(dataset.data), encoded_dataset_size);
+  buffer.write(reinterpret_cast<char *>(dataset.get_data()), encoded_dataset_size);
   buffer.close();
 
   buffer.open(ENCODED_LABEL_FILE, ios::out | ios::binary);
-  buffer.write(reinterpret_cast<char *>(dataset.labels), dataset.n * sizeof(int));
+  buffer.write(reinterpret_cast<char *>(dataset.get_labels()), dataset.n * sizeof(int));
   buffer.close();
 }

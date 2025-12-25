@@ -1,0 +1,220 @@
+#ifndef CPU_LAYERS_H
+#define CPU_LAYERS_H
+
+#include "constants.h"
+#include "macro.h"
+
+#include <algorithm>
+#include <cstring>
+using namespace std;
+
+/**
+ * @brief 2D convolution layer with padding=1 and stride=1
+ *
+ * @param in The input array
+ * @param filter The layer parameters
+ * @param out The output array
+ * @param n The number of images to apply filter
+ * @param width The width of the input array
+ * @param height The height of the input array
+ * @param depth The depth of the input array
+ * @param n_filter The number of filters
+ */
+void cpu_conv2D(float *in,
+                float *filter,
+                float *out,
+                int    n,
+                int    width,
+                int    height,
+                int    depth,
+                int    n_filter);
+
+/**
+ * @brief Apply bias into images
+ *
+ * @param in The input images
+ * @param bias The bias to be added
+ * @param out The output images
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
+ */
+void cpu_add_bias(
+    float *in, float *bias, float *out, int n, int width, int height, int depth);
+
+/**
+ * @brief ReLU layer
+ *
+ * @param in The input array
+ * @param out The output array
+ * @param n The number of images in the array
+ * @param width The width of the input array
+ * @param height The height of the input array
+ * @param depth The depth of the input array
+ */
+void cpu_relu(float *in, float *out, int n, int width, int height, int depth);
+
+/**
+ * @brief Max pooling layer to downsample by half (Replaced Avg Pooling)
+ *
+ * @param in The input array
+ * @param out The output array
+ * @param n The number of images in the array
+ * @param width The width of the input array
+ * @param height The height of the input array
+ * @param depth The depth of the input array
+ */
+void cpu_max_pooling(float *in, float *out, int n, int width, int height, int depth);
+
+/**
+ * @brief Upsampling layer to upsample by twice
+ *
+ * @param in The input array
+ * @param out The output array
+ * @param n The number of images in the array
+ * @param width The width of the input array
+ * @param height The height of the input array
+ * @param depth The depth of the input array
+ */
+void cpu_upsampling(float *in, float *out, int n, int width, int height, int depth);
+
+/**
+ * @brief Mean squared error loss
+ *
+ * @param expected The expected result
+ * @param actual The actual result
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
+ * @return float The MSE loss
+ */
+float cpu_mse_loss(float *expected, float *actual, int n, int width, int height, int depth);
+
+/**
+ * @brief Mean squared error gradient
+ *
+ * @param expected The expected result
+ * @param actual The actual result
+ * @param d_out The output array (delta_out)
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
+ */
+void cpu_mse_grad(float *expected,
+                  float *actual,
+                  float *d_out,
+                  int    n,
+                  int    width,
+                  int    height,
+                  int    depth);
+
+/**
+ * @brief ReLU layer backwards pass
+ *
+ * @param in The input from the forward pass
+ * @param d_out The incoming gradient (from next layer)
+ * @param d_in The output gradient (to prev layer)
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
+ */
+void cpu_relu_backward(
+    float *in, float *d_out, float *d_in, int n, int width, int height, int depth);
+
+/**
+ * @brief Max pooling backwards pass (Replaced Avg Pooling Backward)
+ *
+ * @param in The ORIGINAL input from the forward pass (Required for Max Pooling)
+ * @param d_out The incoming gradient (from next layer)
+ * @param d_in The output gradient (to prev layer)
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
+ */
+void cpu_max_pooling_backward(
+    float *in, float *d_out, float *d_in, int n, int width, int height, int depth);
+
+/**
+ * @brief Upsampling backwards pass
+ *
+ * @param d_out The incoming gradient (from next layer)
+ * @param d_in The output gradient (to prev layer)
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
+ */
+void cpu_upsampling_backward(
+    float *d_out, float *d_in, int n, int width, int height, int depth);
+
+/**
+ * @brief Bias gradient calculation
+ *
+ * @param d_out The incoming gradient
+ * @param d_bias The bias gradient output
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
+ */
+void cpu_bias_grad(float *d_out, float *d_bias, int n, int width, int height, int depth);
+
+/**
+ * @brief Conv2D gradient calculation (Calculates gradient for FILTERS)
+ *
+ * @param in The input from forward pass
+ * @param d_out The incoming gradient
+ * @param d_filter The filter gradient output
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
+ * @param n_filter The number of filters
+ */
+void cpu_conv2D_grad(float *in,
+                     float *d_out,
+                     float *d_filter,
+                     int    n,
+                     int    width,
+                     int    height,
+                     int    depth,
+                     int    n_filter);
+
+/**
+ * @brief Conv2D backward input calculation (Calculates gradient for INPUT - d_in)
+ * [NEW FUNCTION ADDED]
+ *
+ * @param d_out The incoming gradient (from next layer)
+ * @param filter The weights (filters)
+ * @param d_in The output gradient (to prev layer)
+ * @param n The number of images
+ * @param width The width of the images
+ * @param height The height of the images
+ * @param depth The depth of the images
+ * @param n_filter The number of filters
+ */
+void cpu_conv2D_backward_input(float *d_out,
+                               float *filter,
+                               float *d_in,
+                               int    n,
+                               int    width,
+                               int    height,
+                               int    depth,
+                               int    n_filter);
+
+/**
+ * @brief Update weights using gradient descent
+ *
+ * @param weight The weights to update
+ * @param gradient The gradient
+ * @param size The size of the arrays
+ * @param learning_rate The learning rate
+ */
+void cpu_update_weight(float *weight, float *gradient, int size, float learning_rate);
+
+#endif

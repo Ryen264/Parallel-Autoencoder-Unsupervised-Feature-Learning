@@ -144,7 +144,7 @@ __global__ void optimized1_add_bias_kernel(
     float *in, float *bias, float *out, int n, int img_size, int depth) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n * img_size * depth)
-    out[idx] = in[idx] + bias[(idx % (img_size * depth)) / img_size];
+    out[idx] = in[idx] + bias[(idx % img_size) % depth];
 }
 
 // -------------------- ReLU --------------------
@@ -307,7 +307,7 @@ __global__ void optimized1_bias_grad_kernel(
     float *d_out, float *d_bias, int n, int img_size, int depth) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n * img_size * depth)
-    atomicAdd(d_bias + (idx % (img_size * depth) / img_size), d_out[idx]);
+    atomicAdd(d_bias + ((idx % img_size) % depth), d_out[idx]);
 }
 
 // -------------------- Weight Update --------------------

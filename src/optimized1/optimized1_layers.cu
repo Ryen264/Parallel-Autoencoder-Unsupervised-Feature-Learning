@@ -179,23 +179,21 @@ optimized1_max_pooling_kernel(float *in, float *out, int width, int height, int 
 // -------------------- Upsampling (2x up) --------------------
 __global__ void
 optimized1_upsampling_kernel(float *in, float *out, int width, int height, int depth) {
-  int x          = blockIdx.x * blockDim.x + threadIdx.x;
-  int y          = blockIdx.y * blockDim.y + threadIdx.y;
-  int d          = blockIdx.z * blockDim.z + threadIdx.z;
+  int i = blockIdx.y * blockDim.y + threadIdx.y; // Output Height
+  int j = blockIdx.x * blockDim.x + threadIdx.x; // Output Width
+  int d = blockIdx.z * blockDim.z + threadIdx.z; // Depth
+
   int new_width  = width * 2;
   int new_height = height * 2;
 
-  if (x >= width || y >= height || d >= depth)
+  if (j >= new_width || i >= new_height || d >= depth)
     return;
 
-  int   out_x = 2 * x;
-  int   out_y = 2 * y;
-  float val   = in[GET_1D_IDX(y, x, d, width, height)];
-
-  out[GET_1D_IDX(out_y, out_x, d, new_width, new_height)]         = val;
-  out[GET_1D_IDX(out_y, out_x + 1, d, new_width, new_height)]     = val;
-  out[GET_1D_IDX(out_y + 1, out_x, d, new_width, new_height)]     = val;
-  out[GET_1D_IDX(out_y + 1, out_x + 1, d, new_width, new_height)] = val;
+  // Nearest Neighbor: Output (i,j) lấy từ Input (i/2, j/2)
+  int in_i = i / 2;
+  int in_j = j / 2;
+  out[GET_1D_IDX(i, j, d, new_width, new_height)] =
+      in[GET_1D_IDX(in_i, in_j, d, width, height)];
 }
 
 // -------------------- Upsampling Backward --------------------
@@ -685,8 +683,8 @@ void optimized1_max_pooling(
 
 void optimized1_upsampling(
     float *in, float *out, int n, int width, int height, int depth, dim3 block_size) {
-  dim3 grid_size((width - 1) / block_size.x + 1,
-                 (height - 1) / block_size.y + 1,
+  dim3 grid_size((2 * width - 1) / block_size.x + 1,
+                 (2 * height - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
 
   for (int i = 0; i < n; ++i) {
@@ -742,7 +740,7 @@ void optimized1_relu_backward(float *in,
                               int    depth,
                               dim3   block_size) {
   int  size = n * width * height * depth;
-  dim3 grid_size((block_size.x + size - 1) / block_size.x + 1);
+  dim3 grid_size((size - 1) / block_size.x + 1);
 
   optimized1_relu_backward_kernel<<<grid_size, block_size>>>(in, d_out, d_in, size);
 }

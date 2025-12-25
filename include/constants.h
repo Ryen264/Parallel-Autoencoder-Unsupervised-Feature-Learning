@@ -12,7 +12,6 @@ constexpr int NUM_TEST_SAMPLES  = 10000;
 constexpr int   N_EPOCH       = 20;
 constexpr int   BATCH_SIZE    = 32;
 constexpr float LEARNING_RATE = 0.001f;
-constexpr bool  VERBOSE       = false;
 constexpr int   CHECKPOINT    = 0;
 constexpr float TRAIN_RATIO   = 0.8f;
 

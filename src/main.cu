@@ -54,13 +54,13 @@ Dataset load_encoded_dataset(const char *encoded_dataset_path = ENCODED_DATASET_
 // Phase 1: Train and evaluate Autoencoder on trainset
 template <typename AE>
 AE phase_1_train(const Dataset& dataset, const char *output_dir = OUTPUT_DIR, const char *autoencoder_path = CPU_AUTOENCODER_PATH,
-                    int n_epoch = N_EPOCH, int batch_size = BATCH_SIZE, float learning_rate = LEARNING_RATE, bool verbose = VERBOSE, int checkpoint = CHECKPOINT,
+                    int n_epoch = N_EPOCH, int batch_size = BATCH_SIZE, float learning_rate = LEARNING_RATE, int checkpoint = CHECKPOINT,
                     bool is_save_model = true) {
     // Create and train model
     AE autoencoder;
     printf("Training Autoencoder for %d epochs with batch size %d and learning rate %.4f\n", 
            n_epoch, batch_size, learning_rate);
-    autoencoder.fit(dataset, n_epoch, batch_size, learning_rate, verbose, checkpoint, output_dir);
+    autoencoder.fit(dataset, n_epoch, batch_size, learning_rate, checkpoint, output_dir);
 
     // Eval
     printf("Autoencoder Train MSE = %.4f\n", autoencoder.eval(dataset));
@@ -223,7 +223,7 @@ int main(int argc, char *argv[]) {
         Gpu_Autoencoder gpu_autoencoder;
         if (train_phase_1) {
             gpu_autoencoder = phase_1_train<Gpu_Autoencoder>(trainset, OUTPUT_DIR, GPU_AUTOENCODER_PATH,
-                                                            n_epoch, batch_size, learning_rate, VERBOSE, CHECKPOINT,
+                                                            n_epoch, batch_size, learning_rate, CHECKPOINT,
                                                             true);
         } else {
             gpu_autoencoder = phase_1_load<Gpu_Autoencoder>(GPU_AUTOENCODER_PATH);
@@ -238,7 +238,7 @@ int main(int argc, char *argv[]) {
         Cpu_Autoencoder cpu_autoencoder;
         if (train_phase_1) {
             cpu_autoencoder = phase_1_train<Cpu_Autoencoder>(trainset, OUTPUT_DIR, CPU_AUTOENCODER_PATH,
-                                                            n_epoch, batch_size, learning_rate, VERBOSE, CHECKPOINT,
+                                                            n_epoch, batch_size, learning_rate, CHECKPOINT,
                                                             true);
         } else {
             cpu_autoencoder = phase_1_load<Cpu_Autoencoder>(CPU_AUTOENCODER_PATH);

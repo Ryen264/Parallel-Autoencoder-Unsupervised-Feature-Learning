@@ -178,7 +178,6 @@ public:
    * @param n_epoch The number of epochs
    * @param batch_size Minibatch size (set to 0 to disable)
    * @param learning_rate Learning rate of the model
-   * @param verbose Whether to disable more or less information
    * @param checkpoint Save the model's parameter after a specific number of epochs (set
    * to 0 to disable)
    * @param output_dir The file to save model's param
@@ -187,7 +186,6 @@ public:
            int            n_epoch,
            int            batch_size,
            float          learning_rate,
-           bool           verbose,
            int            checkpoint,
            const char    *output_dir = "./model");
 

@@ -496,7 +496,7 @@ float Cpu_Autoencoder::_fit_batch(const Dataset &batch, float learning_rate) {
   return loss;
 }
 
-void Cpu_Autoencoder::fit(const Dataset &dataset, int n_epoch, int batch_size, float learning_rate, bool verbose, int checkpoint, const char *output_dir) {
+void Cpu_Autoencoder::fit(const Dataset &dataset, int n_epoch, int batch_size, float learning_rate, int checkpoint, const char *output_dir) {
   vector<Dataset> batches = create_minibatches(dataset, batch_size);
   _allocate_output_mem(batch_size, dataset.width, dataset.height);
 

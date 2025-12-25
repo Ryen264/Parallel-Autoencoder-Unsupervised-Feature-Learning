@@ -30,7 +30,6 @@ __global__ void gpu_conv2D_kernel(float *in,
         continue;
 
       for (int d = 0; d < depth; ++d)
-
         sum += in[GET_1D_IDX(row, col, d, width, height)] *
                filter_offset[GET_1D_IDX(
                    f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)];
@@ -217,26 +216,6 @@ __global__ void gpu_max_pooling_backward_kernel(
   d_in[idx] = (idx == max_idx)
                   ? d_out[GET_1D_IDX(out_i, out_j, d, new_width, new_height)]
                   : 0.0f;
-}
-
-// -------------------- Avg Pooling Backward --------------------
-__global__ void gpu_avg_pooling_backward_kernel(
-    float *in, float *d_out, float *d_in, int width, int height, int depth) {
-  int i = blockIdx.y * blockDim.y + threadIdx.y; // y
-  int j = blockIdx.x * blockDim.x + threadIdx.x; // x
-  int d = blockIdx.z * blockDim.z + threadIdx.z;
-
-  if (j >= width || i >= height || d >= depth)
-    return;
-
-  int idx        = GET_1D_IDX(i, j, d, width, height);
-  int out_i      = i / 2;
-  int out_j      = j / 2;
-  int new_width  = width / 2;
-  int new_height = height / 2;
-
-  // For average pooling, gradient is distributed equally among all 4 inputs
-  d_in[idx] = d_out[GET_1D_IDX(out_i, out_j, d, new_width, new_height)] / 4.0f;
 }
 
 // -------------------- Upsampling Backward --------------------

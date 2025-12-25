@@ -253,9 +253,9 @@ void shuffle_dataset(Optimized_Dataset &dataset) {
   for (int i = 0; i < n; ++i) {
     // Copy for each color
     float *new_data_start = new_data + i * image_size;
-    float *dat_start      = data + indices[i] * image_size;
+    float *data_start     = data + indices[i] * image_size;
     for (int c = 0; c < depth; ++c)
-      memcpy(new_data_start + c * n_pixel, data + c * n_pixel, n_pixel_bytes);
+      memcpy(new_data_start + c * n_pixel, data_start + c * n_pixel, n_pixel_bytes);
     memcpy(new_labels + i, labels + indices[i], sizeof(int));
   }
 

@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <cstring>
-#include <cfloat> // Để dùng -FLT_MAX
 using namespace std;
 
 /**

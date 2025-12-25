@@ -1,10 +1,10 @@
 #include "cpu_autoencoder.h"
-#include <sys/stat.h>
-#include <sys/types.h>
-#ifdef _WIN32
-  #include <direct.h>
-  #define mkdir(path, mode) _mkdir(path)
-#endif
+#include <algorithm> // max_element
+#include <random>    // normal_distribution
+#include <cmath>     // sqrt
+#include <cstring>   // memset
+
+using namespace std;
 
 // Khởi tạo trọng số theo He Initialization
 void init_weights_he(const unique_ptr<float[]> &arr, int n, int fan_in) {
@@ -33,88 +33,6 @@ void write_data(ostream &buffer, const unique_ptr<float[]> &data, int size) {
   const char *ptr = reinterpret_cast<const char *>(data.get());
   buffer.write(ptr, size);
 }
-
-Cpu_Autoencoder::Cpu_Autoencoder() {
-  _allocate_mem();
-
-  int k_pixels = 9; // 3x3 kernel
-
-  // Layer 1
-  init_weights_he(_encoder_filter_1, ENCODER_FILTER_1_SIZE, 3 * k_pixels);
-  init_bias_zero(_encoder_bias_1, ENCODER_FILTER_1_DEPTH);
-
-  // Layer 2
-  init_weights_he(_encoder_filter_2, ENCODER_FILTER_2_SIZE, ENCODER_FILTER_1_DEPTH * k_pixels);
-  init_bias_zero(_encoder_bias_2, ENCODER_FILTER_2_DEPTH);
-
-  // Decoder 1
-  init_weights_he(_decoder_filter_1, DECODER_FILTER_1_SIZE, ENCODER_FILTER_2_DEPTH * k_pixels);
-  init_bias_zero(_decoder_bias_1, DECODER_FILTER_1_DEPTH);
-
-  // Decoder 2
-  init_weights_he(_decoder_filter_2, DECODER_FILTER_2_SIZE, DECODER_FILTER_1_DEPTH * k_pixels);
-  init_bias_zero(_decoder_bias_2, DECODER_FILTER_2_DEPTH);
-
-  // Decoder 3
-  init_weights_he(_decoder_filter_3, DECODER_FILTER_3_SIZE, DECODER_FILTER_2_DEPTH * k_pixels);
-  init_bias_zero(_decoder_bias_3, DECODER_FILTER_3_DEPTH);
-};
-
-Cpu_Autoencoder::Cpu_Autoencoder(const char *filename) {
-  _allocate_mem();
-
-  ifstream buffer(filename, ios::in | ios::binary);
-  if (!buffer.is_open()) {
-      printf("Error: Cannot open file %s\n", filename);
-      return;
-  }
-
-  read_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
-  read_data(buffer, _encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float));
-
-  read_data(buffer, _encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float));
-  read_data(buffer, _encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float));
-
-  read_data(buffer, _decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float));
-  read_data(buffer, _decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float));
-
-  read_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
-  read_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
-
-  read_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
-  read_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
-};
-
-Cpu_Autoencoder::Cpu_Autoencoder(const Cpu_Autoencoder &other) {
-  // Deep copy parameters
-  _encoder_filter_1 = make_unique<float[]>(ENCODER_FILTER_1_SIZE);
-  memcpy(_encoder_filter_1.get(), other._encoder_filter_1.get(), ENCODER_FILTER_1_SIZE * sizeof(float));
-  _encoder_bias_1 = make_unique<float[]>(ENCODER_FILTER_1_DEPTH);
-  memcpy(_encoder_bias_1.get(), other._encoder_bias_1.get(), ENCODER_FILTER_1_DEPTH * sizeof(float));
-
-  _encoder_filter_2 = make_unique<float[]>(ENCODER_FILTER_2_SIZE);
-  memcpy(_encoder_filter_2.get(), other._encoder_filter_2.get(), ENCODER_FILTER_2_SIZE * sizeof(float));
-  _encoder_bias_2 = make_unique<float[]>(ENCODER_FILTER_2_DEPTH);
-  memcpy(_encoder_bias_2.get(), other._encoder_bias_2.get(), ENCODER_FILTER_2_DEPTH * sizeof(float));
-
-  _decoder_filter_1 = make_unique<float[]>(DECODER_FILTER_1_SIZE);
-  memcpy(_decoder_filter_1.get(), other._decoder_filter_1.get(), DECODER_FILTER_1_SIZE * sizeof(float));
-  _decoder_bias_1 = make_unique<float[]>(DECODER_FILTER_1_DEPTH);
-  memcpy(_decoder_bias_1.get(), other._decoder_bias_1.get(), DECODER_FILTER_1_DEPTH * sizeof(float));
-
-  _decoder_filter_2 = make_unique<float[]>(DECODER_FILTER_2_SIZE);
-  memcpy(_decoder_filter_2.get(), other._decoder_filter_2.get(), DECODER_FILTER_2_SIZE * sizeof(float));
-  _decoder_bias_2 = make_unique<float[]>(DECODER_FILTER_2_DEPTH);
-  memcpy(_decoder_bias_2.get(), other._decoder_bias_2.get(), DECODER_FILTER_2_DEPTH * sizeof(float));
-
-  _decoder_filter_3 = make_unique<float[]>(DECODER_FILTER_3_SIZE);
-  memcpy(_decoder_filter_3.get(), other._decoder_filter_3.get(), DECODER_FILTER_3_SIZE * sizeof(float));
-  _decoder_bias_3 = make_unique<float[]>(DECODER_FILTER_3_DEPTH);
-  memcpy(_decoder_bias_3.get(), other._decoder_bias_3.get(), DECODER_FILTER_3_DEPTH * sizeof(float));
-
-  // Transient buffers remain null (will be allocated on demand)
-}
-
 Cpu_Autoencoder::Cpu_Autoencoder(Cpu_Autoencoder &&other) noexcept
     : _encoder_filter_1(std::move(other._encoder_filter_1)),
       _encoder_bias_1(std::move(other._encoder_bias_1)),
@@ -242,6 +160,58 @@ Cpu_Autoencoder &Cpu_Autoencoder::operator=(Cpu_Autoencoder &&other) noexcept {
 
   return *this;
 }
+
+
+Cpu_Autoencoder::Cpu_Autoencoder() {
+  _allocate_mem();
+
+  int k_pixels = 9; // 3x3 kernel
+
+  // Layer 1
+  init_weights_he(_encoder_filter_1, ENCODER_FILTER_1_SIZE, 3 * k_pixels);
+  init_bias_zero(_encoder_bias_1, ENCODER_FILTER_1_DEPTH);
+
+  // Layer 2
+  init_weights_he(_encoder_filter_2, ENCODER_FILTER_2_SIZE, ENCODER_FILTER_1_DEPTH * k_pixels);
+  init_bias_zero(_encoder_bias_2, ENCODER_FILTER_2_DEPTH);
+
+  // Decoder 1
+  init_weights_he(_decoder_filter_1, DECODER_FILTER_1_SIZE, ENCODER_FILTER_2_DEPTH * k_pixels);
+  init_bias_zero(_decoder_bias_1, DECODER_FILTER_1_DEPTH);
+
+  // Decoder 2
+  init_weights_he(_decoder_filter_2, DECODER_FILTER_2_SIZE, DECODER_FILTER_1_DEPTH * k_pixels);
+  init_bias_zero(_decoder_bias_2, DECODER_FILTER_2_DEPTH);
+
+  // Decoder 3
+  init_weights_he(_decoder_filter_3, DECODER_FILTER_3_SIZE, DECODER_FILTER_2_DEPTH * k_pixels);
+  init_bias_zero(_decoder_bias_3, DECODER_FILTER_3_DEPTH);
+};
+
+Cpu_Autoencoder::Cpu_Autoencoder(const char *filename) {
+  _allocate_mem();
+
+  ifstream buffer(filename, ios::in | ios::binary);
+  if (!buffer.is_open()) {
+      printf("Error: Cannot open file %s\n", filename);
+      return;
+  }
+
+  read_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
+  read_data(buffer, _encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float));
+
+  read_data(buffer, _encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float));
+  read_data(buffer, _encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float));
+
+  read_data(buffer, _decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float));
+
+  read_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
+
+  read_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
+};
 
 void Cpu_Autoencoder::_allocate_mem() {
   _encoder_filter_1 = make_unique<float[]>(ENCODER_FILTER_1_SIZE);
@@ -620,51 +590,24 @@ float Cpu_Autoencoder::eval(const Dataset &dataset) {
 }
 
 void Cpu_Autoencoder::save_parameters(const char *filename) const {
-  // Create directory if it doesn't exist
-  string filepath_str(filename);
-  size_t found = filepath_str.find_last_of("/\\");
-  if (found != string::npos) {
-    string dir_path = filepath_str.substr(0, found);
-    struct stat info;
-    if (stat(dir_path.c_str(), &info) != 0) {
-      printf("Creating directory: %s\n", dir_path.c_str());
-      #ifdef _WIN32
-        _mkdir(dir_path.c_str());
-      #else
-        mkdir(dir_path.c_str(), 0777);
-      #endif
-    }
-  }
-
   ofstream buffer(filename, ios::out | ios::binary);
-  if (!buffer.is_open()) {
-      fprintf(stderr, "Error: Cannot open file %s for writing\n", filename);
-      return;
-  }
-
   write_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
   write_data(buffer, _encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float));
-
   write_data(buffer, _encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float));
   write_data(buffer, _encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float));
-
   write_data(buffer, _decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float));
   write_data(buffer, _decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float));
-
   write_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
   write_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
-  
   write_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
   write_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
-
-  buffer.close();
-  printf("✓ CPU Autoencoder parameters saved successfully to %s\n", filename);
 }
+// Thêm vào cuối file cpu_autoencoder.cpp
 
 void Cpu_Autoencoder::load_parameters(const char *filename) {
   ifstream buffer(filename, ios::in | ios::binary);
   if (!buffer.is_open()) {
-      fprintf(stderr, "Error: Cannot open file %s for reading\n", filename);
+      printf("Error: Cannot open file %s\n", filename);
       return;
   }
 
@@ -683,7 +626,6 @@ void Cpu_Autoencoder::load_parameters(const char *filename) {
 
   read_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
   read_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
-
-  buffer.close();
-  printf("✓ CPU Autoencoder parameters loaded successfully from %s\n", filename);
+  
+  printf("Model loaded from %s\n", filename);
 }

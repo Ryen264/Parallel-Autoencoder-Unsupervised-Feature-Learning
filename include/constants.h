@@ -37,8 +37,7 @@ constexpr int MAX_IMAGE_SIZE   = IMAGE_WIDTH * IMAGE_HEIGHT * MAX_FILTER_DEPTH;
 
 // The first conv2d layer of the encoder
 constexpr int ENCODER_FILTER_1_DEPTH = 256;
-constexpr int ENCODER_FILTER_1_SIZE =
-    CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * IMAGE_DEPTH * ENCODER_FILTER_1_DEPTH;
+constexpr int ENCODER_FILTER_1_SIZE = CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * IMAGE_DEPTH * ENCODER_FILTER_1_DEPTH;
 
 // The second conv2d layer of the encoder
 constexpr int ENCODER_FILTER_2_DEPTH = 128;

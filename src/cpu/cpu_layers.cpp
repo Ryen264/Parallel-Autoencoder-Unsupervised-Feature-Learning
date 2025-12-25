@@ -1,6 +1,12 @@
 #include "cpu_layers.h"
+#include <algorithm>
+#include <cstring>
+#include <cfloat> // Để dùng -FLT_MAX
+
+using namespace std;
 
 // 1. CONVOLUTION FORWARD
+
 void cpu_conv2D(float *in, float *filter, float *out, int n, int width, int height, int depth, int n_filter) {
   // 1. Reset toàn bộ output về 0 trước (vì ta sẽ cộng dồn)
   // Logic này tách biệt với bias (bias được cộng ở hàm cpu_add_bias riêng)

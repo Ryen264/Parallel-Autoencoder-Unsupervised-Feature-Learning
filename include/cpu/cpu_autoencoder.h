@@ -32,40 +32,38 @@ class Cpu_Autoencoder {
   // Save output for backwards propogation
   unique_ptr<float[]> _out_encoder_filter_1;
   unique_ptr<float[]> _out_encoder_bias_1;
-
   unique_ptr<float[]> _out_encoder_relu_1;
-  
   // [UPDATED] Đổi tên biến từ avg -> max cho đúng logic Max Pooling
   unique_ptr<float[]> _out_max_pooling_1; 
 
   unique_ptr<float[]> _encoder_filter_2;
   unique_ptr<float[]> _encoder_bias_2;
+
   unique_ptr<float[]> _out_encoder_filter_2;
   unique_ptr<float[]> _out_encoder_bias_2;
-
   unique_ptr<float[]> _out_encoder_relu_2;
-  
   // [UPDATED] Đổi tên biến từ avg -> max cho đúng logic Max Pooling
   unique_ptr<float[]> _out_max_pooling_2;
 
   unique_ptr<float[]> _decoder_filter_1;
   unique_ptr<float[]> _decoder_bias_1;
+
   unique_ptr<float[]> _out_decoder_filter_1;
   unique_ptr<float[]> _out_decoder_bias_1;
-
   unique_ptr<float[]> _out_decoder_relu_1;
   unique_ptr<float[]> _out_upsampling_1;
 
   unique_ptr<float[]> _decoder_filter_2;
   unique_ptr<float[]> _decoder_bias_2;
+
   unique_ptr<float[]> _out_decoder_filter_2;
   unique_ptr<float[]> _out_decoder_bias_2;
-
   unique_ptr<float[]> _out_decoder_relu_2;
   unique_ptr<float[]> _out_upsampling_2;
 
   unique_ptr<float[]> _decoder_filter_3;
   unique_ptr<float[]> _decoder_bias_3;
+  
   unique_ptr<float[]> _out_decoder_filter_3;
   unique_ptr<float[]> _out_decoder_bias_3;
 

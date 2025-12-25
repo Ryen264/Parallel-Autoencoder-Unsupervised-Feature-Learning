@@ -17,7 +17,7 @@ __global__ void optimized1_conv2D_kernel(float *in,
   int dim_x = blockDim.x;
   int i     = blockIdx.y * dim_y + tid_y;
   int j     = blockIdx.x * dim_x + tid_x;
-  int f     = tid_z * blockDim.z + threadIdx.z;
+  int f     = blockIdx.z * blockDim.z + tid_z;
 
   if (j >= width || i >= height || f >= n_filter)
     return;
@@ -336,7 +336,7 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
   int dim_x = blockDim.x;
   int i     = blockIdx.y * dim_y + tid_y;
   int j     = blockIdx.x * dim_x + tid_x;
-  int f     = tid_z * blockDim.z + threadIdx.z;
+  int f     = blockIdx.z * blockDim.z + tid_z;
 
   if (j >= width || i >= height || f >= n_filter)
     return;
@@ -471,12 +471,11 @@ __global__ void optimized1_conv2D_backward_kernel(float *d_out,
 
   int tid_y = threadIdx.y;
   int tid_x = threadIdx.x;
-  int tid_z = threadIdx.z;
   int dim_y = blockDim.y;
   int dim_x = blockDim.x;
   int i     = blockIdx.y * dim_y + tid_y;
   int j     = blockIdx.x * dim_x + tid_x;
-  int d     = tid_z * blockDim.z + threadIdx.z;
+  int d     = blockIdx.z * blockDim.z + threadIdx.z;
 
   if (j >= width || i >= height || d >= depth)
     return;

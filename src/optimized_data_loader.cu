@@ -96,7 +96,7 @@ Optimized_Dataset &Optimized_Dataset::operator=(Optimized_Dataset &&other) {
 }
 
 // CUDA kernel for normalization: convert uint8 [0, 255] to float [0, 1]
-__global__ void normalizeKernel(unsigned char *input, float *output, int size) {
+__global__ void normalizeOptimizedKernel(unsigned char *input, float *output, int size) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < size)
     output[idx] = input[idx] / 255.0f;
@@ -157,7 +157,7 @@ static void parseAndNormalize(unsigned char *raw_data,
   // Launch normalization kernel
   int blocksPerGrid = (image_data_size + MAX_BLOCK_SIZE - 1) / MAX_BLOCK_SIZE;
 
-  normalizeKernel<<<blocksPerGrid, MAX_BLOCK_SIZE>>>(
+  normalizeOptimizedKernel<<<blocksPerGrid, MAX_BLOCK_SIZE>>>(
       d_raw_images, d_images, image_data_size);
   CUDA_CHECK(cudaGetLastError());
   CUDA_CHECK(cudaDeviceSynchronize());
@@ -172,7 +172,7 @@ static void parseAndNormalize(unsigned char *raw_data,
   CUDA_CHECK(cudaFree(d_images));
 }
 
-Optimized_Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_train) {
+Optimized_Dataset read_optimized_dataset(const char *dataset_dir, int n_batches, bool is_train) {
   int num_samples = is_train ? n_batches * NUM_PER_BATCH : NUM_TEST_SAMPLES;
 
   Optimized_Dataset dataset(num_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
@@ -224,7 +224,7 @@ Optimized_Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_t
   return dataset;
 }
 
-void shuffle_dataset(Optimized_Dataset &dataset) {
+void shuffle_optimized_dataset(Optimized_Dataset &dataset) {
   int    n             = dataset.n;
   int    n_pixel       = dataset.width * dataset.height;
   int    depth         = dataset.depth;

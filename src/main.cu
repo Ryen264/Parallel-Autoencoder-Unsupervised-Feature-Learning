@@ -3,11 +3,13 @@
 #include "cpu_autoencoder.h"
 #include "gpu_autoencoder.h"
 #include "optimized1_autoencoder.h"
+#include "optimized_data_loader.h"
 #include "model.h"
 
 #include <iostream>
 #include <string>
 using namespace std;
+#include <type_traits>
 
 //./main [version=cpu/gpu/opt1] [phase_1_mode=train/load] [phase_2_mode=train/load] \
 //       [n_batches] [n_epoch] [batch_size] [learning_rate] \
@@ -39,33 +41,42 @@ const char *SVM_MODEL_PATH = "/content/model/svm_model.bin";
 const char *SVM_EVAL_PATH = "/content/eval/svm_evaluation.txt";
 
 // Load and preprocess dataset
-Dataset load_dataset(const char *dataset_dir = DATASET_DIR,
-                     int         n_batches   = NUM_BATCHES,
-                     bool        is_train    = true) {
-  // Read dataset
+Dataset load_dataset_ds(const char *dataset_dir = DATASET_DIR,
+                        int         n_batches   = NUM_BATCHES,
+                        bool        is_train    = true) {
   Dataset dataset = read_dataset(dataset_dir, n_batches, is_train);
-
-  // Shuffle dataset
   shuffle_dataset(dataset);
   return dataset;
 }
 
-Dataset load_encoded_dataset(const char *encoded_dataset_path = ENCODED_DATASET_PATH) {
-  Dataset encoded_dataset = read_binary(encoded_dataset_path);
-  return encoded_dataset;
+// Convert Dataset -> Optimized_Dataset for opt1 path without relying on conflicting loaders
+Optimized_Dataset to_optimized(const Dataset &src) {
+  Optimized_Dataset dst(src.n, src.width, src.height, src.depth);
+  size_t count = static_cast<size_t>(src.n) * src.width * src.height * src.depth;
+  memcpy(dst.data, src.get_data(), count * sizeof(float));
+  memcpy(dst.labels, src.get_labels(), static_cast<size_t>(src.n) * sizeof(int));
+  return dst;
+}
+
+// Load and preprocess optimized dataset (opt1)
+Optimized_Dataset load_dataset_opt(const char *dataset_dir = DATASET_DIR,
+                                   int         n_batches   = NUM_BATCHES,
+                                   bool        is_train    = true) {
+  Optimized_Dataset dataset = read_optimized_dataset(dataset_dir, n_batches, is_train);
+  shuffle_optimized_dataset(dataset);
+  return dataset;
 }
 
 // Phase 1: Train and evaluate Autoencoder on trainset
-template <typename AE>
-AE phase_1_train(const Dataset &dataset,
-                 const char    *output_dir       = OUTPUT_DIR,
-                 const char    *autoencoder_path = CPU_AUTOENCODER_PATH,
-                 int            n_epoch          = N_EPOCH,
-                 int            batch_size       = BATCH_SIZE,
-                 float          learning_rate    = LEARNING_RATE,
-                 int            checkpoint       = CHECKPOINT,
-                 bool           is_save_model    = true) {
-  // Create and train model
+template <typename AE, typename DT>
+AE phase_1_train(const DT   &dataset,
+                 const char *output_dir       = OUTPUT_DIR,
+                 const char *autoencoder_path = CPU_AUTOENCODER_PATH,
+                 int         n_epoch          = N_EPOCH,
+                 int         batch_size       = BATCH_SIZE,
+                 float       learning_rate    = LEARNING_RATE,
+                 int         checkpoint       = CHECKPOINT,
+                 bool        is_save_model    = true) {
   AE autoencoder;
   printf(
       "Training Autoencoder for %d epochs with batch size %d and learning rate %.4f\n",
@@ -73,14 +84,9 @@ AE phase_1_train(const Dataset &dataset,
       batch_size,
       learning_rate);
   autoencoder.fit(dataset, n_epoch, batch_size, learning_rate, checkpoint, output_dir);
-
-  // Eval
   printf("Autoencoder Train MSE = %.4f\n", autoencoder.eval(dataset));
-
-  // Save model
   if (is_save_model)
     autoencoder.save_parameters(autoencoder_path);
-
   return autoencoder;
 }
 
@@ -93,48 +99,60 @@ AE phase_1_load(const char *autoencoder_path = CPU_AUTOENCODER_PATH) {
 }
 
 // Phase 1: Encode dataset using trained Autoencoder
-template <typename AE>
-Dataset phase_1_encode(const Dataset &dataset,
-                       const AE      &autoencoder,
-                       const char    *encoded_dataset_path = ENCODED_DATASET_PATH,
-                       bool           is_save_encoded      = true) {
-  Dataset encoded_dataset = autoencoder.encode(dataset);
+// Helpers to access data/labels across dataset types
+inline float *data_ptr(const Dataset &d) { return d.get_data(); }
+inline int   *labels_ptr(const Dataset &d) { return d.get_labels(); }
+inline float *data_ptr(const Optimized_Dataset &d) { return d.data; }
+inline int   *labels_ptr(const Optimized_Dataset &d) { return d.labels; }
+
+template <typename AE, typename DT>
+auto phase_1_encode(const DT   &dataset,
+                    const AE   &autoencoder,
+                    const char *encoded_dataset_path = ENCODED_DATASET_PATH,
+                    bool        is_save_encoded      = true) {
+  auto encoded_dataset = autoencoder.encode(dataset);
   printf("Encoded dataset: n=%d, width=%d, height=%d, depth=%d\n",
          encoded_dataset.n,
          encoded_dataset.width,
          encoded_dataset.height,
          encoded_dataset.depth);
 
-  if (is_save_encoded)
-    write_binary(encoded_dataset, encoded_dataset_path);
-
+  if constexpr (std::is_same_v<decltype(encoded_dataset), Dataset>) {
+    if (is_save_encoded)
+      write_binary(encoded_dataset, encoded_dataset_path);
+  } else {
+    // No generic binary writer for Optimized_Dataset; skip saving.
+    (void)encoded_dataset_path;
+    (void)is_save_encoded;
+  }
   return encoded_dataset;
 }
 
 // Phase 2: Train and evaluate SVM on trainset
-SVMmodel phase_2_train(const Dataset &encoded_dataset,
-                       const char    *svm_model_path = SVM_MODEL_PATH,
-                       float          train_ratio    = TRAIN_RATIO,
-                       float          c_param        = C_PARAM,
-                       string         kernel_type    = string(KERNEL_PARAM),
-                       string         gamma_type     = string(GAMMA_PARAM),
-                       float          tolerance      = TOLERANCE,
-                       float          cache_size     = CACHE_SIZE,
-                       int            max_iter       = MAX_ITER,
-                       int            nochange_steps = NOCHANGE_STEPS,
-                       int            num_classes    = NUM_CLASSES,
-                       bool           is_save_model  = true) {
+template <typename DT>
+SVMmodel phase_2_train(const DT   &encoded_dataset,
+                       const char *svm_model_path = SVM_MODEL_PATH,
+                       float       train_ratio    = TRAIN_RATIO,
+                       float       c_param        = C_PARAM,
+                       string      kernel_type    = string(KERNEL_PARAM),
+                       string      gamma_type     = string(GAMMA_PARAM),
+                       float       tolerance      = TOLERANCE,
+                       float       cache_size     = CACHE_SIZE,
+                       int         max_iter       = MAX_ITER,
+                       int         nochange_steps = NOCHANGE_STEPS,
+                       int         num_classes    = NUM_CLASSES,
+                       bool        is_save_model  = true) {
   vector<vector<double>> data;
   for (int i = 0; i < encoded_dataset.n; ++i) {
     vector<double> sample(
         encoded_dataset.width * encoded_dataset.height * encoded_dataset.depth);
     for (int j = 0; j < sample.size(); ++j) {
-      sample[j] = encoded_dataset.data[i * sample.size() + j];
+      sample[j] = data_ptr(encoded_dataset)[i * sample.size() + j];
     }
     data.push_back(sample);
   }
-  vector<int> labels(encoded_dataset.labels.get(),
-                     encoded_dataset.labels.get() + encoded_dataset.n);
+  vector<int> labels(labels_ptr(encoded_dataset),
+                     labels_ptr(encoded_dataset) + encoded_dataset.n);
 
   // Split into train and test sets
   int train_size = static_cast<int>(train_ratio * encoded_dataset.n);
@@ -185,22 +203,23 @@ SVMmodel phase_2_load(const char *svm_model_path = SVM_MODEL_PATH) {
 }
 
 // Phase 2: Test SVM on testset
-double phase_2_test(SVMmodel      &model,
-                    const Dataset &encoded_dataset,
-                    const char    *eval_file    = SVM_EVAL_PATH,
-                    int            num_classes  = NUM_CLASSES,
-                    bool           is_save_eval = true) {
+template <typename DT>
+double phase_2_test(SVMmodel   &model,
+                    const DT   &encoded_dataset,
+                    const char *eval_file    = SVM_EVAL_PATH,
+                    int         num_classes  = NUM_CLASSES,
+                    bool        is_save_eval = true) {
   vector<vector<double>> data;
   for (int i = 0; i < encoded_dataset.n; ++i) {
     vector<double> sample(
         encoded_dataset.width * encoded_dataset.height * encoded_dataset.depth);
     for (int j = 0; j < sample.size(); ++j) {
-      sample[j] = encoded_dataset.data[i * sample.size() + j];
+      sample[j] = data_ptr(encoded_dataset)[i * sample.size() + j];
     }
     data.push_back(sample);
   }
-  vector<int> labels(encoded_dataset.labels.get(),
-                     encoded_dataset.labels.get() + encoded_dataset.n);
+  vector<int> labels(labels_ptr(encoded_dataset),
+                     labels_ptr(encoded_dataset) + encoded_dataset.n);
 
   // Predict using SVM model
   vector<int> predictions = model.predict(data);
@@ -258,8 +277,8 @@ int main(int argc, char *argv[]) {
     gamma_type = argv[10];
 
   cout << "Loading and preprocessing datasets..." << endl;
-  Dataset trainset = load_dataset(DATASET_DIR, n_batches, true);
-  Dataset testset  = load_dataset(DATASET_DIR, 1, false);
+  Dataset trainset = load_dataset_ds(DATASET_DIR, n_batches, true);
+  Dataset testset  = load_dataset_ds(DATASET_DIR, 1, false);
 
   // Test by just using some first samples
   if (TRAIN_SAMPLES > 0)
@@ -267,12 +286,14 @@ int main(int argc, char *argv[]) {
   if (TEST_SAMPLES > 0)
     testset.n = TEST_SAMPLES;
 
-  Dataset encoded_trainset, encoded_testset;
+  // Branch-specific encoded datasets holders
+  Dataset            encoded_trainset_ds, encoded_testset_ds;
+  Optimized_Dataset  encoded_trainset_opt, encoded_testset_opt;
   // Phase 1: Train and evaluate Autoencoder on trainset
   if (version == "gpu") {
     Gpu_Autoencoder gpu_autoencoder;
     if (train_phase_1) {
-      gpu_autoencoder = phase_1_train<Gpu_Autoencoder>(trainset,
+      gpu_autoencoder = phase_1_train<Gpu_Autoencoder, Dataset>(trainset,
                                                        OUTPUT_DIR,
                                                        GPU_AUTOENCODER_PATH,
                                                        n_epoch,
@@ -285,14 +306,14 @@ int main(int argc, char *argv[]) {
     }
     // Phase 1: Encode trainset and testset
     printf("Encoding trainset and testset using GPU Autoencoder...\n");
-    encoded_trainset = phase_1_encode<Gpu_Autoencoder>(
+    encoded_trainset_ds = phase_1_encode<Gpu_Autoencoder, Dataset>(
         trainset, gpu_autoencoder, ENCODED_DATASET_PATH, true);
-    encoded_testset = phase_1_encode<Gpu_Autoencoder>(
+    encoded_testset_ds = phase_1_encode<Gpu_Autoencoder, Dataset>(
         testset, gpu_autoencoder, ENCODED_DATASET_PATH, false);
   } else if (version == "cpu") {
     Cpu_Autoencoder cpu_autoencoder;
     if (train_phase_1) {
-      cpu_autoencoder = phase_1_train<Cpu_Autoencoder>(trainset,
+      cpu_autoencoder = phase_1_train<Cpu_Autoencoder, Dataset>(trainset,
                                                        OUTPUT_DIR,
                                                        CPU_AUTOENCODER_PATH,
                                                        n_epoch,
@@ -305,14 +326,17 @@ int main(int argc, char *argv[]) {
     }
     // Phase 1: Encode trainset and testset
     printf("Encoding trainset and testset using CPU Autoencoder...\n");
-    encoded_trainset = phase_1_encode<Cpu_Autoencoder>(
+    encoded_trainset_ds = phase_1_encode<Cpu_Autoencoder, Dataset>(
         trainset, cpu_autoencoder, ENCODED_DATASET_PATH, true);
-    encoded_testset = phase_1_encode<Cpu_Autoencoder>(
+    encoded_testset_ds = phase_1_encode<Cpu_Autoencoder, Dataset>(
         testset, cpu_autoencoder, ENCODED_DATASET_PATH, false);
   } else if (version == "opt1") {
+    // Load optimized datasets directly for opt1 path
+    Optimized_Dataset opt_trainset = load_dataset_opt(DATASET_DIR, n_batches, true);
+    Optimized_Dataset opt_testset  = load_dataset_opt(DATASET_DIR, 1, false);
     Optimized1_Autoencoder opt1_autoencoder;
     if (train_phase_1) {
-      opt1_autoencoder = phase_1_train<Optimized1_Autoencoder>(trainset,
+      opt1_autoencoder = phase_1_train<Optimized1_Autoencoder, Optimized_Dataset>(opt_trainset,
                                                                OUTPUT_DIR,
                                                                GPU_AUTOENCODER_PATH,
                                                                n_epoch,
@@ -325,10 +349,10 @@ int main(int argc, char *argv[]) {
     }
     // Phase 1: Encode trainset and testset
     printf("Encoding trainset and testset using Optimized1 Autoencoder...\n");
-    encoded_trainset = phase_1_encode<Optimized1_Autoencoder>(
-        trainset, opt1_autoencoder, ENCODED_DATASET_PATH, true);
-    encoded_testset = phase_1_encode<Optimized1_Autoencoder>(
-        testset, opt1_autoencoder, ENCODED_DATASET_PATH, false);
+    encoded_trainset_opt = phase_1_encode<Optimized1_Autoencoder, Optimized_Dataset>(
+        opt_trainset, opt1_autoencoder, ENCODED_DATASET_PATH, true);
+    encoded_testset_opt = phase_1_encode<Optimized1_Autoencoder, Optimized_Dataset>(
+        opt_testset, opt1_autoencoder, ENCODED_DATASET_PATH, false);
   } else {
     cout << "Invalid version specified. Use 'cpu', 'gpu', or 'opt1'." << endl;
     return -1;
@@ -346,25 +370,45 @@ int main(int argc, char *argv[]) {
   // Phase 2: Train and evaluate SVM on encoded trainset
   SVMmodel svm_model;
   if (train_phase_2) {
-    svm_model = phase_2_train(encoded_trainset,
-                              SVM_MODEL_PATH,
-                              TRAIN_RATIO,
-                              c_param,
-                              string(kernel_type),
-                              string(gamma_type),
-                              TOLERANCE,
-                              CACHE_SIZE,
-                              MAX_ITER,
-                              NOCHANGE_STEPS,
-                              NUM_CLASSES,
-                              true);
+    if (version == "opt1") {
+      svm_model = phase_2_train(encoded_trainset_opt,
+                                SVM_MODEL_PATH,
+                                TRAIN_RATIO,
+                                c_param,
+                                string(kernel_type),
+                                string(gamma_type),
+                                TOLERANCE,
+                                CACHE_SIZE,
+                                MAX_ITER,
+                                NOCHANGE_STEPS,
+                                NUM_CLASSES,
+                                true);
+    } else {
+      svm_model = phase_2_train(encoded_trainset_ds,
+                                SVM_MODEL_PATH,
+                                TRAIN_RATIO,
+                                c_param,
+                                string(kernel_type),
+                                string(gamma_type),
+                                TOLERANCE,
+                                CACHE_SIZE,
+                                MAX_ITER,
+                                NOCHANGE_STEPS,
+                                NUM_CLASSES,
+                                true);
+    }
   } else {
     svm_model = phase_2_load(SVM_MODEL_PATH);
   }
 
   // Phase 2: Test SVM on encoded testset
-  double test_accuracy =
-      phase_2_test(svm_model, encoded_testset, SVM_EVAL_PATH, NUM_CLASSES, true);
+  double test_accuracy;
+  if (version == "opt1") {
+    test_accuracy = phase_2_test(svm_model, encoded_testset_opt, SVM_EVAL_PATH, NUM_CLASSES, true);
+  } else {
+    test_accuracy = phase_2_test(svm_model, encoded_testset_ds, SVM_EVAL_PATH, NUM_CLASSES, true);
+  }
+  printf("Final Test Accuracy: %.2f%%\n", test_accuracy * 100.0);
 
   return 0;
 }

@@ -82,13 +82,13 @@ struct Optimized_Dataset {
  * @param is_train True for training set, false for test set
  * @return Dataset The loaded and normalized dataset
  */
-Optimized_Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_train = true);
+Optimized_Dataset read_optimized_dataset(const char *dataset_dir, int n_batches, bool is_train = true);
 
 /**
  * @brief Shuffle the dataset
  *
  * @param dataset The dataset to be shuffle
  */
-void shuffle_dataset(Optimized_Dataset &dataset);
+void shuffle_optimized_dataset(Optimized_Dataset &dataset);
 
 #endif

@@ -43,10 +43,12 @@ __global__ void optimized1_conv2D_kernel(float *in,
   if (tid_y == 0) {
     for (int f_i = 0; f_i < padding_y; ++f_i) {
       int cur_row = i - padding_y + f_i;
-      if (cur_row >= 0)
-        for (int d = 0; d < depth; ++d)
-          s_in[GET_1D_IDX(f_i, shared_x, d, shared_width, shared_height)] =
-              in[GET_1D_IDX(cur_row, j, d, width, height)];
+      if (cur_row < 0)
+        continue;
+
+      for (int d = 0; d < depth; ++d)
+        s_in[GET_1D_IDX(f_i, shared_x, d, shared_width, shared_height)] =
+            in[GET_1D_IDX(cur_row, j, d, width, height)];
 
       if (tid_x == 0) {
         for (int f_j = 0; f_j < padding_x; ++f_j) {
@@ -73,10 +75,12 @@ __global__ void optimized1_conv2D_kernel(float *in,
   if (tid_y + 1 == dim_y) {
     for (int f_i = 1; f_i <= padding_y; ++f_i) {
       int cur_row = i + f_i;
-      if (cur_row < height)
-        for (int d = 0; d < depth; ++d)
-          s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
-              in[GET_1D_IDX(cur_row, j, d, width, height)];
+      if (cur_row >= height)
+        continue;
+
+      for (int d = 0; d < depth; ++d)
+        s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
+            in[GET_1D_IDX(cur_row, j, d, width, height)];
 
       if (tid_x == 0) {
         for (int f_j = 0; f_j < padding_x; ++f_j) {
@@ -134,8 +138,6 @@ __global__ void optimized1_conv2D_kernel(float *in,
     }
   }
 
-  __syncthreads();
-
   out[GET_1D_IDX(i, j, f, width, height)] = sum;
 }
 
@@ -144,7 +146,7 @@ __global__ void optimized1_add_bias_kernel(
     float *in, float *bias, float *out, int n, int img_size, int depth) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n * img_size * depth)
-    out[idx] = in[idx] + bias[(idx % (img_size * depth)) / img_size];
+    out[idx] = in[idx] + bias[(idx % img_size) % depth];
 }
 
 // -------------------- ReLU --------------------
@@ -179,23 +181,20 @@ optimized1_max_pooling_kernel(float *in, float *out, int width, int height, int 
 // -------------------- Upsampling (2x up) --------------------
 __global__ void
 optimized1_upsampling_kernel(float *in, float *out, int width, int height, int depth) {
-  int x          = blockIdx.x * blockDim.x + threadIdx.x;
-  int y          = blockIdx.y * blockDim.y + threadIdx.y;
-  int d          = blockIdx.z * blockDim.z + threadIdx.z;
+  int i = blockIdx.y * blockDim.y + threadIdx.y; // Output Height
+  int j = blockIdx.x * blockDim.x + threadIdx.x; // Output Width
+  int d = blockIdx.z * blockDim.z + threadIdx.z; // Depth
+
   int new_width  = width * 2;
   int new_height = height * 2;
 
-  if (x >= width || y >= height || d >= depth)
+  if (j >= new_width || i >= new_height || d >= depth)
     return;
 
-  int   out_x = 2 * x;
-  int   out_y = 2 * y;
-  float val   = in[GET_1D_IDX(y, x, d, width, height)];
-
-  out[GET_1D_IDX(out_y, out_x, d, new_width, new_height)]         = val;
-  out[GET_1D_IDX(out_y, out_x + 1, d, new_width, new_height)]     = val;
-  out[GET_1D_IDX(out_y + 1, out_x, d, new_width, new_height)]     = val;
-  out[GET_1D_IDX(out_y + 1, out_x + 1, d, new_width, new_height)] = val;
+  int in_i = i / 2;
+  int in_j = j / 2;
+  out[GET_1D_IDX(i, j, d, new_width, new_height)] =
+      in[GET_1D_IDX(in_i, in_j, d, width, height)];
 }
 
 // -------------------- Upsampling Backward --------------------
@@ -299,7 +298,7 @@ __global__ void
 optimized1_relu_backward_kernel(float *in, float *d_out, float *d_in, int size) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < size)
-    d_out[idx] = in[idx] > 0 ? d_in[idx] : 0;
+    d_in[idx] = in[idx] > 0 ? d_out[idx] : 0;
 }
 
 // -------------------- Bias Gradient --------------------
@@ -307,7 +306,7 @@ __global__ void optimized1_bias_grad_kernel(
     float *d_out, float *d_bias, int n, int img_size, int depth) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < n * img_size * depth)
-    atomicAdd(d_bias + (idx % (img_size * depth) / img_size), d_out[idx]);
+    atomicAdd(d_bias + ((idx % img_size) % depth), d_out[idx]);
 }
 
 // -------------------- Weight Update --------------------
@@ -372,10 +371,12 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
       if (tid_x == 0) {
         for (int f_j = 0; f_j < padding_x; ++f_j) {
           int cur_col = j - padding_x + f_j;
-          if (cur_col >= 0)
-            for (int d = 0; d < depth; ++d)
-              s_in[GET_1D_IDX(f_i, f_j, d, shared_width, shared_height)] =
-                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+          if (cur_col < 0)
+            continue;
+
+          for (int d = 0; d < depth; ++d)
+            s_in[GET_1D_IDX(f_i, f_j, d, shared_width, shared_height)] =
+                in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
         }
       }
 
@@ -394,10 +395,12 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
   if (tid_y + 1 == dim_y) {
     for (int f_i = 1; f_i <= padding_y; ++f_i) {
       int cur_row = i + f_i;
-      if (cur_row < height)
-        for (int d = 0; d < depth; ++d)
-          s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
-              in[GET_1D_IDX(cur_row, j, d, width, height)];
+      if (cur_row >= height)
+        continue;
+
+      for (int d = 0; d < depth; ++d)
+        s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
+            in[GET_1D_IDX(cur_row, j, d, width, height)];
 
       if (tid_x == 0) {
         for (int f_j = 0; f_j < padding_x; ++f_j) {
@@ -685,8 +688,8 @@ void optimized1_max_pooling(
 
 void optimized1_upsampling(
     float *in, float *out, int n, int width, int height, int depth, dim3 block_size) {
-  dim3 grid_size((width - 1) / block_size.x + 1,
-                 (height - 1) / block_size.y + 1,
+  dim3 grid_size((2 * width - 1) / block_size.x + 1,
+                 (2 * height - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
 
   for (int i = 0; i < n; ++i) {
@@ -742,7 +745,7 @@ void optimized1_relu_backward(float *in,
                               int    depth,
                               dim3   block_size) {
   int  size = n * width * height * depth;
-  dim3 grid_size((block_size.x + size - 1) / block_size.x + 1);
+  dim3 grid_size((size - 1) / block_size.x + 1);
 
   optimized1_relu_backward_kernel<<<grid_size, block_size>>>(in, d_out, d_in, size);
 }

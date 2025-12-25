@@ -172,7 +172,7 @@ static void parseAndNormalize(unsigned char *raw_data,
   CUDA_CHECK(cudaFree(d_images));
 }
 
-Optimized_Dataset load_dataset(const char *dataset_dir, int n_batches, bool is_train) {
+Optimized_Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_train) {
   int num_samples = is_train ? n_batches * NUM_PER_BATCH : NUM_TEST_SAMPLES;
 
   Optimized_Dataset dataset(num_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);
@@ -225,11 +225,14 @@ Optimized_Dataset load_dataset(const char *dataset_dir, int n_batches, bool is_t
 }
 
 void shuffle_dataset(Optimized_Dataset &dataset) {
-  int    n           = dataset.n;
-  int    image_size  = dataset.width * dataset.height * dataset.depth;
-  int    image_bytes = image_size * sizeof(float);
-  float *data        = dataset.data;
-  int   *labels      = dataset.labels;
+  int    n             = dataset.n;
+  int    n_pixel       = dataset.width * dataset.height;
+  int    depth         = dataset.depth;
+  int    image_size    = n_pixel * depth;
+  int    n_pixel_bytes = n_pixel * sizeof(float);
+  int    image_bytes   = image_size * sizeof(float);
+  float *data          = dataset.data;
+  int   *labels        = dataset.labels;
 
   float *new_data;
   int   *new_labels;
@@ -248,7 +251,11 @@ void shuffle_dataset(Optimized_Dataset &dataset) {
 
   // Copy data base on indices
   for (int i = 0; i < n; ++i) {
-    memcpy(new_data + i * image_size, data + indices[i] * image_size, image_bytes);
+    // Copy for each color
+    float *new_data_start = new_data + i * image_size;
+    float *dat_start      = data + indices[i] * image_size;
+    for (int c = 0; c < depth; ++c)
+      memcpy(new_data_start + c * n_pixel, data + c * n_pixel, n_pixel_bytes);
     memcpy(new_labels + i, labels + indices[i], sizeof(int));
   }
 

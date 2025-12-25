@@ -18,7 +18,7 @@ constexpr int N_BATCHES = 2;
 
 int main() {
   Optimized1_Autoencoder autoencoder;
-  Optimized_Dataset      dataset = load_dataset(DATASET_DIR, N_BATCHES, true);
+  Optimized_Dataset      dataset = read_dataset(DATASET_DIR, N_BATCHES, true);
 
   autoencoder.fit(
       dataset, N_EPOCH, BATCH_SIZE, LEARNING_RATE, CHECKPOINT, MODEL_OUTPUT_DIR);
@@ -38,7 +38,7 @@ int main() {
   buffer.close();
 
   puts("\n=======================ENCODING TEST DATASET=======================");
-  dataset = autoencoder.encode(load_dataset(DATASET_DIR, 1, false));
+  dataset = autoencoder.encode(read_dataset(DATASET_DIR, 1, false));
 
   encoded_dataset_size =
       dataset.n * dataset.width * dataset.height * dataset.depth * sizeof(float);

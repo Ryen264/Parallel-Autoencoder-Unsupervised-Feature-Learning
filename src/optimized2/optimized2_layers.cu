@@ -1,0 +1,928 @@
+#include "optimized2_layers.h"
+
+// -------------------- Conv2D Forward --------------------
+__global__ void void optimized2_full_filter_kernel(float *in,
+                                                   float *filter,
+                                                   float *bias,
+                                                   float *in_relu,
+                                                   float *out,
+                                                   int    width,
+                                                   int    height,
+                                                   int    depth,
+                                                   int    n_filter) {
+  extern __shared__ float s_in[];
+
+  int tid_y = threadIdx.y;
+  int tid_x = threadIdx.x;
+  int tid_z = threadIdx.z;
+  int dim_y = blockDim.y;
+  int dim_x = blockDim.x;
+  int i     = blockIdx.y * dim_y + tid_y;
+  int j     = blockIdx.x * dim_x + tid_x;
+  int f     = blockIdx.z * blockDim.z + tid_z;
+  int idx   = GET_1D_IDX(i, j, f, width, height);
+
+  if (j >= width || i >= height || f >= n_filter)
+    return;
+
+  int    padding_y     = CONV_FILTER_HEIGHT / 2;
+  int    padding_x     = CONV_FILTER_WIDTH / 2;
+  int    shared_y      = tid_y + padding_y;
+  int    shared_x      = tid_x + padding_x;
+  int    shared_height = dim_y + CONV_FILTER_HEIGHT - 1;
+  int    shared_width  = dim_x + CONV_FILTER_WIDTH - 1;
+  float *filter_offset = filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;
+  float  sum           = 0;
+
+  if (tid_x == 0 && tid_y == 0 && tid_z == 0)
+    for (int elem = 0; elem < shared_width * shared_height * depth; ++elem)
+      s_in[elem] = 0.0f;
+  __syncthreads();
+
+  for (int d = 0; d < depth; ++d) {
+    s_in[GET_1D_IDX(shared_y, shared_x, d, shared_width, shared_height)] =
+        in[GET_1D_IDX(i, j, d, width, height)];
+  }
+
+  if (tid_y == 0) {
+    for (int f_i = 0; f_i < padding_y; ++f_i) {
+      int cur_row = i - padding_y + f_i;
+      if (cur_row < 0)
+        continue;
+
+      for (int d = 0; d < depth; ++d)
+        s_in[GET_1D_IDX(f_i, shared_x, d, shared_width, shared_height)] =
+            in[GET_1D_IDX(cur_row, j, d, width, height)];
+
+      if (tid_x == 0) {
+        for (int f_j = 0; f_j < padding_x; ++f_j) {
+          int cur_col = j - padding_x + f_j;
+          if (cur_col >= 0)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(f_i, f_j, d, shared_width, shared_height)] =
+                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+        }
+      }
+
+      if (tid_x + 1 == dim_x) {
+        for (int f_j = 1; f_j <= padding_x; ++f_j) {
+          int cur_col = j + f_j;
+          if (cur_col < width)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(f_i, shared_x + f_j, d, shared_width, shared_height)] =
+                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+        }
+      }
+    }
+  }
+
+  if (tid_y + 1 == dim_y) {
+    for (int f_i = 1; f_i <= padding_y; ++f_i) {
+      int cur_row = i + f_i;
+      if (cur_row >= height)
+        continue;
+
+      for (int d = 0; d < depth; ++d)
+        s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
+            in[GET_1D_IDX(cur_row, j, d, width, height)];
+
+      if (tid_x == 0) {
+        for (int f_j = 0; f_j < padding_x; ++f_j) {
+          int cur_col = j - padding_x + f_j;
+          if (cur_col >= 0)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(shared_y + f_i, f_j, d, shared_width, shared_height)] =
+                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+        }
+      }
+
+      if (tid_x + 1 == dim_x) {
+        for (int f_j = 1; f_j <= padding_x; ++f_j) {
+          int cur_col = j + f_j;
+          if (cur_col < width)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(
+                  shared_y + f_i, shared_x + f_j, d, shared_width, shared_height)] =
+                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+        }
+      }
+    }
+  }
+
+  if (tid_x == 0) {
+    for (int f_j = 0; f_j < padding_x; ++f_j) {
+      int cur_col = j - padding_x + f_j;
+      if (cur_col >= 0)
+        for (int d = 0; d < depth; ++d)
+          s_in[GET_1D_IDX(shared_y, f_j, d, shared_width, shared_height)] =
+              in[GET_1D_IDX(i, cur_col, d, width, height)];
+    }
+  }
+
+  if (tid_x + 1 == dim_x) {
+    for (int f_j = 1; f_j <= padding_x; ++f_j) {
+      int cur_col = j + f_j;
+      if (cur_col < width)
+        for (int d = 0; d < depth; ++d)
+          s_in[GET_1D_IDX(shared_y, shared_x + f_j, d, shared_width, shared_height)] =
+              in[GET_1D_IDX(i, cur_col, d, width, height)];
+    }
+  }
+
+  __syncthreads();
+
+  for (int d = 0; d < depth; ++d) {
+    for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
+      for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
+        sum +=
+            s_in[GET_1D_IDX(tid_y + f_i, tid_x + f_j, d, shared_width, shared_height)] *
+            filter_offset[GET_1D_IDX(
+                f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)];
+      }
+    }
+  }
+
+  sum          += bias[f];
+  in_relu[idx]  = sum;
+  out[idx]      = fmaxf(0.0f, sum);
+}
+
+// -------------------- Max Pooling (2x down) --------------------
+__global__ void
+optimized2_max_pooling_kernel(float *in, float *out, int width, int height, int depth) {
+  int x          = blockIdx.x * blockDim.x + threadIdx.x;
+  int y          = blockIdx.y * blockDim.y + threadIdx.y;
+  int d          = blockIdx.z * blockDim.z + threadIdx.z;
+  int new_width  = width / 2;
+  int new_height = height / 2;
+
+  if (x >= new_width || y >= new_height || d >= depth)
+    return;
+
+  int in_x = x * 2;
+  int in_y = y * 2;
+
+  out[GET_1D_IDX(y, x, d, new_width, new_height)] =
+      fmaxf(fmaxf(in[GET_1D_IDX(in_y, in_x, d, width, height)],
+                  in[GET_1D_IDX(in_y, in_x + 1, d, width, height)]),
+            fmaxf(in[GET_1D_IDX(in_y + 1, in_x, d, width, height)],
+                  in[GET_1D_IDX(in_y + 1, in_x + 1, d, width, height)]));
+}
+
+// -------------------- Upsampling (2x up) --------------------
+__global__ void
+optimized2_upsampling_kernel(float *in, float *out, int width, int height, int depth) {
+  int i = blockIdx.y * blockDim.y + threadIdx.y; // Output Height
+  int j = blockIdx.x * blockDim.x + threadIdx.x; // Output Width
+  int d = blockIdx.z * blockDim.z + threadIdx.z; // Depth
+
+  int new_width  = width * 2;
+  int new_height = height * 2;
+
+  if (j >= new_width || i >= new_height || d >= depth)
+    return;
+
+  int in_i = i / 2;
+  int in_j = j / 2;
+  out[GET_1D_IDX(i, j, d, new_width, new_height)] =
+      in[GET_1D_IDX(in_i, in_j, d, width, height)];
+}
+
+// -------------------- Upsampling Backward --------------------
+__global__ void optimized2_upsampling_backward_kernel(
+    float *d_out, float *d_in, int width, int height, int depth) {
+  int x          = blockIdx.x * blockDim.x + threadIdx.x;
+  int y          = blockIdx.y * blockDim.y + threadIdx.y;
+  int d          = blockIdx.z * blockDim.z + threadIdx.z;
+  int new_width  = width * 2;
+  int new_height = height * 2;
+
+  if (x >= width || y >= height || d >= depth)
+    return;
+
+  int   out_x = 2 * x;
+  int   out_y = 2 * y;
+  float d_sum = 0;
+
+  d_sum += d_out[GET_1D_IDX(out_y, out_x, d, new_width, new_height)];
+  d_sum += d_out[GET_1D_IDX(out_y, out_x + 1, d, new_width, new_height)];
+  d_sum += d_out[GET_1D_IDX(out_y + 1, out_x, d, new_width, new_height)];
+  d_sum += d_out[GET_1D_IDX(out_y + 1, out_x + 1, d, new_width, new_height)];
+
+  d_in[GET_1D_IDX(y, x, d, width, height)] = d_sum;
+}
+
+// -------------------- MSE Loss & Gradient --------------------
+__global__ void optimized2_mse_loss_kernel(
+    float *expected, float *actual, float *out, int n, int size) {
+  __shared__ float shared[MAX_BLOCK_SIZE];
+
+  int    tid    = threadIdx.x;
+  float *elem   = shared + tid;
+  int    offset = (blockDim.x * blockIdx.x) * 2 + tid;
+
+  // Set all the element to 0
+  *elem = 0;
+
+  // Copy into shared memory, and doing the first pass at the same time
+  if (offset < size) {
+    *elem = SQR(expected[offset] - actual[offset]);
+    // If block size is less than 32,
+    // we do the unroll directly
+    if (blockDim.x > 32 && (offset += blockDim.x) < size)
+      *elem += SQR(expected[offset] - actual[offset]);
+  }
+  __syncthreads();
+
+  // Since MAX_BLOCK_SIZE is 1024, we start from 512
+  // because we already did the first pass
+  if (blockDim.x > 512) {
+    if (tid < 512)
+      *elem += elem[512];
+    __syncthreads();
+  }
+
+  if (blockDim.x > 256) {
+    if (tid < 256)
+      *elem += elem[256];
+    __syncthreads();
+  }
+
+  if (blockDim.x > 128) {
+    if (tid < 128)
+      *elem += elem[128];
+    __syncthreads();
+  }
+
+  if (blockDim.x > 64) {
+    if (tid < 64)
+      *elem += elem[64];
+    __syncthreads();
+  }
+
+  // Unroll last warp
+  if (tid < 32) {
+    volatile float *vmem = elem;
+
+    *vmem += vmem[32];
+    *vmem += vmem[16];
+    *vmem += vmem[8];
+    *vmem += vmem[4];
+    *vmem += vmem[2];
+    *vmem += vmem[1];
+  }
+
+  // Copy to output
+  if (tid == 0)
+    atomicAdd(out, *elem / size / n);
+}
+
+__global__ void optimized2_mse_grad_kernel(
+    float *expected, float *actual, float *d_out, int n, int size) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < size)
+    d_out[idx] = 2.0f * (actual[idx] - expected[idx]) / size / n;
+}
+
+// -------------------- ReLU Backward --------------------
+__global__ void
+optimized2_relu_backward_kernel(float *in, float *d_out, float *d_in, int size) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < size)
+    d_in[idx] = in[idx] > 0 ? d_out[idx] : 0;
+}
+
+// -------------------- Weight Update --------------------
+__global__ void optimized2_update_weight_kernel(float *weight,
+                                                float *gradient,
+                                                int    size,
+                                                float  learning_rate) {
+  int idx = blockIdx.x * blockDim.x + threadIdx.x;
+  if (idx < size)
+    weight[idx] -= learning_rate * gradient[idx];
+}
+
+// -------------------- Conv2D Backward: Filter Gradient only --------------------
+__global__ void optimized2_full_filter_grad_kernel(float *in,
+                                                   float *d_out,
+                                                   float *d_bias,
+                                                   float *d_filter,
+                                                   int    width,
+                                                   int    height,
+                                                   int    depth,
+                                                   int    n_filter) {
+  extern __shared__ float s_in[];
+
+  int tid_y = threadIdx.y;
+  int tid_x = threadIdx.x;
+  int tid_z = threadIdx.z;
+  int dim_y = blockDim.y;
+  int dim_x = blockDim.x;
+  int i     = blockIdx.y * dim_y + tid_y;
+  int j     = blockIdx.x * dim_x + tid_x;
+  int f     = blockIdx.z * blockDim.z + tid_z;
+
+  if (j >= width || i >= height || f >= n_filter)
+    return;
+
+  int    padding_y     = CONV_FILTER_HEIGHT / 2;
+  int    padding_x     = CONV_FILTER_WIDTH / 2;
+  int    shared_y      = tid_y + padding_y;
+  int    shared_x      = tid_x + padding_x;
+  int    shared_height = dim_y + CONV_FILTER_HEIGHT - 1;
+  int    shared_width  = dim_x + CONV_FILTER_WIDTH - 1;
+  float *d_filter_offset =
+      d_filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;
+  float d_out_val = d_out[idx];
+  int   idx       = GET_1D_IDX(i, j, f, width, height);
+  atomicAdd(d_bias + f, d_out_val);
+
+  if (tid_x == 0 && tid_y == 0 && tid_z == 0)
+    for (int elem = 0; elem < shared_width * shared_height * depth; ++elem)
+      s_in[elem] = 0.0f;
+  __syncthreads();
+
+  for (int d = 0; d < depth; ++d) {
+    s_in[GET_1D_IDX(shared_y, shared_x, d, shared_width, shared_height)] =
+        in[GET_1D_IDX(i, j, d, width, height)];
+  }
+
+  if (tid_y == 0) {
+    for (int f_i = 0; f_i < padding_y; ++f_i) {
+      int cur_row = i - padding_y + f_i;
+      if (cur_row < 0)
+        continue;
+
+      for (int d = 0; d < depth; ++d)
+        s_in[GET_1D_IDX(f_i, shared_x, d, shared_width, shared_height)] =
+            in[GET_1D_IDX(cur_row, j, d, width, height)];
+
+      if (tid_x == 0) {
+        for (int f_j = 0; f_j < padding_x; ++f_j) {
+          int cur_col = j - padding_x + f_j;
+          if (cur_col >= 0)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(f_i, f_j, d, shared_width, shared_height)] =
+                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+        }
+      }
+
+      if (tid_x + 1 == dim_x) {
+        for (int f_j = 1; f_j <= padding_x; ++f_j) {
+          int cur_col = j + f_j;
+          if (cur_col < width)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(f_i, shared_x + f_j, d, shared_width, shared_height)] =
+                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+        }
+      }
+    }
+  }
+
+  if (tid_y + 1 == dim_y) {
+    for (int f_i = 1; f_i <= padding_y; ++f_i) {
+      int cur_row = i + f_i;
+      if (cur_row >= height)
+        continue;
+
+      for (int d = 0; d < depth; ++d)
+        s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
+            in[GET_1D_IDX(cur_row, j, d, width, height)];
+
+      if (tid_x == 0) {
+        for (int f_j = 0; f_j < padding_x; ++f_j) {
+          int cur_col = j - padding_x + f_j;
+          if (cur_col >= 0)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(shared_y + f_i, f_j, d, shared_width, shared_height)] =
+                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+        }
+      }
+
+      if (tid_x + 1 == dim_x) {
+        for (int f_j = 1; f_j <= padding_x; ++f_j) {
+          int cur_col = j + f_j;
+          if (cur_col < width)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(
+                  shared_y + f_i, shared_x + f_j, d, shared_width, shared_height)] =
+                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+        }
+      }
+    }
+  }
+
+  if (tid_x == 0) {
+    for (int f_j = 0; f_j < padding_x; ++f_j) {
+      int cur_col = j - padding_x + f_j;
+      if (cur_col >= 0)
+        for (int d = 0; d < depth; ++d)
+          s_in[GET_1D_IDX(shared_y, f_j, d, shared_width, shared_height)] =
+              in[GET_1D_IDX(i, cur_col, d, width, height)];
+    }
+  }
+
+  if (tid_x + 1 == dim_x) {
+    for (int f_j = 1; f_j <= padding_x; ++f_j) {
+      int cur_col = j + f_j;
+      if (cur_col < width)
+        for (int d = 0; d < depth; ++d)
+          s_in[GET_1D_IDX(shared_y, shared_x + f_j, d, shared_width, shared_height)] =
+              in[GET_1D_IDX(i, cur_col, d, width, height)];
+    }
+  }
+
+  __syncthreads();
+
+  for (int d = 0; d < depth; ++d) {
+    for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
+      for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
+        atomicAdd(
+            d_filter_offset +
+                GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT),
+            s_in[GET_1D_IDX(tid_y + f_i, tid_x + f_j, d, shared_width, shared_height)] *
+                d_out_val);
+      }
+    }
+  }
+}
+
+__global__ void optimized2_conv2D_backward_kernel(float *d_out,
+                                                  float *filter,
+                                                  float *d_in,
+                                                  int    width,
+                                                  int    height,
+                                                  int    depth,
+                                                  int    n_filter) {
+  extern __shared__ float s_in[];
+
+  int tid_y = threadIdx.y;
+  int tid_x = threadIdx.x;
+  int tid_z = threadIdx.z;
+  int dim_y = blockDim.y;
+  int dim_x = blockDim.x;
+  int i     = blockIdx.y * dim_y + tid_y;
+  int j     = blockIdx.x * dim_x + tid_x;
+  int d     = blockIdx.z * blockDim.z + tid_z;
+
+  if (j >= width || i >= height || d >= depth)
+    return;
+
+  int   padding_y     = CONV_FILTER_HEIGHT / 2;
+  int   padding_x     = CONV_FILTER_WIDTH / 2;
+  int   shared_y      = tid_y + padding_y;
+  int   shared_x      = tid_x + padding_x;
+  int   shared_height = dim_y + CONV_FILTER_HEIGHT - 1;
+  int   shared_width  = dim_x + CONV_FILTER_WIDTH - 1;
+  float sum           = 0;
+
+  if (tid_x == 0 && tid_y == 0 && tid_z == 0)
+    for (int elem = 0; elem < shared_width * shared_height * n_filter; ++elem)
+      s_in[elem] = 0.0f;
+  __syncthreads();
+
+  for (int f = 0; f < n_filter; ++f) {
+    s_in[GET_1D_IDX(shared_y, shared_x, f, shared_width, shared_height)] =
+        d_out[GET_1D_IDX(i, j, f, width, height)];
+  }
+
+  if (tid_y == 0) {
+    for (int f_i = 0; f_i < padding_y; ++f_i) {
+      int cur_row = i - padding_y + f_i;
+      if (cur_row < 0)
+        continue;
+
+      for (int f = 0; f < n_filter; ++f)
+        s_in[GET_1D_IDX(f_i, shared_x, f, shared_width, shared_height)] =
+            d_out[GET_1D_IDX(cur_row, j, f, width, height)];
+
+      if (tid_x == 0) {
+        for (int f_j = 0; f_j < padding_x; ++f_j) {
+          int cur_col = j - padding_x + f_j;
+          if (cur_col >= 0)
+            for (int f = 0; f < n_filter; ++f)
+              s_in[GET_1D_IDX(f_i, f_j, f, shared_width, shared_height)] =
+                  d_out[GET_1D_IDX(cur_row, cur_col, f, width, height)];
+        }
+      }
+
+      if (tid_x + 1 == dim_x) {
+        for (int f_j = 1; f_j <= padding_x; ++f_j) {
+          int cur_col = j + f_j;
+          if (cur_col < width)
+            for (int f = 0; f < n_filter; ++f)
+              s_in[GET_1D_IDX(f_i, shared_x + f_j, f, shared_width, shared_height)] =
+                  d_out[GET_1D_IDX(cur_row, cur_col, f, width, height)];
+        }
+      }
+    }
+  }
+
+  if (tid_y + 1 == dim_y) {
+    for (int f_i = 1; f_i <= padding_y; ++f_i) {
+      int cur_row = i + f_i;
+      if (cur_row >= height)
+        continue;
+
+      for (int f = 0; f < n_filter; ++f)
+        s_in[GET_1D_IDX(shared_y + f_i, shared_x, f, shared_width, shared_height)] =
+            d_out[GET_1D_IDX(cur_row, j, f, width, height)];
+
+      if (tid_x == 0) {
+        for (int f_j = 0; f_j < padding_x; ++f_j) {
+          int cur_col = j - padding_x + f_j;
+          if (cur_col >= 0)
+            for (int f = 0; f < n_filter; ++f)
+              s_in[GET_1D_IDX(shared_y + f_i, f_j, f, shared_width, shared_height)] =
+                  d_out[GET_1D_IDX(cur_row, cur_col, f, width, height)];
+        }
+      }
+
+      if (tid_x + 1 == dim_x) {
+        for (int f_j = 1; f_j <= padding_x; ++f_j) {
+          int cur_col = j + f_j;
+          if (cur_col < width)
+            for (int f = 0; f < n_filter; ++f)
+              s_in[GET_1D_IDX(
+                  shared_y + f_i, shared_x + f_j, f, shared_width, shared_height)] =
+                  d_out[GET_1D_IDX(cur_row, cur_col, f, width, height)];
+        }
+      }
+    }
+  }
+
+  if (tid_x == 0) {
+    for (int f_j = 0; f_j < padding_x; ++f_j) {
+      int cur_col = j - padding_x + f_j;
+      if (cur_col >= 0)
+        for (int f = 0; f < n_filter; ++f)
+          s_in[GET_1D_IDX(shared_y, f_j, f, shared_width, shared_height)] =
+              d_out[GET_1D_IDX(i, cur_col, f, width, height)];
+    }
+  }
+
+  if (tid_x + 1 == dim_x) {
+    for (int f_j = 1; f_j <= padding_x; ++f_j) {
+      int cur_col = j + f_j;
+      if (cur_col < width)
+        for (int f = 0; f < n_filter; ++f)
+          s_in[GET_1D_IDX(shared_y, shared_x + f_j, f, shared_width, shared_height)] =
+              d_out[GET_1D_IDX(i, cur_col, f, width, height)];
+    }
+  }
+
+  __syncthreads();
+
+  for (int f = 0; f < n_filter; ++f) {
+    float *filter_offset = filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
+    for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
+      for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
+        sum +=
+            s_in[GET_1D_IDX(tid_y + f_i, tid_x + f_j, f, shared_width, shared_height)] *
+            filter_offset[GET_1D_IDX(
+                f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)];
+      }
+    }
+  }
+
+  d_in[GET_1D_IDX(i, j, d, width, height)] = sum;
+}
+
+// optimized2 Max Pooling Backward
+__global__ void optimized2_max_pooling_backward_kernel(
+    float *in, float *d_out, float *d_in, int width, int height, int depth) {
+  int i = blockIdx.y * blockDim.y + threadIdx.y; // y
+  int j = blockIdx.x * blockDim.x + threadIdx.x; // x
+  int d = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (j >= width || i >= height || d >= depth)
+    return;
+
+  int idx        = GET_1D_IDX(i, j, d, width, height);
+  int out_i      = i / 2;
+  int out_j      = j / 2;
+  int new_width  = width / 2;
+  int new_height = height / 2;
+
+  // Indices of the 2x2 block contributing to pooled output (out_i, out_j)
+  int base_y          = out_i * 2;
+  int base_x          = out_j * 2;
+  int neighbors_idx[] = {
+    GET_1D_IDX(base_y, base_x, d, width, height),
+    GET_1D_IDX(base_y, base_x + 1, d, width, height),
+    GET_1D_IDX(base_y + 1, base_x, d, width, height),
+    GET_1D_IDX(base_y + 1, base_x + 1, d, width, height),
+  };
+
+  // Find max index manually (device-safe)
+  int   max_idx = neighbors_idx[0];
+  float max_val = in[max_idx];
+  for (int k = 1; k < 4; ++k) {
+    int   n_idx = neighbors_idx[k];
+    float n_val = in[n_idx];
+    if (n_val > max_val) {
+      max_val = n_val;
+      max_idx = n_idx;
+    }
+  }
+
+  d_in[idx] = (idx == max_idx)
+                  ? d_out[GET_1D_IDX(out_i, out_j, d, new_width, new_height)]
+                  : 0.0f;
+}
+
+void optimized2_full_filter(float       *in,
+                            float       *filter,
+                            float       *bias,
+                            float       *in_relu,
+                            float       *out,
+                            int          n,
+                            int          width,
+                            int          height,
+                            int          depth,
+                            int          n_filter,
+                            dim3         block_size,
+                            cudaStream_t streams[]) {
+  dim3 grid_size((width - 1) / block_size.x + 1,
+                 (height - 1) / block_size.y + 1,
+                 (n_filter - 1) / block_size.z + 1);
+  int  shared_size = (block_size.x + CONV_FILTER_WIDTH - 1) *
+                    (block_size.y + CONV_FILTER_HEIGHT - 1) *
+                    depth *
+                    sizeof(float);
+
+  for (int i = 0; i < n; ++i) {
+    int in_offset  = i * width * height * depth;
+    int out_offset = i * width * height * n_filter;
+
+    optimized2_conv2D_kernel<<<grid_size,
+                               block_size,
+                               shared_size,
+                               streams[i % N_STREAMS]>>>(in + in_offset,
+                                                         filter,
+                                                         bias,
+                                                         in_relu + out_offset,
+                                                         out + out_offset,
+                                                         width,
+                                                         height,
+                                                         depth,
+                                                         n_filter);
+  }
+}
+
+void optimized2_max_pooling(float       *in,
+                            float       *out,
+                            int          n,
+                            int          width,
+                            int          height,
+                            int          depth,
+                            dim3         block_size,
+                            cudaStream_t streams[]) {
+  dim3 grid_size((width / 2 - 1) / block_size.x + 1,
+                 (height / 2 - 1) / block_size.y + 1,
+                 (depth - 1) / block_size.z + 1);
+
+  for (int i = 0; i < n; ++i) {
+    int in_offset  = i * width * height * depth;
+    int out_offset = i * width * height * depth / 4;
+
+    optimized2_max_pooling_kernel<<<grid_size, block_size, 0, streams[i % N_STREAMS]>>>(
+        in + in_offset, out + out_offset, width, height, depth);
+  }
+}
+
+void optimized2_upsampling(float       *in,
+                           float       *out,
+                           int          n,
+                           int          width,
+                           int          height,
+                           int          depth,
+                           dim3         block_size,
+                           cudaStream_t streams[]) {
+  dim3 grid_size((2 * width - 1) / block_size.x + 1,
+                 (2 * height - 1) / block_size.y + 1,
+                 (depth - 1) / block_size.z + 1);
+
+  for (int i = 0; i < n; ++i) {
+    int in_offset  = i * width * height * depth;
+    int out_offset = i * width * height * depth * 4;
+
+    optimized2_upsampling_kernel<<<grid_size, block_size, 0, streams[i % N_STREAMS]>>>(
+        in + in_offset, out + out_offset, width, height, depth);
+  }
+}
+
+float optimized2_mse_loss(float       *expected,
+                          float       *actual,
+                          int          n,
+                          int          width,
+                          int          height,
+                          int          depth,
+                          dim3         block_size,
+                          cudaStream_t streams[]) {
+  int    size = width * height * depth;
+  dim3   grid_size((size - 1) / block_size.x + 1);
+  float  loss = 0;
+  float *d_loss;
+  CUDA_CHECK(cudaMalloc(&d_loss, sizeof(float)));
+  CUDA_CHECK(cudaMemset(d_loss, 0, sizeof(float)));
+
+  for (int i = 0; i < n; ++i) {
+    int offset = i * size;
+    optimized2_mse_loss_kernel<<<grid_size, block_size, 0, streams[i % N_STREAMS]>>>(
+        expected + offset, actual + offset, d_loss, n, size);
+  }
+
+  for (int i = 0; i < N_STREAMS; ++i)
+    CUDA_CHECK(cudaStreamSynchronize(streams[i]));
+
+  CUDA_CHECK(cudaMemcpy(&loss, d_loss, sizeof(float), cudaMemcpyDeviceToHost));
+  CUDA_CHECK(cudaFree(d_loss));
+
+  return loss;
+}
+
+void optimized2_mse_grad(float       *expected,
+                         float       *actual,
+                         float       *d_out,
+                         int          n,
+                         int          width,
+                         int          height,
+                         int          depth,
+                         dim3         block_size,
+                         cudaStream_t streams[]) {
+  int  size = width * height * depth;
+  dim3 grid_size((size - 1) / block_size.x + 1);
+
+  for (int i = 0; i < n; ++i) {
+    int offset = i * size;
+    optimized2_mse_grad_kernel<<<grid_size, block_size, 0, streams[i % N_STREAMS]>>>(
+        expected + offset, actual + offset, d_out + offset, n, size);
+  }
+}
+
+void optimized2_relu_backward(float       *in,
+                              float       *d_out,
+                              float       *d_in,
+                              int          n,
+                              int          width,
+                              int          height,
+                              int          depth,
+                              dim3         block_size,
+                              cudaStream_t streams[]) {
+  int  size = width * height * depth;
+  dim3 grid_size((size - 1) / block_size.x + 1);
+
+  for (int i = 0; i < n; ++i) {
+    int offset = i * size;
+    optimized2_relu_backward_kernel<<<grid_size,
+                                      block_size,
+                                      0,
+                                      streams[i % N_STREAMS]>>>(
+        in + offset, d_out + offset, d_in + offset, size);
+  }
+}
+
+void optimized2_max_pooling_backward(float       *in,
+                                     float       *d_out,
+                                     float       *d_in,
+                                     int          n,
+                                     int          width,
+                                     int          height,
+                                     int          depth,
+                                     dim3         block_size,
+                                     cudaStream_t streams[]) {
+  dim3 grid_size((width - 1) / block_size.x + 1,
+                 (height - 1) / block_size.y + 1,
+                 (depth - 1) / block_size.z + 1);
+
+  for (int i = 0; i < n; ++i) {
+    int in_offset  = i * width * height * depth;
+    int out_offset = i * width * height * depth / 4;
+
+    optimized2_max_pooling_backward_kernel<<<grid_size,
+                                             block_size,
+                                             0,
+                                             streams[i % N_STREAMS]>>>(
+        in + in_offset, d_out + out_offset, d_in + in_offset, width, height, depth);
+  }
+}
+
+void optimized2_upsampling_backward(float       *d_out,
+                                    float       *d_in,
+                                    int          n,
+                                    int          width,
+                                    int          height,
+                                    int          depth,
+                                    dim3         block_size,
+                                    cudaStream_t streams[]) {
+  dim3 grid_size((width - 1) / block_size.x + 1,
+                 (height - 1) / block_size.y + 1,
+                 (depth - 1) / block_size.z + 1);
+
+  for (int i = 0; i < n; ++i) {
+    int in_offset  = i * width * height * depth;
+    int out_offset = i * width * height * depth * 4;
+
+    optimized2_upsampling_backward_kernel<<<grid_size,
+                                            block_size,
+                                            0,
+                                            streams[i % N_STREAMS]>>>(
+        d_out + out_offset, d_in + in_offset, width, height, depth);
+  }
+}
+
+void optimized2_full_filter_grad(float       *in,
+                                 float       *d_out,
+                                 float       *d_bias,
+                                 float       *d_filter,
+                                 int          n,
+                                 int          width,
+                                 int          height,
+                                 int          depth,
+                                 int          n_filter,
+                                 dim3         block_size,
+                                 cudaStream_t streams[]) {
+  dim3 grid_size((width - 1) / block_size.x + 1,
+                 (height - 1) / block_size.y + 1,
+                 (n_filter - 1) / block_size.z + 1);
+  int  shared_size = (block_size.x + CONV_FILTER_WIDTH - 1) *
+                    (block_size.y + CONV_FILTER_HEIGHT - 1) *
+                    depth *
+                    sizeof(float);
+
+  CUDA_CHECK(cudaMemset(d_bias, 0, n_filter * sizeof(float)));
+  CUDA_CHECK(cudaMemset(
+      d_filter,
+      0,
+      CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth * n_filter * sizeof(float)));
+
+  for (int i = 0; i < N_STREAMS; ++i)
+    CUDA_CHECK(cudaStreamSynchronize(streams[i]));
+
+  for (int i = 0; i < n; ++i) {
+    int in_offset  = i * width * height * depth;
+    int out_offset = i * width * height * n_filter;
+
+    optimized2_full_filter_grad_kernel<<<grid_size,
+                                         block_size,
+                                         shared_size,
+                                         streams[i % N_STREAMS]>>>(in + in_offset,
+                                                                   d_out + out_offset,
+                                                                   d_bias,
+                                                                   d_filter,
+                                                                   width,
+                                                                   height,
+                                                                   depth,
+                                                                   n_filter);
+  }
+}
+
+void optimized2_update_weight(float       *weight,
+                              float       *gradient,
+                              int          size,
+                              float        learning_rate,
+                              dim3         block_size,
+                              cudaStream_t streams[]) {
+  dim3 grid_size((size - 1) / block_size.x + 1);
+  for (int i = 0; i < N_STREAMS; ++i)
+    CUDA_CHECK(cudaStreamSynchronize(streams[i]));
+
+  optimized2_update_weight_kernel<<<grid_size, block_size>>>(
+      weight, gradient, size, learning_rate);
+}
+
+void optimized2_conv2D_backward(float       *d_out,
+                                float       *filter,
+                                float       *d_in,
+                                int          n,
+                                int          width,
+                                int          height,
+                                int          depth,
+                                int          n_filter,
+                                dim3         block_size,
+                                cudaStream_t streams[]) {
+  dim3 grid_size((width - 1) / block_size.x + 1,
+                 (height - 1) / block_size.y + 1,
+                 (depth - 1) / block_size.z + 1);
+  int  shared_size = (block_size.x + CONV_FILTER_WIDTH - 1) *
+                    (block_size.y + CONV_FILTER_HEIGHT - 1) *
+                    n_filter *
+                    sizeof(float);
+
+  for (int i = 0; i < n; ++i) {
+    int d_in_offset  = i * width * height * depth;
+    int d_out_offset = i * width * height * n_filter;
+
+    optimized2_conv2D_backward_kernel<<<grid_size,
+                                        block_size,
+                                        shared_size,
+                                        streams[i % N_STREAMS]>>>(d_out + d_out_offset,
+                                                                  filter,
+                                                                  d_in + d_in_offset,
+                                                                  width,
+                                                                  height,
+                                                                  depth,
+                                                                  n_filter);
+  }
+}

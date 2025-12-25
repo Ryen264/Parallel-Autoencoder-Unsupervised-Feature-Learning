@@ -14,7 +14,7 @@ constexpr const char *ENCODED_DATASET_FILE =
     "./data/encoded/optimized1_encoded_dataset.bin";
 constexpr const char *ENCODED_LABEL_FILE =
     "./data/encoded/optimized1_label_dataset.bin";
-constexpr int N_BATCHES = 2;
+constexpr int N_BATCHES = 1;
 
 int main() {
   Optimized1_Autoencoder autoencoder;

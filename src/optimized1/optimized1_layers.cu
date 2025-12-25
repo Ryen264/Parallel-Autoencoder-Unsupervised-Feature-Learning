@@ -43,10 +43,12 @@ __global__ void optimized1_conv2D_kernel(float *in,
   if (tid_y == 0) {
     for (int f_i = 0; f_i < padding_y; ++f_i) {
       int cur_row = i - padding_y + f_i;
-      if (cur_row >= 0)
-        for (int d = 0; d < depth; ++d)
-          s_in[GET_1D_IDX(f_i, shared_x, d, shared_width, shared_height)] =
-              in[GET_1D_IDX(cur_row, j, d, width, height)];
+      if (cur_row < 0)
+        continue;
+
+      for (int d = 0; d < depth; ++d)
+        s_in[GET_1D_IDX(f_i, shared_x, d, shared_width, shared_height)] =
+            in[GET_1D_IDX(cur_row, j, d, width, height)];
 
       if (tid_x == 0) {
         for (int f_j = 0; f_j < padding_x; ++f_j) {
@@ -73,10 +75,12 @@ __global__ void optimized1_conv2D_kernel(float *in,
   if (tid_y + 1 == dim_y) {
     for (int f_i = 1; f_i <= padding_y; ++f_i) {
       int cur_row = i + f_i;
-      if (cur_row < height)
-        for (int d = 0; d < depth; ++d)
-          s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
-              in[GET_1D_IDX(cur_row, j, d, width, height)];
+      if (cur_row >= height)
+        continue;
+
+      for (int d = 0; d < depth; ++d)
+        s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
+            in[GET_1D_IDX(cur_row, j, d, width, height)];
 
       if (tid_x == 0) {
         for (int f_j = 0; f_j < padding_x; ++f_j) {
@@ -134,8 +138,6 @@ __global__ void optimized1_conv2D_kernel(float *in,
     }
   }
 
-  __syncthreads();
-
   out[GET_1D_IDX(i, j, f, width, height)] = sum;
 }
 
@@ -189,7 +191,6 @@ optimized1_upsampling_kernel(float *in, float *out, int width, int height, int d
   if (j >= new_width || i >= new_height || d >= depth)
     return;
 
-  // Nearest Neighbor: Output (i,j) lấy từ Input (i/2, j/2)
   int in_i = i / 2;
   int in_j = j / 2;
   out[GET_1D_IDX(i, j, d, new_width, new_height)] =
@@ -297,7 +298,7 @@ __global__ void
 optimized1_relu_backward_kernel(float *in, float *d_out, float *d_in, int size) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < size)
-    d_out[idx] = in[idx] > 0 ? d_in[idx] : 0;
+    d_in[idx] = in[idx] > 0 ? d_out[idx] : 0;
 }
 
 // -------------------- Bias Gradient --------------------
@@ -370,10 +371,12 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
       if (tid_x == 0) {
         for (int f_j = 0; f_j < padding_x; ++f_j) {
           int cur_col = j - padding_x + f_j;
-          if (cur_col >= 0)
-            for (int d = 0; d < depth; ++d)
-              s_in[GET_1D_IDX(f_i, f_j, d, shared_width, shared_height)] =
-                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+          if (cur_col < 0)
+            continue;
+
+          for (int d = 0; d < depth; ++d)
+            s_in[GET_1D_IDX(f_i, f_j, d, shared_width, shared_height)] =
+                in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
         }
       }
 
@@ -392,10 +395,12 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
   if (tid_y + 1 == dim_y) {
     for (int f_i = 1; f_i <= padding_y; ++f_i) {
       int cur_row = i + f_i;
-      if (cur_row < height)
-        for (int d = 0; d < depth; ++d)
-          s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
-              in[GET_1D_IDX(cur_row, j, d, width, height)];
+      if (cur_row >= height)
+        continue;
+
+      for (int d = 0; d < depth; ++d)
+        s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
+            in[GET_1D_IDX(cur_row, j, d, width, height)];
 
       if (tid_x == 0) {
         for (int f_j = 0; f_j < padding_x; ++f_j) {

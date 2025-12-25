@@ -1,13 +1,14 @@
 #ifndef OPT_DATASET_H
 #define OPT_DATASET_H
 
+#include "constants.h"
+#include "macro.h"
+
 #include <random>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include "constants.h"
-#include "macro.h"
+using namespace std;
 
 /**
  * @brief Struct that represents a list of image (either encoded or decoded)

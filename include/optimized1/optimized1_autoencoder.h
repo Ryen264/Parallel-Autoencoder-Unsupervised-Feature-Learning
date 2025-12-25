@@ -1,18 +1,19 @@
 #ifndef OPT1_AUTOENCODER_H
 #define OPT1_AUTOENCODER_H
 
+#include "optimized1_layers.h"
+#include "optimized_data_loader.h"
+#include "progress_bar.h"
+#include "timer.h"
+#include "utils.h"
+
 #include <algorithm>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <random>
 #include <vector>
-
-#include "optimized1_layers.h"
-#include "optimized_data_loader.h"
-#include "progress_bar.h"
-#include "timer.h"
-#include "utils.h"
+using namespace std;
 
 /**
  * @brief The class that encapsulates the network using CPU
@@ -182,6 +183,13 @@ public:
    * @param filename The file to write the model's parameter
    */
   void save_parameters(const char *filename) const;
+
+    /**
+   * @brief Load the model's parameters from a file
+   *
+   * @param filename The file containing the model's parameters
+   */
+  void load_parameters(const char *filename);
 };
 
 #endif

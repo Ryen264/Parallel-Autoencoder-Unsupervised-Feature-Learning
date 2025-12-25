@@ -1,13 +1,15 @@
 #include "constants.h"
-#include "cpu_autoencoder.h"
 #include "data_loader.h"
+#include "cpu_autoencoder.h"
 #include "gpu_autoencoder.h"
+#include "optimized1_autoencoder.h"
 #include "model.h"
 
 #include <iostream>
+#include <string>
 using namespace std;
 
-//./main [hardware=cpu/gpu] [phase_1_mode=train/load] [phase_2_mode=train/load] \
+//./main [version=cpu/gpu/opt1] [phase_1_mode=train/load] [phase_2_mode=train/load] \
 //       [n_batches] [n_epoch] [batch_size] [learning_rate] \
 //       [c_param] [kernel_type] [gamma_type]
 
@@ -16,9 +18,7 @@ int TRAIN_SAMPLES = -1;
 int TEST_SAMPLES  = -1;
 
 // const char *DATASET_DIR          = "./data/cifar-10-batches-bin";
-const char *DATASET_DIR =
-    "/content/drive/MyDrive/LapTrinhSongSong/Team "
-    "Project/data/cifar-10-binary/cifar-10-batches-bin";
+const char *DATASET_DIR = "/content/drive/MyDrive/LapTrinhSongSong/Team Project/data/cifar-10-binary/cifar-10-batches-bin";
 
 // const char *OUTPUT_DIR           = "./output";
 const char *OUTPUT_DIR = "/content/output";
@@ -224,7 +224,7 @@ double phase_2_test(SVMmodel      &model,
 }
 
 int main(int argc, char *argv[]) {
-  bool use_gpu       = false;
+  string version = "cpu";
   bool train_phase_1 = true;
   bool train_phase_2 = true;
 
@@ -237,7 +237,7 @@ int main(int argc, char *argv[]) {
   const char *gamma_type    = GAMMA_PARAM;
 
   if (argc > 1)
-    use_gpu = (string(argv[1]) == "gpu") ? true : false;
+    version = string(argv[1]);
   if (argc > 2)
     train_phase_1 = (string(argv[2]) == "train") ? true : false;
   if (argc > 3)
@@ -269,7 +269,7 @@ int main(int argc, char *argv[]) {
 
   Dataset encoded_trainset, encoded_testset;
   // Phase 1: Train and evaluate Autoencoder on trainset
-  if (use_gpu) {
+  if (version == "gpu") {
     Gpu_Autoencoder gpu_autoencoder;
     if (train_phase_1) {
       gpu_autoencoder = phase_1_train<Gpu_Autoencoder>(trainset,
@@ -289,7 +289,7 @@ int main(int argc, char *argv[]) {
         trainset, gpu_autoencoder, ENCODED_DATASET_PATH, true);
     encoded_testset = phase_1_encode<Gpu_Autoencoder>(
         testset, gpu_autoencoder, ENCODED_DATASET_PATH, false);
-  } else {
+  } else if (version == "cpu") {
     Cpu_Autoencoder cpu_autoencoder;
     if (train_phase_1) {
       cpu_autoencoder = phase_1_train<Cpu_Autoencoder>(trainset,
@@ -309,6 +309,29 @@ int main(int argc, char *argv[]) {
         trainset, cpu_autoencoder, ENCODED_DATASET_PATH, true);
     encoded_testset = phase_1_encode<Cpu_Autoencoder>(
         testset, cpu_autoencoder, ENCODED_DATASET_PATH, false);
+  } else if (version == "opt1") {
+    Optimized1_Autoencoder opt1_autoencoder;
+    if (train_phase_1) {
+      opt1_autoencoder = phase_1_train<Optimized1_Autoencoder>(trainset,
+                                                               OUTPUT_DIR,
+                                                               GPU_AUTOENCODER_PATH,
+                                                               n_epoch,
+                                                               batch_size,
+                                                               learning_rate,
+                                                               CHECKPOINT,
+                                                               true);
+    } else {
+      opt1_autoencoder = phase_1_load<Optimized1_Autoencoder>(GPU_AUTOENCODER_PATH);
+    }
+    // Phase 1: Encode trainset and testset
+    printf("Encoding trainset and testset using Optimized1 Autoencoder...\n");
+    encoded_trainset = phase_1_encode<Optimized1_Autoencoder>(
+        trainset, opt1_autoencoder, ENCODED_DATASET_PATH, true);
+    encoded_testset = phase_1_encode<Optimized1_Autoencoder>(
+        testset, opt1_autoencoder, ENCODED_DATASET_PATH, false);
+  } else {
+    cout << "Invalid version specified. Use 'cpu', 'gpu', or 'opt1'." << endl;
+    return -1;
   }
   // // Dummy for testing
   // encoded_trainset = trainset;

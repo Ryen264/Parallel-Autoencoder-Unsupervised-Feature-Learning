@@ -693,7 +693,7 @@ void Optimized1_Autoencoder::fit(const Optimized_Dataset &dataset,
   // Allocate memory for training
   _allocate_output_mem(batch_size, dataset.width, dataset.height);
 
-  std::filesystem::create_directories(output_dir);
+  filesystem::create_directories(output_dir);
 
   Timer timer;
   float total_time = 0;
@@ -1062,4 +1062,46 @@ void Optimized1_Autoencoder::save_parameters(const char *filename) const {
   write_data(buffer, _decoder_bias_3, tmp, DECODER_FILTER_3_DEPTH * sizeof(float));
 
   CUDA_CHECK(cudaFreeHost(tmp));
+}
+
+void Optimized1_Autoencoder::load_parameters(const char *filename) {
+  ifstream buffer(filename, ios::in | ios::binary);
+  if (!buffer.is_open()) {
+      fprintf(stderr, "Error: Cannot open file %s for reading\n", filename);
+      return;
+  }
+
+  static constexpr int FILTER_SIZES[] = {ENCODER_FILTER_1_SIZE,
+                                         ENCODER_FILTER_2_SIZE,
+                                         DECODER_FILTER_1_SIZE,
+                                         DECODER_FILTER_2_SIZE,
+                                         DECODER_FILTER_3_SIZE};
+  constexpr int MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
+
+  char *tmp;
+  CUDA_CHECK(cudaMallocHost(&tmp, MAX_FILTER_SIZE * sizeof(float)));
+
+  // Read first encoder conv2D layer
+  read_data(buffer, _encoder_filter_1, tmp, ENCODER_FILTER_1_SIZE * sizeof(float));
+  read_data(buffer, _encoder_bias_1, tmp, ENCODER_FILTER_1_DEPTH * sizeof(float));
+
+  // Read second encoder conv2D layer
+  read_data(buffer, _encoder_filter_2, tmp, ENCODER_FILTER_2_SIZE * sizeof(float));
+  read_data(buffer, _encoder_bias_2, tmp, ENCODER_FILTER_2_DEPTH * sizeof(float));
+
+  // Read first decoder conv2D layer
+  read_data(buffer, _decoder_filter_1, tmp, DECODER_FILTER_1_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_1, tmp, DECODER_FILTER_1_DEPTH * sizeof(float));
+
+  // Read second decoder conv2D layer
+  read_data(buffer, _decoder_filter_2, tmp, DECODER_FILTER_2_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_2, tmp, DECODER_FILTER_2_DEPTH * sizeof(float));
+
+  // Read third decoder conv2D layer
+  read_data(buffer, _decoder_filter_3, tmp, DECODER_FILTER_3_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_3, tmp, DECODER_FILTER_3_DEPTH * sizeof(float));
+
+  CUDA_CHECK(cudaFreeHost(tmp));
+  buffer.close();
+  printf("✓ Optimized1 Autoencoder parameters loaded successfully from %s\n", filename);
 }

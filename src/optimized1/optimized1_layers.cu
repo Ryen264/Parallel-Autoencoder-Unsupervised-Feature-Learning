@@ -32,8 +32,8 @@ __global__ void optimized1_conv2D_kernel(float *in,
   float  sum           = 0;
 
   if (tid_x == 0 && tid_y == 0 && tid_z == 0)
-    for (int i = 0; i < shared_width * shared_height * depth; ++i)
-      s_in[i] = 0.0f;
+    for (int elem = 0; elem < shared_width * shared_height * depth; ++elem)
+      s_in[elem] = 0.0f;
   __syncthreads();
 
   for (int d = 0; d < depth; ++d) {
@@ -353,8 +353,8 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
   float d_out_val = d_out[GET_1D_IDX(i, j, f, width, height)];
 
   if (tid_x == 0 && tid_y == 0 && tid_z == 0)
-    for (int i = 0; i < shared_width * shared_height * depth; ++i)
-      s_in[i] = 0.0f;
+    for (int elem = 0; elem < shared_width * shared_height * depth; ++elem)
+      s_in[elem] = 0.0f;
   __syncthreads();
 
   for (int d = 0; d < depth; ++d) {
@@ -492,8 +492,8 @@ __global__ void optimized1_conv2D_backward_kernel(float *d_out,
   float sum           = 0;
 
   if (tid_x == 0 && tid_y == 0 && tid_z == 0)
-    for (int i = 0; i < shared_width * shared_height * n_filter; ++i)
-      s_in[i] = 0.0f;
+    for (int elem = 0; elem < shared_width * shared_height * n_filter; ++elem)
+      s_in[elem] = 0.0f;
   __syncthreads();
 
   for (int f = 0; f < n_filter; ++f) {

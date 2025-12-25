@@ -186,26 +186,31 @@ __global__ void gpu_max_pooling_backward_kernel(
   int new_width  = width / 2;
   int new_height = height / 2;
 
+  // Indices of the 2x2 block contributing to pooled output (out_i, out_j)
+  int base_y = out_i * 2;
+  int base_x = out_j * 2;
   int neighbors_idx[] = {
-    GET_1D_IDX(i * 2, j * 2, d, width, height),
-    GET_1D_IDX(i * 2, j * 2 + 1, d, width, height),
-    GET_1D_IDX(i * 2 + 1, j * 2, d, width, height),
-    GET_1D_IDX(i * 2 + 1, j * 2 + 1, d, width, height),
+    GET_1D_IDX(base_y,     base_x,     d, width, height),
+    GET_1D_IDX(base_y,     base_x + 1, d, width, height),
+    GET_1D_IDX(base_y + 1, base_x,     d, width, height),
+    GET_1D_IDX(base_y + 1, base_x + 1, d, width, height),
   };
 
-  // Find max index manually
-  int max_idx = neighbors_idx[0];
-  float max_val = in[max_idx];
+  // Find max index manually (device-safe)
+  int   max_idx  = neighbors_idx[0];
+  float max_val  = in[max_idx];
   for (int k = 1; k < 4; ++k) {
-    if (in[neighbors_idx[k]] > max_val) {
-      max_val = in[neighbors_idx[k]];
-      max_idx = neighbors_idx[k];
+    int n_idx = neighbors_idx[k];
+    float n_val = in[n_idx];
+    if (n_val > max_val) {
+      max_val = n_val;
+      max_idx = n_idx;
     }
   }
-  int max_idx = *max_element(
-      neighbors_idx, neighbors_idx + 4, [in](int a, int b) { return in[a] < in[b]; });
 
-  d_in[idx] = (idx == max_idx) ? d_out[GET_1D_IDX(out_i, out_j, d, new_width, new_height)] : 0.0f;
+  d_in[idx] = (idx == max_idx)
+                  ? d_out[GET_1D_IDX(out_i, out_j, d, new_width, new_height)]
+                  : 0.0f;
 }
 
 // -------------------- Avg Pooling Backward --------------------
@@ -320,14 +325,8 @@ __global__ void gpu_conv2D_backward_kernel(float *d_out,
         if (col < 0 || col >= width)
           continue;
 
-z<<<<<<< HEAD
-        d_sum += d_filter_offset[GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)]
-              * d_out[GET_1D_IDX(row, col, f, width, height)];
-=======
-        d_sum += filter_offset[GET_1D_IDX(
-                     f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)] *
-                 d_out[GET_1D_IDX(row, col, f, width, height)];
->>>>>>> efaa2a41a63c17f27afd7b46f5a36e4a672d9076
+          d_sum += filter_offset[GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)]
+            * d_out[GET_1D_IDX(row, col, f, width, height)];
       }
     }
   }

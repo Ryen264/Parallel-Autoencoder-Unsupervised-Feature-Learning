@@ -268,7 +268,7 @@ void Optimized1_Autoencoder::_forward_pass(
                         width / 4,
                         height / 4,
                         DECODER_FILTER_1_DEPTH,
-                        _block_size_3D_3);
+                        _block_size_3D_2);
 
   // Dim: n * 2w * 2w * 256
   // Second conv2D layer
@@ -308,7 +308,7 @@ void Optimized1_Autoencoder::_forward_pass(
                         width / 2,
                         height / 2,
                         DECODER_FILTER_2_DEPTH,
-                        _block_size_3D_2);
+                        _block_size_3D_1);
 
   // Dim: n * 4w * 4w * 256
   // Third conv2D layer
@@ -933,7 +933,7 @@ Optimized1_Autoencoder::decode(const Optimized_Dataset &dataset) const {
 
     // Upsampling
     optimized1_upsampling(
-        a, b, cur_batch_size, width, height, DECODER_FILTER_1_DEPTH, _block_size_3D_3);
+        a, b, cur_batch_size, width, height, DECODER_FILTER_1_DEPTH, _block_size_3D_2);
 
     // Second conv2D
     optimized1_conv2D(b,
@@ -971,7 +971,7 @@ Optimized1_Autoencoder::decode(const Optimized_Dataset &dataset) const {
                           width * 2,
                           height * 2,
                           DECODER_FILTER_2_DEPTH,
-                          _block_size_3D_2);
+                          _block_size_3D_1);
 
     // Third conv2D
     optimized1_conv2D(b,

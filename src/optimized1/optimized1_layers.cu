@@ -820,7 +820,7 @@ void optimized1_conv2D_grad(float *in,
                             dim3   block_size) {
   dim3 grid_size((width - 1) / block_size.x + 1,
                  (height - 1) / block_size.y + 1,
-                 (depth - 1) / block_size.z + 1);
+                 (n_filter - 1) / block_size.z + 1);
   int  shared_size = (block_size.x + CONV_FILTER_WIDTH - 1) *
                     (block_size.y + CONV_FILTER_HEIGHT - 1) *
                     depth *

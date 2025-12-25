@@ -363,20 +363,20 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
   if (tid_y == 0) {
     for (int f_i = 0; f_i < padding_y; ++f_i) {
       int cur_row = i - padding_y + f_i;
-      if (cur_row >= 0)
-        for (int d = 0; d < depth; ++d)
-          s_in[GET_1D_IDX(f_i, shared_x, d, shared_width, shared_height)] =
-              in[GET_1D_IDX(cur_row, j, d, width, height)];
+      if (cur_row < 0)
+        continue;
+
+      for (int d = 0; d < depth; ++d)
+        s_in[GET_1D_IDX(f_i, shared_x, d, shared_width, shared_height)] =
+            in[GET_1D_IDX(cur_row, j, d, width, height)];
 
       if (tid_x == 0) {
         for (int f_j = 0; f_j < padding_x; ++f_j) {
           int cur_col = j - padding_x + f_j;
-          if (cur_col < 0)
-            continue;
-
-          for (int d = 0; d < depth; ++d)
-            s_in[GET_1D_IDX(f_i, f_j, d, shared_width, shared_height)] =
-                in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
+          if (cur_col >= 0)
+            for (int d = 0; d < depth; ++d)
+              s_in[GET_1D_IDX(f_i, f_j, d, shared_width, shared_height)] =
+                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
         }
       }
 
@@ -501,10 +501,12 @@ __global__ void optimized1_conv2D_backward_kernel(float *d_out,
   if (tid_y == 0) {
     for (int f_i = 0; f_i < padding_y; ++f_i) {
       int cur_row = i - padding_y + f_i;
-      if (cur_row >= 0)
-        for (int f = 0; f < n_filter; ++f)
-          s_in[GET_1D_IDX(f_i, shared_x, f, shared_width, shared_height)] =
-              d_out[GET_1D_IDX(cur_row, j, f, width, height)];
+      if (cur_row < 0)
+        continue;
+
+      for (int f = 0; f < n_filter; ++f)
+        s_in[GET_1D_IDX(f_i, shared_x, f, shared_width, shared_height)] =
+            d_out[GET_1D_IDX(cur_row, j, f, width, height)];
 
       if (tid_x == 0) {
         for (int f_j = 0; f_j < padding_x; ++f_j) {
@@ -531,10 +533,12 @@ __global__ void optimized1_conv2D_backward_kernel(float *d_out,
   if (tid_y + 1 == dim_y) {
     for (int f_i = 1; f_i <= padding_y; ++f_i) {
       int cur_row = i + f_i;
-      if (cur_row < height)
-        for (int f = 0; f < n_filter; ++f)
-          s_in[GET_1D_IDX(shared_y + f_i, shared_x, f, shared_width, shared_height)] =
-              d_out[GET_1D_IDX(cur_row, j, f, width, height)];
+      if (cur_row >= height)
+        continue;
+
+      for (int f = 0; f < n_filter; ++f)
+        s_in[GET_1D_IDX(shared_y + f_i, shared_x, f, shared_width, shared_height)] =
+            d_out[GET_1D_IDX(cur_row, j, f, width, height)];
 
       if (tid_x == 0) {
         for (int f_j = 0; f_j < padding_x; ++f_j) {

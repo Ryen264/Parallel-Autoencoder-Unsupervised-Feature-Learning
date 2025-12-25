@@ -172,7 +172,7 @@ static void parseAndNormalize(unsigned char *raw_data,
   CUDA_CHECK(cudaFree(d_images));
 }
 
-Optimized_Dataset load_dataset(const char *dataset_dir, int n_batches, bool is_train) {
+Optimized_Dataset read_dataset(const char *dataset_dir, int n_batches, bool is_train) {
   int num_samples = is_train ? n_batches * NUM_PER_BATCH : NUM_TEST_SAMPLES;
 
   Optimized_Dataset dataset(num_samples, IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_DEPTH);

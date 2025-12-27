@@ -1,115 +1,62 @@
 #include "optimized2_autoencoder.h"
+#include <sys/stat.h>
+#include <sys/types.h>
+#ifdef _WIN32
+#include <direct.h>
+#define mkdir(path, mode) _mkdir(path)
+#endif
 
-/**
- * @brief Generate a random array with elements using Kaiming initialization
- *
- * @param arr The array
- * @param n The number of elements
- */
-void generate_array(float *arr, float *tmp, int n, mt19937 &rng) {
-  normal_distribution<float> d(0.0f, sqrt(2.0f / n));
+inline void generate_array(float *arr, int n, int fan_in, mt19937 &rng) {
+  vector<float>              tmp(n);
+  normal_distribution<float> d(0.0f, sqrt(2.0f / fan_in));
   for (int i = 0; i < n; ++i)
     tmp[i] = d(rng);
-  CUDA_CHECK(cudaMemcpy(arr, tmp, n * sizeof(float), cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(arr, tmp.data(), n * sizeof(float), cudaMemcpyHostToDevice));
 }
 
-/**
- * @brief Read data from a buffer
- *
- * @param buffer The buffer
- * @param data The data
- * @param size Number of bytes to read
- */
-void read_data(ifstream &buffer, float *data, char *tmp, int size) {
-  buffer.read(tmp, size);
-  CUDA_CHECK(cudaMemcpy(data, tmp, size, cudaMemcpyHostToDevice));
+inline void read_data(ifstream &buffer, float *data, int size) {
+  unique_ptr<char[]> ptr = make_unique<char[]>(size);
+  buffer.read(ptr.get(), size);
+  CUDA_CHECK(cudaMemcpy(data, ptr.get(), size, cudaMemcpyHostToDevice));
 }
 
-/**
- * @brief Write data to a buffer
- *
- * @param buffer The buffer
- * @param data The data
- * @param size Number of bytes to write
- */
-void write_data(ostream &buffer, float *data, char *tmp, int size) {
-  CUDA_CHECK(cudaMemcpy(tmp, data, size, cudaMemcpyDeviceToHost));
-  buffer.write(tmp, size);
+inline void write_data(ostream &buffer, float *data, int size) {
+  unique_ptr<char[]> ptr = make_unique<char[]>(size);
+  CUDA_CHECK(cudaMemcpy(ptr.get(), data, size, cudaMemcpyDeviceToHost));
+  buffer.write(ptr.get(), size);
 }
 
 Optimized2_Autoencoder::Optimized2_Autoencoder() {
   _allocate_mem();
   mt19937 rng(time(nullptr));
+  int     n_in = CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT;
 
-  static constexpr int FILTER_SIZES[]  = { ENCODER_FILTER_1_SIZE,
-                                           ENCODER_FILTER_2_SIZE,
-                                           DECODER_FILTER_1_SIZE,
-                                           DECODER_FILTER_2_SIZE,
-                                           DECODER_FILTER_3_SIZE };
-  constexpr int        MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
+  // Random Init
+  srand(time(0));
 
-  float *tmp;
-  CUDA_CHECK(cudaMallocHost(&tmp, MAX_FILTER_SIZE * sizeof(float)));
-
-  generate_array(_encoder_filter_1, tmp, ENCODER_FILTER_1_SIZE, rng);
+  generate_array(_encoder_filter_1, ENCODER_FILTER_1_SIZE, n_in * IMAGE_SIZE, rng);
   CUDA_CHECK(cudaMemset(_encoder_bias_1, 0, ENCODER_FILTER_1_DEPTH * sizeof(float)));
 
-  generate_array(_encoder_filter_2, tmp, ENCODER_FILTER_1_SIZE, rng);
+  generate_array(
+      _encoder_filter_2, ENCODER_FILTER_2_SIZE, n_in * ENCODER_FILTER_1_DEPTH, rng);
   CUDA_CHECK(cudaMemset(_encoder_bias_2, 0, ENCODER_FILTER_2_DEPTH * sizeof(float)));
 
-  generate_array(_decoder_filter_1, tmp, ENCODER_FILTER_1_SIZE, rng);
+  generate_array(
+      _decoder_filter_1, DECODER_FILTER_1_SIZE, n_in * ENCODER_FILTER_2_DEPTH, rng);
   CUDA_CHECK(cudaMemset(_decoder_bias_1, 0, DECODER_FILTER_1_DEPTH * sizeof(float)));
 
-  generate_array(_decoder_filter_2, tmp, ENCODER_FILTER_1_SIZE, rng);
+  generate_array(
+      _decoder_filter_2, DECODER_FILTER_2_SIZE, n_in * DECODER_FILTER_1_DEPTH, rng);
   CUDA_CHECK(cudaMemset(_decoder_bias_2, 0, DECODER_FILTER_2_DEPTH * sizeof(float)));
 
-  generate_array(_decoder_filter_3, tmp, ENCODER_FILTER_1_SIZE, rng);
+  generate_array(
+      _decoder_filter_3, DECODER_FILTER_3_SIZE, n_in * DECODER_FILTER_2_DEPTH, rng);
   CUDA_CHECK(cudaMemset(_decoder_bias_3, 0, DECODER_FILTER_3_DEPTH * sizeof(float)));
-
-  CUDA_CHECK(cudaFreeHost(tmp));
 }
 
 Optimized2_Autoencoder::Optimized2_Autoencoder(const char *filename) {
   _allocate_mem();
-
-  // Read from file
-  ifstream buffer(filename, ios::in | ios::binary);
-  if (!buffer.is_open()) {
-    printf("Unable to open the file %s, using random initialization.\n", filename);
-    return;
-  }
-
-  static constexpr int FILTER_SIZES[]  = { ENCODER_FILTER_1_SIZE,
-                                           ENCODER_FILTER_2_SIZE,
-                                           DECODER_FILTER_1_SIZE,
-                                           DECODER_FILTER_2_SIZE,
-                                           DECODER_FILTER_3_SIZE };
-  constexpr int        MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
-
-  char *tmp;
-  CUDA_CHECK(cudaMallocHost(&tmp, MAX_FILTER_SIZE * sizeof(float)));
-
-  // Read first encoder conv2D layer
-  read_data(buffer, _encoder_filter_1, tmp, ENCODER_FILTER_1_SIZE * sizeof(float));
-  read_data(buffer, _encoder_bias_1, tmp, ENCODER_FILTER_1_DEPTH * sizeof(float));
-
-  // Read second encoder conv2D layer
-  read_data(buffer, _encoder_filter_2, tmp, ENCODER_FILTER_2_SIZE * sizeof(float));
-  read_data(buffer, _encoder_bias_2, tmp, ENCODER_FILTER_2_DEPTH * sizeof(float));
-
-  // Read first decoder conv2D layer
-  read_data(buffer, _decoder_filter_1, tmp, DECODER_FILTER_1_SIZE * sizeof(float));
-  read_data(buffer, _decoder_bias_1, tmp, DECODER_FILTER_1_DEPTH * sizeof(float));
-
-  // Read second decoder conv2D layer
-  read_data(buffer, _decoder_filter_2, tmp, DECODER_FILTER_2_SIZE * sizeof(float));
-  read_data(buffer, _decoder_bias_2, tmp, DECODER_FILTER_2_DEPTH * sizeof(float));
-
-  // Read third encoder conv2D layer
-  read_data(buffer, _decoder_filter_3, tmp, DECODER_FILTER_3_SIZE * sizeof(float));
-  read_data(buffer, _decoder_bias_3, tmp, DECODER_FILTER_3_DEPTH * sizeof(float));
-
-  CUDA_CHECK(cudaFreeHost(tmp));
+  load_parameters(filename); // Reuse load logic
 }
 
 Optimized2_Autoencoder::~Optimized2_Autoencoder() {
@@ -706,7 +653,7 @@ Optimized_Dataset Optimized2_Autoencoder::encode(const Optimized_Dataset &datase
                            height,
                            depth,
                            ENCODER_FILTER_1_DEPTH,
-                           _conv_block_size_1);
+                           _block_size_3D_1);
 
     // Max pooling
     optimized2_max_pooling(
@@ -722,7 +669,7 @@ Optimized_Dataset Optimized2_Autoencoder::encode(const Optimized_Dataset &datase
                            height / 2,
                            ENCODER_FILTER_1_DEPTH,
                            ENCODER_FILTER_2_DEPTH,
-                           _conv_block_size_2);
+                           _block_size_3D_2);
 
     // Second max pooling
     optimized2_max_pooling(a,
@@ -791,7 +738,7 @@ Optimized2_Autoencoder::decode(const Optimized_Dataset &dataset) const {
                            height,
                            depth,
                            DECODER_FILTER_1_DEPTH,
-                           _conv_block_size_3);
+                           _block_size_3D_3);
 
     // Upsampling
     optimized2_upsampling(
@@ -808,7 +755,7 @@ Optimized2_Autoencoder::decode(const Optimized_Dataset &dataset) const {
                            height * 2,
                            DECODER_FILTER_1_DEPTH,
                            DECODER_FILTER_2_DEPTH,
-                           _conv_block_size_3);
+                           _block_size_3D_2);
 
     // Upsampling
     optimized2_upsampling(a,
@@ -870,35 +817,41 @@ void Optimized2_Autoencoder::save_parameters(const char *filename) const {
     return;
   }
 
-  static constexpr int FILTER_SIZES[]  = { ENCODER_FILTER_1_SIZE,
-                                           ENCODER_FILTER_2_SIZE,
-                                           DECODER_FILTER_1_SIZE,
-                                           DECODER_FILTER_2_SIZE,
-                                           DECODER_FILTER_3_SIZE };
-  constexpr int        MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
+  // Uses STATIC write_data (no conflict)
+  write_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
+  write_data(buffer, _encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float));
+  write_data(buffer, _encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float));
+  write_data(buffer, _encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float));
+  write_data(buffer, _decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float));
+  write_data(buffer, _decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float));
+  write_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
+  write_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
+  write_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
+  write_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
 
-  char *tmp;
-  CUDA_CHECK(cudaMallocHost(&tmp, MAX_FILTER_SIZE * sizeof(float)));
+  buffer.close();
+  printf("✓ Optimized2 Autoencoder parameters saved successfully to %s\n", filename);
+}
 
-  // Write first encoder conv2D layer
-  write_data(buffer, _encoder_filter_1, tmp, ENCODER_FILTER_1_SIZE * sizeof(float));
-  write_data(buffer, _encoder_bias_1, tmp, ENCODER_FILTER_1_DEPTH * sizeof(float));
+void Optimized2_Autoencoder::load_parameters(const char *filename) {
+  ifstream buffer(filename, ios::in | ios::binary);
+  if (!buffer.is_open()) {
+    fprintf(stderr, "Error: Cannot open file %s for reading\n", filename);
+    return;
+  }
 
-  // Write second encoder conv2D layer
-  write_data(buffer, _encoder_filter_2, tmp, ENCODER_FILTER_2_SIZE * sizeof(float));
-  write_data(buffer, _encoder_bias_2, tmp, ENCODER_FILTER_2_DEPTH * sizeof(float));
+  // Uses STATIC read_data (no conflict)
+  read_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
+  read_data(buffer, _encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float));
+  read_data(buffer, _encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float));
+  read_data(buffer, _encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float));
+  read_data(buffer, _decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float));
+  read_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
+  read_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
+  read_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
 
-  // Write first decoder conv2D layer
-  write_data(buffer, _decoder_filter_1, tmp, DECODER_FILTER_1_SIZE * sizeof(float));
-  write_data(buffer, _decoder_bias_1, tmp, DECODER_FILTER_1_DEPTH * sizeof(float));
-
-  // Write second decoder conv2D layer
-  write_data(buffer, _decoder_filter_2, tmp, DECODER_FILTER_2_SIZE * sizeof(float));
-  write_data(buffer, _decoder_bias_2, tmp, DECODER_FILTER_2_DEPTH * sizeof(float));
-
-  // Write third encoder conv2D layer
-  write_data(buffer, _decoder_filter_3, tmp, DECODER_FILTER_3_SIZE * sizeof(float));
-  write_data(buffer, _decoder_bias_3, tmp, DECODER_FILTER_3_DEPTH * sizeof(float));
-
-  CUDA_CHECK(cudaFreeHost(tmp));
+  buffer.close();
+  printf("✓ Optimized2 Autoencoder parameters loaded successfully from %s\n", filename);
 }

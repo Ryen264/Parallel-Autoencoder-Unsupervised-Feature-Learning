@@ -73,9 +73,6 @@ class Optimized1_Autoencoder {
   static constexpr dim3 _block_size_3D_1   = dim3(32, 32, 1);
   static constexpr dim3 _block_size_3D_2   = dim3(16, 16, 4);
   static constexpr dim3 _block_size_3D_3   = dim3(8, 8, 16);
-  static constexpr dim3 _conv_block_size_1 = dim3(32, 32, 1);
-  static constexpr dim3 _conv_block_size_2 = dim3(4, 4, 64);
-  static constexpr dim3 _conv_block_size_3 = dim3(8, 4, 128);
 
   /**
    * @brief Perform a formward pass
@@ -112,8 +109,7 @@ class Optimized1_Autoencoder {
    * @param learning_rate The learning rate
    * @return float Loss of the minibatch
    */
-  float
-  _fit_batch(float *data, int n, int width, int height, int depth, float learning_rate);
+  float _fit_batch(float *data, int n, int width, int height, int depth, float learning_rate);
 
 public:
   /**

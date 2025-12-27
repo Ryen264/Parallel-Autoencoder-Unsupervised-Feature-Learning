@@ -6,14 +6,7 @@
 #define mkdir(path, mode) _mkdir(path)
 #endif
 
-// =================================================================================
-// HELPER FUNCTIONS (STATIC TO PREVENT LINKER ERRORS)
-// =================================================================================
-
-/**
- * @brief Generate a random array using Kaiming initialization (CPU init -> GPU copy)
- */
-static void generate_array(float *arr, int n, int fan_in, mt19937 &rng) {
+inline void generate_array(float *arr, int n, int fan_in, mt19937 &rng) {
   vector<float>              tmp(n);
   normal_distribution<float> d(0.0f, sqrt(2.0f / fan_in));
   for (int i = 0; i < n; ++i)
@@ -21,19 +14,13 @@ static void generate_array(float *arr, int n, int fan_in, mt19937 &rng) {
   CUDA_CHECK(cudaMemcpy(arr, tmp.data(), n * sizeof(float), cudaMemcpyHostToDevice));
 }
 
-/**
- * @brief Read data from a buffer (Handles temp memory internally)
- */
-static void read_data(ifstream &buffer, float *data, int size) {
+inline void read_data(ifstream &buffer, float *data, int size) {
   unique_ptr<char[]> ptr = make_unique<char[]>(size);
   buffer.read(ptr.get(), size);
   CUDA_CHECK(cudaMemcpy(data, ptr.get(), size, cudaMemcpyHostToDevice));
 }
 
-/**
- * @brief Write data to a buffer (Handles temp memory internally)
- */
-static void write_data(ostream &buffer, float *data, int size) {
+inline void write_data(ostream &buffer, float *data, int size) {
   unique_ptr<char[]> ptr = make_unique<char[]>(size);
   CUDA_CHECK(cudaMemcpy(ptr.get(), data, size, cudaMemcpyDeviceToHost));
   buffer.write(ptr.get(), size);

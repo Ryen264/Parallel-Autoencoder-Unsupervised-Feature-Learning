@@ -1,18 +1,19 @@
 #ifndef OPT2_AUTOENCODER_H
 #define OPT2_AUTOENCODER_H
 
+#include "optimized2_layers.h"
+#include "optimized_data_loader.h"
+#include "progress_bar.h"
+#include "timer.h"
+#include "utils.h"
+
 #include <algorithm>
 #include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <random>
 #include <vector>
-
-#include "optimized2_layers.h"
-#include "optimized_data_loader.h"
-#include "progress_bar.h"
-#include "timer.h"
-#include "utils.h"
+using namespace std;
 
 /**
  * @brief The class that encapsulates the network using CPU
@@ -73,9 +74,6 @@ class Optimized2_Autoencoder {
   static constexpr dim3 _block_size_3D_1   = dim3(32, 32, 1);
   static constexpr dim3 _block_size_3D_2   = dim3(16, 16, 4);
   static constexpr dim3 _block_size_3D_3   = dim3(8, 8, 16);
-  static constexpr dim3 _conv_block_size_1 = dim3(32, 32, 1);
-  static constexpr dim3 _conv_block_size_2 = dim3(4, 4, 64);
-  static constexpr dim3 _conv_block_size_3 = dim3(8, 4, 32);
 
   /**
    * @brief Perform a formward pass
@@ -112,8 +110,7 @@ class Optimized2_Autoencoder {
    * @param learning_rate The learning rate
    * @return float Loss of the minibatch
    */
-  float
-  _fit_batch(float *data, int n, int width, int height, int depth, float learning_rate);
+  float _fit_batch(float *data, int n, int width, int height, int depth, float learning_rate);
 
 public:
   /**
@@ -183,6 +180,14 @@ public:
    * @param filename The file to write the model's parameter
    */
   void save_parameters(const char *filename) const;
+
+  /**
+   * @brief Load the model's parameters from a file
+   *
+   * @param filename The file containing the model's parameters
+   */
+  void load_parameters(const char *filename);
+
 };
 
 #endif

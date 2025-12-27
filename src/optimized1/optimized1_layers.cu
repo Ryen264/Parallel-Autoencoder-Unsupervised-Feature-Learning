@@ -1,5 +1,155 @@
 #include "optimized1_layers.h"
 
+__device__ void load_tile_to_shared(float *d_in,
+                                    float *s_in,
+                                    int    n_channels,
+                                    int    width,
+                                    int    height,
+                                    int    i,
+                                    int    j,
+                                    int    tid_y,
+                                    int    tid_x,
+                                    int    dim_y,
+                                    int    dim_x,
+                                    int    padding_y,
+                                    int    padding_x,
+                                    int    shared_width,
+                                    int    shared_height) {
+  // 1. Center
+  for (int c = 0; c < n_channels; ++c) {
+    if (i < height && j < width) {
+      s_in[GET_1D_IDX(
+          tid_y + padding_y, tid_x + padding_x, c, shared_width, shared_height)] =
+          d_in[GET_1D_IDX(i, j, c, width, height)];
+    } else {
+      s_in[GET_1D_IDX(
+          tid_y + padding_y, tid_x + padding_x, c, shared_width, shared_height)] = 0.0f;
+    }
+  }
+
+  // 2. Halo - Top & Bottom
+  if (tid_y < padding_y) {
+    int r_top = i - padding_y;
+    if (r_top >= 0 && r_top < height && j < width) {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(tid_y, tid_x + padding_x, c, shared_width, shared_height)] =
+            d_in[GET_1D_IDX(r_top, j, c, width, height)];
+    } else {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(tid_y, tid_x + padding_x, c, shared_width, shared_height)] =
+            0.0f;
+    }
+
+    int r_bot = i + dim_y;
+    if (r_bot < height && j < width) {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(tid_y + dim_y + padding_y,
+                        tid_x + padding_x,
+                        c,
+                        shared_width,
+                        shared_height)] = d_in[GET_1D_IDX(r_bot, j, c, width, height)];
+    } else {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(tid_y + dim_y + padding_y,
+                        tid_x + padding_x,
+                        c,
+                        shared_width,
+                        shared_height)] = 0.0f;
+    }
+  }
+
+  // 3. Halo - Left & Right
+  if (tid_x < padding_x) {
+    int c_left = j - padding_x;
+    if (c_left >= 0 && c_left < width && i < height) {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(tid_y + padding_y, tid_x, c, shared_width, shared_height)] =
+            d_in[GET_1D_IDX(i, c_left, c, width, height)];
+    } else {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(tid_y + padding_y, tid_x, c, shared_width, shared_height)] =
+            0.0f;
+    }
+
+    int c_right = j + dim_x;
+    if (c_right < width && i < height) {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(tid_y + padding_y,
+                        tid_x + dim_x + padding_x,
+                        c,
+                        shared_width,
+                        shared_height)] =
+            d_in[GET_1D_IDX(i, c_right, c, width, height)];
+    } else {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(tid_y + padding_y,
+                        tid_x + dim_x + padding_x,
+                        c,
+                        shared_width,
+                        shared_height)] = 0.0f;
+    }
+  }
+
+  // 4. Corners
+  if (tid_y < padding_y && tid_x < padding_x) {
+    int r_tl = i - padding_y;
+    int c_tl = j - padding_x;
+    if (r_tl >= 0 && r_tl < height && c_tl >= 0 && c_tl < width) {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(tid_y, tid_x, c, shared_width, shared_height)] =
+            d_in[GET_1D_IDX(r_tl, c_tl, c, width, height)];
+    } else {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(tid_y, tid_x, c, shared_width, shared_height)] = 0.0f;
+    }
+
+    int r_tr = i - padding_y;
+    int c_tr = j + dim_x;
+    if (r_tr >= 0 && r_tr < height && c_tr < width) {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(
+            tid_y, tid_x + dim_x + padding_x, c, shared_width, shared_height)] =
+            d_in[GET_1D_IDX(r_tr, c_tr, c, width, height)];
+    } else {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(
+            tid_y, tid_x + dim_x + padding_x, c, shared_width, shared_height)] = 0.0f;
+    }
+
+    int r_bl = i + dim_y;
+    int c_bl = j - padding_x;
+    if (r_bl < height && c_bl >= 0 && c_bl < width) {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(
+            tid_y + dim_y + padding_y, tid_x, c, shared_width, shared_height)] =
+            d_in[GET_1D_IDX(r_bl, c_bl, c, width, height)];
+    } else {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(
+            tid_y + dim_y + padding_y, tid_x, c, shared_width, shared_height)] = 0.0f;
+    }
+
+    int r_br = i + dim_y;
+    int c_br = j + dim_x;
+    if (r_br < height && c_br < width) {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(tid_y + dim_y + padding_y,
+                        tid_x + dim_x + padding_x,
+                        c,
+                        shared_width,
+                        shared_height)] =
+            d_in[GET_1D_IDX(r_br, c_br, c, width, height)];
+    } else {
+      for (int c = 0; c < n_channels; ++c)
+        s_in[GET_1D_IDX(tid_y + dim_y + padding_y,
+                        tid_x + dim_x + padding_x,
+                        c,
+                        shared_width,
+                        shared_height)] = 0.0f;
+    }
+  }
+}
+
 // -------------------- Conv2D Forward --------------------
 __global__ void optimized1_conv2D_kernel(float *in,
                                          float *filter,
@@ -19,9 +169,6 @@ __global__ void optimized1_conv2D_kernel(float *in,
   int j     = blockIdx.x * dim_x + tid_x;
   int f     = blockIdx.z * blockDim.z + tid_z;
 
-  if (j >= width || i >= height || f >= n_filter)
-    return;
-
   int    padding_y     = CONV_FILTER_HEIGHT / 2;
   int    padding_x     = CONV_FILTER_WIDTH / 2;
   int    shared_y      = tid_y + padding_y;
@@ -31,101 +178,21 @@ __global__ void optimized1_conv2D_kernel(float *in,
   float *filter_offset = filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;
   float  sum           = 0;
 
-  if (tid_x == 0 && tid_y == 0 && tid_z == 0)
-    for (int elem = 0; elem < shared_width * shared_height * depth; ++elem)
-      s_in[elem] = 0.0f;
-  __syncthreads();
-
-  for (int d = 0; d < depth; ++d) {
-    s_in[GET_1D_IDX(shared_y, shared_x, d, shared_width, shared_height)] =
-        in[GET_1D_IDX(i, j, d, width, height)];
-  }
-
-  if (tid_y == 0) {
-    for (int f_i = 0; f_i < padding_y; ++f_i) {
-      int cur_row = i - padding_y + f_i;
-      if (cur_row < 0)
-        continue;
-
-      for (int d = 0; d < depth; ++d)
-        s_in[GET_1D_IDX(f_i, shared_x, d, shared_width, shared_height)] =
-            in[GET_1D_IDX(cur_row, j, d, width, height)];
-
-      if (tid_x == 0) {
-        for (int f_j = 0; f_j < padding_x; ++f_j) {
-          int cur_col = j - padding_x + f_j;
-          if (cur_col >= 0)
-            for (int d = 0; d < depth; ++d)
-              s_in[GET_1D_IDX(f_i, f_j, d, shared_width, shared_height)] =
-                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-        }
-      }
-
-      if (tid_x + 1 == dim_x) {
-        for (int f_j = 1; f_j <= padding_x; ++f_j) {
-          int cur_col = j + f_j;
-          if (cur_col < width)
-            for (int d = 0; d < depth; ++d)
-              s_in[GET_1D_IDX(f_i, shared_x + f_j, d, shared_width, shared_height)] =
-                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-        }
-      }
-    }
-  }
-
-  if (tid_y + 1 == dim_y) {
-    for (int f_i = 1; f_i <= padding_y; ++f_i) {
-      int cur_row = i + f_i;
-      if (cur_row >= height)
-        continue;
-
-      for (int d = 0; d < depth; ++d)
-        s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
-            in[GET_1D_IDX(cur_row, j, d, width, height)];
-
-      if (tid_x == 0) {
-        for (int f_j = 0; f_j < padding_x; ++f_j) {
-          int cur_col = j - padding_x + f_j;
-          if (cur_col >= 0)
-            for (int d = 0; d < depth; ++d)
-              s_in[GET_1D_IDX(shared_y + f_i, f_j, d, shared_width, shared_height)] =
-                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-        }
-      }
-
-      if (tid_x + 1 == dim_x) {
-        for (int f_j = 1; f_j <= padding_x; ++f_j) {
-          int cur_col = j + f_j;
-          if (cur_col < width)
-            for (int d = 0; d < depth; ++d)
-              s_in[GET_1D_IDX(
-                  shared_y + f_i, shared_x + f_j, d, shared_width, shared_height)] =
-                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-        }
-      }
-    }
-  }
-
-  if (tid_x == 0) {
-    for (int f_j = 0; f_j < padding_x; ++f_j) {
-      int cur_col = j - padding_x + f_j;
-      if (cur_col >= 0)
-        for (int d = 0; d < depth; ++d)
-          s_in[GET_1D_IDX(shared_y, f_j, d, shared_width, shared_height)] =
-              in[GET_1D_IDX(i, cur_col, d, width, height)];
-    }
-  }
-
-  if (tid_x + 1 == dim_x) {
-    for (int f_j = 1; f_j <= padding_x; ++f_j) {
-      int cur_col = j + f_j;
-      if (cur_col < width)
-        for (int d = 0; d < depth; ++d)
-          s_in[GET_1D_IDX(shared_y, shared_x + f_j, d, shared_width, shared_height)] =
-              in[GET_1D_IDX(i, cur_col, d, width, height)];
-    }
-  }
-
+  load_tile_to_shared(in,
+                      s_in,
+                      depth,
+                      width,
+                      height,
+                      i,
+                      j,
+                      tid_y,
+                      tid_x,
+                      blockDim.y,
+                      blockDim.x,
+                      padding_y,
+                      padding_x,
+                      shared_width,
+                      shared_height);
   __syncthreads();
 
   for (int d = 0; d < depth; ++d) {
@@ -330,133 +397,51 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
                                               int    n_filter) {
   extern __shared__ float s_in[];
 
-  int tid_y = threadIdx.y;
   int tid_x = threadIdx.x;
+  int tid_y = threadIdx.y;
   int tid_z = threadIdx.z;
-  int dim_y = blockDim.y;
-  int dim_x = blockDim.x;
-  int i     = blockIdx.y * dim_y + tid_y;
-  int j     = blockIdx.x * dim_x + tid_x;
-  int f     = blockIdx.z * blockDim.z + tid_z;
+
+  int j = blockIdx.x * blockDim.x + tid_x;
+  int i = blockIdx.y * blockDim.y + tid_y;
+  int f = blockIdx.z * blockDim.z + tid_z; // Filter Index
+
+  int padding_x     = CONV_FILTER_WIDTH / 2;
+  int padding_y     = CONV_FILTER_HEIGHT / 2;
+  int shared_width  = blockDim.x + CONV_FILTER_WIDTH - 1;
+  int shared_height = blockDim.y + CONV_FILTER_HEIGHT - 1;
+
+  load_tile_to_shared(in,
+                      s_in,
+                      depth,
+                      width,
+                      height,
+                      i,
+                      j,
+                      tid_y,
+                      tid_x,
+                      blockDim.y,
+                      blockDim.x,
+                      padding_y,
+                      padding_x,
+                      shared_width,
+                      shared_height);
+  __syncthreads();
 
   if (j >= width || i >= height || f >= n_filter)
     return;
 
-  int    padding_y     = CONV_FILTER_HEIGHT / 2;
-  int    padding_x     = CONV_FILTER_WIDTH / 2;
-  int    shared_y      = tid_y + padding_y;
-  int    shared_x      = tid_x + padding_x;
-  int    shared_height = dim_y + CONV_FILTER_HEIGHT - 1;
-  int    shared_width  = dim_x + CONV_FILTER_WIDTH - 1;
   float *d_filter_offset =
-      d_filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;
+      d_filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
   float d_out_val = d_out[GET_1D_IDX(i, j, f, width, height)];
 
-  if (tid_x == 0 && tid_y == 0 && tid_z == 0)
-    for (int elem = 0; elem < shared_width * shared_height * depth; ++elem)
-      s_in[elem] = 0.0f;
-  __syncthreads();
-
-  for (int d = 0; d < depth; ++d) {
-    s_in[GET_1D_IDX(shared_y, shared_x, d, shared_width, shared_height)] =
-        in[GET_1D_IDX(i, j, d, width, height)];
-  }
-
-  if (tid_y == 0) {
-    for (int f_i = 0; f_i < padding_y; ++f_i) {
-      int cur_row = i - padding_y + f_i;
-      if (cur_row < 0)
-        continue;
-
-      for (int d = 0; d < depth; ++d)
-        s_in[GET_1D_IDX(f_i, shared_x, d, shared_width, shared_height)] =
-            in[GET_1D_IDX(cur_row, j, d, width, height)];
-
-      if (tid_x == 0) {
-        for (int f_j = 0; f_j < padding_x; ++f_j) {
-          int cur_col = j - padding_x + f_j;
-          if (cur_col >= 0)
-            for (int d = 0; d < depth; ++d)
-              s_in[GET_1D_IDX(f_i, f_j, d, shared_width, shared_height)] =
-                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-        }
-      }
-
-      if (tid_x + 1 == dim_x) {
-        for (int f_j = 1; f_j <= padding_x; ++f_j) {
-          int cur_col = j + f_j;
-          if (cur_col < width)
-            for (int d = 0; d < depth; ++d)
-              s_in[GET_1D_IDX(f_i, shared_x + f_j, d, shared_width, shared_height)] =
-                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-        }
-      }
-    }
-  }
-
-  if (tid_y + 1 == dim_y) {
-    for (int f_i = 1; f_i <= padding_y; ++f_i) {
-      int cur_row = i + f_i;
-      if (cur_row >= height)
-        continue;
-
-      for (int d = 0; d < depth; ++d)
-        s_in[GET_1D_IDX(shared_y + f_i, shared_x, d, shared_width, shared_height)] =
-            in[GET_1D_IDX(cur_row, j, d, width, height)];
-
-      if (tid_x == 0) {
-        for (int f_j = 0; f_j < padding_x; ++f_j) {
-          int cur_col = j - padding_x + f_j;
-          if (cur_col >= 0)
-            for (int d = 0; d < depth; ++d)
-              s_in[GET_1D_IDX(shared_y + f_i, f_j, d, shared_width, shared_height)] =
-                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-        }
-      }
-
-      if (tid_x + 1 == dim_x) {
-        for (int f_j = 1; f_j <= padding_x; ++f_j) {
-          int cur_col = j + f_j;
-          if (cur_col < width)
-            for (int d = 0; d < depth; ++d)
-              s_in[GET_1D_IDX(
-                  shared_y + f_i, shared_x + f_j, d, shared_width, shared_height)] =
-                  in[GET_1D_IDX(cur_row, cur_col, d, width, height)];
-        }
-      }
-    }
-  }
-
-  if (tid_x == 0) {
-    for (int f_j = 0; f_j < padding_x; ++f_j) {
-      int cur_col = j - padding_x + f_j;
-      if (cur_col >= 0)
-        for (int d = 0; d < depth; ++d)
-          s_in[GET_1D_IDX(shared_y, f_j, d, shared_width, shared_height)] =
-              in[GET_1D_IDX(i, cur_col, d, width, height)];
-    }
-  }
-
-  if (tid_x + 1 == dim_x) {
-    for (int f_j = 1; f_j <= padding_x; ++f_j) {
-      int cur_col = j + f_j;
-      if (cur_col < width)
-        for (int d = 0; d < depth; ++d)
-          s_in[GET_1D_IDX(shared_y, shared_x + f_j, d, shared_width, shared_height)] =
-              in[GET_1D_IDX(i, cur_col, d, width, height)];
-    }
-  }
-
-  __syncthreads();
-
-  for (int d = 0; d < depth; ++d) {
-    for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
-      for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
-        atomicAdd(
-            d_filter_offset +
-                GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT),
-            s_in[GET_1D_IDX(tid_y + f_i, tid_x + f_j, d, shared_width, shared_height)] *
-                d_out_val);
+  for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
+    for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
+      for (int d = 0; d < depth; ++d) {
+        float val_in =
+            s_in[GET_1D_IDX(tid_y + f_i, tid_x + f_j, d, shared_width, shared_height)];
+        atomicAdd(d_filter_offset +
+                      GET_1D_IDX(f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT),
+                  val_in * d_out_val);
       }
     }
   }
@@ -469,138 +454,110 @@ __global__ void optimized1_conv2D_backward_kernel(float *d_out,
                                                   int    height,
                                                   int    depth,
                                                   int    n_filter) {
-  extern __shared__ float s_in[];
+  extern __shared__ float s_in[]; // Chứa tile của 'd_out'
 
-  int tid_y = threadIdx.y;
   int tid_x = threadIdx.x;
+  int tid_y = threadIdx.y;
   int tid_z = threadIdx.z;
-  int dim_y = blockDim.y;
-  int dim_x = blockDim.x;
-  int i     = blockIdx.y * dim_y + tid_y;
-  int j     = blockIdx.x * dim_x + tid_x;
-  int d     = blockIdx.z * blockDim.z + tid_z;
+
+  int j = blockIdx.x * blockDim.x + tid_x;
+  int i = blockIdx.y * blockDim.y + tid_y;
+  int d = blockIdx.z * blockDim.z + tid_z;
+
+  int padding_x     = CONV_FILTER_WIDTH / 2;
+  int padding_y     = CONV_FILTER_HEIGHT / 2;
+  int shared_width  = blockDim.x + CONV_FILTER_WIDTH - 1;
+  int shared_height = blockDim.y + CONV_FILTER_HEIGHT - 1;
+
+  load_tile_to_shared(d_out,
+                      s_in,
+                      n_filter,
+                      width,
+                      height,
+                      i,
+                      j,
+                      tid_y,
+                      tid_x,
+                      blockDim.y,
+                      blockDim.x,
+                      padding_y,
+                      padding_x,
+                      shared_width,
+                      shared_height);
+  __syncthreads();
 
   if (j >= width || i >= height || d >= depth)
     return;
 
-  int   padding_y     = CONV_FILTER_HEIGHT / 2;
-  int   padding_x     = CONV_FILTER_WIDTH / 2;
-  int   shared_y      = tid_y + padding_y;
-  int   shared_x      = tid_x + padding_x;
-  int   shared_height = dim_y + CONV_FILTER_HEIGHT - 1;
-  int   shared_width  = dim_x + CONV_FILTER_WIDTH - 1;
-  float sum           = 0;
-
-  if (tid_x == 0 && tid_y == 0 && tid_z == 0)
-    for (int elem = 0; elem < shared_width * shared_height * n_filter; ++elem)
-      s_in[elem] = 0.0f;
-  __syncthreads();
-
-  for (int f = 0; f < n_filter; ++f) {
-    s_in[GET_1D_IDX(shared_y, shared_x, f, shared_width, shared_height)] =
-        d_out[GET_1D_IDX(i, j, f, width, height)];
-  }
-
-  if (tid_y == 0) {
-    for (int f_i = 0; f_i < padding_y; ++f_i) {
-      int cur_row = i - padding_y + f_i;
-      if (cur_row < 0)
-        continue;
-
-      for (int f = 0; f < n_filter; ++f)
-        s_in[GET_1D_IDX(f_i, shared_x, f, shared_width, shared_height)] =
-            d_out[GET_1D_IDX(cur_row, j, f, width, height)];
-
-      if (tid_x == 0) {
-        for (int f_j = 0; f_j < padding_x; ++f_j) {
-          int cur_col = j - padding_x + f_j;
-          if (cur_col >= 0)
-            for (int f = 0; f < n_filter; ++f)
-              s_in[GET_1D_IDX(f_i, f_j, f, shared_width, shared_height)] =
-                  d_out[GET_1D_IDX(cur_row, cur_col, f, width, height)];
-        }
-      }
-
-      if (tid_x + 1 == dim_x) {
-        for (int f_j = 1; f_j <= padding_x; ++f_j) {
-          int cur_col = j + f_j;
-          if (cur_col < width)
-            for (int f = 0; f < n_filter; ++f)
-              s_in[GET_1D_IDX(f_i, shared_x + f_j, f, shared_width, shared_height)] =
-                  d_out[GET_1D_IDX(cur_row, cur_col, f, width, height)];
-        }
-      }
-    }
-  }
-
-  if (tid_y + 1 == dim_y) {
-    for (int f_i = 1; f_i <= padding_y; ++f_i) {
-      int cur_row = i + f_i;
-      if (cur_row >= height)
-        continue;
-
-      for (int f = 0; f < n_filter; ++f)
-        s_in[GET_1D_IDX(shared_y + f_i, shared_x, f, shared_width, shared_height)] =
-            d_out[GET_1D_IDX(cur_row, j, f, width, height)];
-
-      if (tid_x == 0) {
-        for (int f_j = 0; f_j < padding_x; ++f_j) {
-          int cur_col = j - padding_x + f_j;
-          if (cur_col >= 0)
-            for (int f = 0; f < n_filter; ++f)
-              s_in[GET_1D_IDX(shared_y + f_i, f_j, f, shared_width, shared_height)] =
-                  d_out[GET_1D_IDX(cur_row, cur_col, f, width, height)];
-        }
-      }
-
-      if (tid_x + 1 == dim_x) {
-        for (int f_j = 1; f_j <= padding_x; ++f_j) {
-          int cur_col = j + f_j;
-          if (cur_col < width)
-            for (int f = 0; f < n_filter; ++f)
-              s_in[GET_1D_IDX(
-                  shared_y + f_i, shared_x + f_j, f, shared_width, shared_height)] =
-                  d_out[GET_1D_IDX(cur_row, cur_col, f, width, height)];
-        }
-      }
-    }
-  }
-
-  if (tid_x == 0) {
-    for (int f_j = 0; f_j < padding_x; ++f_j) {
-      int cur_col = j - padding_x + f_j;
-      if (cur_col >= 0)
-        for (int f = 0; f < n_filter; ++f)
-          s_in[GET_1D_IDX(shared_y, f_j, f, shared_width, shared_height)] =
-              d_out[GET_1D_IDX(i, cur_col, f, width, height)];
-    }
-  }
-
-  if (tid_x + 1 == dim_x) {
-    for (int f_j = 1; f_j <= padding_x; ++f_j) {
-      int cur_col = j + f_j;
-      if (cur_col < width)
-        for (int f = 0; f < n_filter; ++f)
-          s_in[GET_1D_IDX(shared_y, shared_x + f_j, f, shared_width, shared_height)] =
-              d_out[GET_1D_IDX(i, cur_col, f, width, height)];
-    }
-  }
-
-  __syncthreads();
+  float d_sum = 0;
 
   for (int f = 0; f < n_filter; ++f) {
     float *filter_offset = filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
+
     for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
       for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
-        sum +=
-            s_in[GET_1D_IDX(tid_y + f_i, tid_x + f_j, f, shared_width, shared_height)] *
-            filter_offset[GET_1D_IDX(
-                f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)];
+
+        // *** KEY FIX: FLIP INDICES FOR CONVOLUTION BACKPROP ***
+        // Use (CONV_FILTER_HEIGHT - 1 - f_i) instead of f_i to perform proper
+        // convolution
+
+        float val_dout =
+            s_in[GET_1D_IDX(tid_y + f_i, tid_x + f_j, f, shared_width, shared_height)];
+
+        float val_filter = filter_offset[GET_1D_IDX(CONV_FILTER_HEIGHT - 1 - f_i,
+                                                    CONV_FILTER_WIDTH - 1 - f_j,
+                                                    d, // depth
+                                                    CONV_FILTER_WIDTH,
+                                                    CONV_FILTER_HEIGHT)];
+
+        d_sum += val_filter * val_dout;
       }
     }
   }
 
-  d_in[GET_1D_IDX(i, j, d, width, height)] = sum;
+  d_in[GET_1D_IDX(i, j, d, width, height)] = d_sum;
+}
+
+// optimized1 Max Pooling Backward
+__global__ void optimized1_max_pooling_backward_kernel(
+    float *in, float *d_out, float *d_in, int width, int height, int depth) {
+  int j = blockIdx.x * blockDim.x + threadIdx.x; // x
+  int i = blockIdx.y * blockDim.y + threadIdx.y; // y
+  int d = blockIdx.z * blockDim.z + threadIdx.z;
+
+  if (j >= width || i >= height || d >= depth)
+    return;
+
+  int idx        = GET_1D_IDX(i, j, d, width, height);
+  int out_i      = i / 2;
+  int out_j      = j / 2;
+  int new_width  = width / 2;
+  int new_height = height / 2;
+
+  // Indices of the 2x2 block
+  int base_y          = out_i * 2;
+  int base_x          = out_j * 2;
+  int neighbors_idx[] = {
+    GET_1D_IDX(base_y, base_x, d, width, height),
+    GET_1D_IDX(base_y, base_x + 1, d, width, height),
+    GET_1D_IDX(base_y + 1, base_x, d, width, height),
+    GET_1D_IDX(base_y + 1, base_x + 1, d, width, height),
+  };
+
+  int   max_idx = neighbors_idx[0];
+  float max_val = in[max_idx];
+  for (int k = 1; k < 4; ++k) {
+    int   n_idx = neighbors_idx[k];
+    float n_val = in[n_idx];
+    if (n_val > max_val) {
+      max_val = n_val;
+      max_idx = n_idx;
+    }
+  }
+
+  d_in[idx] = (idx == max_idx)
+                  ? d_out[GET_1D_IDX(out_i, out_j, d, new_width, new_height)]
+                  : 0.0f;
 }
 
 // optimized1 Max Pooling Backward

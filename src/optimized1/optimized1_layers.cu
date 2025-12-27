@@ -1,5 +1,8 @@
 #include "optimized1_layers.h"
 
+// =========================================================
+// HELPER: Shared Memory Loading (Giữ nguyên)
+// =========================================================
 __device__ void load_tile_to_shared(float *d_in,
                                     float *s_in,
                                     int    n_channels,
@@ -160,23 +163,18 @@ __global__ void optimized1_conv2D_kernel(float *in,
                                          int    n_filter) {
   extern __shared__ float s_in[];
 
-  int tid_y = threadIdx.y;
   int tid_x = threadIdx.x;
+  int tid_y = threadIdx.y;
   int tid_z = threadIdx.z;
-  int dim_y = blockDim.y;
-  int dim_x = blockDim.x;
-  int i     = blockIdx.y * dim_y + tid_y;
-  int j     = blockIdx.x * dim_x + tid_x;
-  int f     = blockIdx.z * blockDim.z + tid_z;
 
-  int    padding_y     = CONV_FILTER_HEIGHT / 2;
-  int    padding_x     = CONV_FILTER_WIDTH / 2;
-  int    shared_y      = tid_y + padding_y;
-  int    shared_x      = tid_x + padding_x;
-  int    shared_height = dim_y + CONV_FILTER_HEIGHT - 1;
-  int    shared_width  = dim_x + CONV_FILTER_WIDTH - 1;
-  float *filter_offset = filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;
-  float  sum           = 0;
+  int j = blockIdx.x * blockDim.x + tid_x;
+  int i = blockIdx.y * blockDim.y + tid_y;
+  int f = blockIdx.z * blockDim.z + tid_z;
+
+  int padding_x     = CONV_FILTER_WIDTH / 2;
+  int padding_y     = CONV_FILTER_HEIGHT / 2;
+  int shared_width  = blockDim.x + CONV_FILTER_WIDTH - 1;
+  int shared_height = blockDim.y + CONV_FILTER_HEIGHT - 1;
 
   load_tile_to_shared(in,
                       s_in,
@@ -193,11 +191,18 @@ __global__ void optimized1_conv2D_kernel(float *in,
                       padding_x,
                       shared_width,
                       shared_height);
+
   __syncthreads();
 
-  for (int d = 0; d < depth; ++d) {
-    for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
-      for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
+  if (j >= width || i >= height || f >= n_filter)
+    return;
+
+  float  sum           = 0;
+  float *filter_offset = filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;
+
+  for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
+    for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {
+      for (int d = 0; d < depth; ++d) {
         sum +=
             s_in[GET_1D_IDX(tid_y + f_i, tid_x + f_j, d, shared_width, shared_height)] *
             filter_offset[GET_1D_IDX(
@@ -224,33 +229,33 @@ __global__ void optimized1_relu_kernel(float *in, float *out, int size) {
     out[idx] = fmaxf(0.0f, in[idx]);
 }
 
-// -------------------- Max Pooling (2x down) --------------------
+// -------------------- Max Pooling --------------------
 __global__ void
 optimized1_max_pooling_kernel(float *in, float *out, int width, int height, int depth) {
-  int x          = blockIdx.x * blockDim.x + threadIdx.x;
-  int y          = blockIdx.y * blockDim.y + threadIdx.y;
+  int j          = blockIdx.x * blockDim.x + threadIdx.x;
+  int i          = blockIdx.y * blockDim.y + threadIdx.y;
   int d          = blockIdx.z * blockDim.z + threadIdx.z;
   int new_width  = width / 2;
   int new_height = height / 2;
 
-  if (x >= new_width || y >= new_height || d >= depth)
+  if (j >= new_width || i >= new_height || d >= depth)
     return;
 
-  int in_x = x * 2;
-  int in_y = y * 2;
+  int in_x = j * 2;
+  int in_y = i * 2;
 
-  out[GET_1D_IDX(y, x, d, new_width, new_height)] =
+  out[GET_1D_IDX(i, j, d, new_width, new_height)] =
       fmaxf(fmaxf(in[GET_1D_IDX(in_y, in_x, d, width, height)],
                   in[GET_1D_IDX(in_y, in_x + 1, d, width, height)]),
             fmaxf(in[GET_1D_IDX(in_y + 1, in_x, d, width, height)],
                   in[GET_1D_IDX(in_y + 1, in_x + 1, d, width, height)]));
 }
 
-// -------------------- Upsampling (2x up) --------------------
+// -------------------- Upsampling --------------------
 __global__ void
 optimized1_upsampling_kernel(float *in, float *out, int width, int height, int depth) {
-  int i = blockIdx.y * blockDim.y + threadIdx.y; // Output Height
   int j = blockIdx.x * blockDim.x + threadIdx.x; // Output Width
+  int i = blockIdx.y * blockDim.y + threadIdx.y; // Output Height
   int d = blockIdx.z * blockDim.z + threadIdx.z; // Depth
 
   int new_width  = width * 2;
@@ -268,17 +273,17 @@ optimized1_upsampling_kernel(float *in, float *out, int width, int height, int d
 // -------------------- Upsampling Backward --------------------
 __global__ void optimized1_upsampling_backward_kernel(
     float *d_out, float *d_in, int width, int height, int depth) {
-  int x          = blockIdx.x * blockDim.x + threadIdx.x;
-  int y          = blockIdx.y * blockDim.y + threadIdx.y;
+  int j          = blockIdx.x * blockDim.x + threadIdx.x;
+  int i          = blockIdx.y * blockDim.y + threadIdx.y;
   int d          = blockIdx.z * blockDim.z + threadIdx.z;
   int new_width  = width * 2;
   int new_height = height * 2;
 
-  if (x >= width || y >= height || d >= depth)
+  if (j >= width || i >= height || d >= depth)
     return;
 
-  int   out_x = 2 * x;
-  int   out_y = 2 * y;
+  int   out_x = 2 * j;
+  int   out_y = 2 * i;
   float d_sum = 0;
 
   d_sum += d_out[GET_1D_IDX(out_y, out_x, d, new_width, new_height)];
@@ -286,72 +291,43 @@ __global__ void optimized1_upsampling_backward_kernel(
   d_sum += d_out[GET_1D_IDX(out_y + 1, out_x, d, new_width, new_height)];
   d_sum += d_out[GET_1D_IDX(out_y + 1, out_x + 1, d, new_width, new_height)];
 
-  d_in[GET_1D_IDX(y, x, d, width, height)] = d_sum;
+  d_in[GET_1D_IDX(i, j, d, width, height)] = d_sum;
 }
 
-// -------------------- MSE Loss & Gradient --------------------
+// -------------------- MSE Loss --------------------
 __global__ void
 optimized1_mse_loss_kernel(float *expected, float *actual, float *out, int size) {
   __shared__ float shared[MAX_BLOCK_SIZE];
+  int              tid    = threadIdx.x;
+  int              offset = (blockDim.x * blockIdx.x) * 2 + tid;
+  shared[tid]             = 0;
 
-  int    tid    = threadIdx.x;
-  float *elem   = shared + tid;
-  int    offset = (blockDim.x * blockIdx.x) * 2 + tid;
-
-  // Set all the element to 0
-  *elem = 0;
-
-  // Copy into shared memory, and doing the first pass at the same time
   if (offset < size) {
-    *elem = SQR(expected[offset] - actual[offset]);
-    // If block size is less than 32,
-    // we do the unroll directly
+    shared[tid] = SQR(expected[offset] - actual[offset]);
     if (blockDim.x > 32 && (offset += blockDim.x) < size)
-      *elem += SQR(expected[offset] - actual[offset]);
+      shared[tid] += SQR(expected[offset] - actual[offset]);
   }
   __syncthreads();
 
-  // Since MAX_BLOCK_SIZE is 1024, we start from 512
-  // because we already did the first pass
-  if (blockDim.x > 512) {
-    if (tid < 512)
-      *elem += elem[512];
+  for (int s = blockDim.x / 2; s > 32; s >>= 1) {
+    if (tid < s)
+      shared[tid] += shared[tid + s];
     __syncthreads();
   }
 
-  if (blockDim.x > 256) {
-    if (tid < 256)
-      *elem += elem[256];
-    __syncthreads();
-  }
-
-  if (blockDim.x > 128) {
-    if (tid < 128)
-      *elem += elem[128];
-    __syncthreads();
-  }
-
-  if (blockDim.x > 64) {
-    if (tid < 64)
-      *elem += elem[64];
-    __syncthreads();
-  }
-
-  // Unroll last warp
   if (tid < 32) {
-    volatile float *vmem = elem;
-
-    *vmem = *vmem + vmem[32];
-    *vmem = *vmem + vmem[16];
-    *vmem = *vmem + vmem[8];
-    *vmem = *vmem + vmem[4];
-    *vmem = *vmem + vmem[2];
-    *vmem = *vmem + vmem[1];
+    volatile float *vmem = shared;
+    if (blockDim.x >= 64)
+      vmem[tid] = vmem[tid] + vmem[tid + 32];
+    vmem[tid] = vmem[tid] + vmem[tid + 16];
+    vmem[tid] = vmem[tid] + vmem[tid + 8];
+    vmem[tid] = vmem[tid] + vmem[tid + 4];
+    vmem[tid] = vmem[tid + 2];
+    vmem[tid] = vmem[tid + 1];
   }
 
-  // Copy to output
   if (tid == 0)
-    atomicAdd(out, *elem / size);
+    atomicAdd(out, shared[0] / size);
 }
 
 __global__ void
@@ -387,7 +363,7 @@ __global__ void optimized1_update_weight_kernel(float *weight,
     weight[idx] -= learning_rate * gradient[idx];
 }
 
-// -------------------- Conv2D Backward: Filter Gradient only --------------------
+// -------------------- Conv2D Gradient (Filter) --------------------
 __global__ void optimized1_conv2D_grad_kernel(float *in,
                                               float *d_out,
                                               float *d_filter,
@@ -447,6 +423,8 @@ __global__ void optimized1_conv2D_grad_kernel(float *in,
   }
 }
 
+// -------------------- Conv2D Backward (Input) --------------------
+// *** FIX: FLIP FILTER (ROTATED 180) ***
 __global__ void optimized1_conv2D_backward_kernel(float *d_out,
                                                   float *filter,
                                                   float *d_in,
@@ -521,8 +499,8 @@ __global__ void optimized1_conv2D_backward_kernel(float *d_out,
 // optimized1 Max Pooling Backward
 __global__ void optimized1_max_pooling_backward_kernel(
     float *in, float *d_out, float *d_in, int width, int height, int depth) {
-  int i = blockIdx.y * blockDim.y + threadIdx.y; // y
   int j = blockIdx.x * blockDim.x + threadIdx.x; // x
+  int i = blockIdx.y * blockDim.y + threadIdx.y; // y
   int d = blockIdx.z * blockDim.z + threadIdx.z;
 
   if (j >= width || i >= height || d >= depth)
@@ -534,7 +512,7 @@ __global__ void optimized1_max_pooling_backward_kernel(
   int new_width  = width / 2;
   int new_height = height / 2;
 
-  // Indices of the 2x2 block contributing to pooled output (out_i, out_j)
+  // Indices of the 2x2 block
   int base_y          = out_i * 2;
   int base_x          = out_j * 2;
   int neighbors_idx[] = {
@@ -544,7 +522,6 @@ __global__ void optimized1_max_pooling_backward_kernel(
     GET_1D_IDX(base_y + 1, base_x + 1, d, width, height),
   };
 
-  // Find max index manually (device-safe)
   int   max_idx = neighbors_idx[0];
   float max_val = in[max_idx];
   for (int k = 1; k < 4; ++k) {
@@ -561,6 +538,7 @@ __global__ void optimized1_max_pooling_backward_kernel(
                   : 0.0f;
 }
 
+// Wrapper Functions
 void optimized1_conv2D(float *in,
                        float *filter,
                        float *out,
@@ -577,11 +555,9 @@ void optimized1_conv2D(float *in,
                     (block_size.y + CONV_FILTER_HEIGHT - 1) *
                     depth *
                     sizeof(float);
-
   for (int i = 0; i < n; ++i) {
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * n_filter;
-
     optimized1_conv2D_kernel<<<grid_size, block_size, shared_size>>>(
         in + in_offset, filter, out + out_offset, width, height, depth, n_filter);
   }
@@ -597,7 +573,6 @@ void optimized1_add_bias(float *in,
                          dim3   block_size) {
   int  size = n * width * height * depth;
   dim3 grid_size((size - 1) / block_size.x + 1);
-
   optimized1_add_bias_kernel<<<grid_size, block_size>>>(
       in, bias, out, n, width * height, depth);
 }
@@ -606,7 +581,6 @@ void optimized1_relu(
     float *in, float *out, int n, int width, int height, int depth, dim3 block_size) {
   int  size = n * width * height * depth;
   dim3 grid_size((size - 1) / block_size.x + 1);
-
   optimized1_relu_kernel<<<grid_size, block_size>>>(in, out, size);
 }
 
@@ -615,11 +589,9 @@ void optimized1_max_pooling(
   dim3 grid_size((width / 2 - 1) / block_size.x + 1,
                  (height / 2 - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
-
   for (int i = 0; i < n; ++i) {
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * depth / 4;
-
     optimized1_max_pooling_kernel<<<grid_size, block_size>>>(
         in + in_offset, out + out_offset, width, height, depth);
   }
@@ -630,11 +602,9 @@ void optimized1_upsampling(
   dim3 grid_size((2 * width - 1) / block_size.x + 1,
                  (2 * height - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
-
   for (int i = 0; i < n; ++i) {
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * depth * 4;
-
     optimized1_upsampling_kernel<<<grid_size, block_size>>>(
         in + in_offset, out + out_offset, width, height, depth);
   }
@@ -653,11 +623,9 @@ float optimized1_mse_loss(float *expected,
   float *d_loss;
   CUDA_CHECK(cudaMalloc(&d_loss, sizeof(float)));
   CUDA_CHECK(cudaMemset(d_loss, 0, sizeof(float)));
-
   optimized1_mse_loss_kernel<<<grid_size, block_size>>>(expected, actual, d_loss, size);
   CUDA_CHECK(cudaMemcpy(&loss, d_loss, sizeof(float), cudaMemcpyDeviceToHost));
   CUDA_CHECK(cudaFree(d_loss));
-
   return loss;
 }
 
@@ -671,7 +639,6 @@ void optimized1_mse_grad(float *expected,
                          dim3   block_size) {
   int  size = n * width * height * depth;
   dim3 grid_size((size - 1) / block_size.x + 1);
-
   optimized1_mse_grad_kernel<<<grid_size, block_size>>>(expected, actual, d_out, size);
 }
 
@@ -685,7 +652,6 @@ void optimized1_relu_backward(float *in,
                               dim3   block_size) {
   int  size = n * width * height * depth;
   dim3 grid_size((size - 1) / block_size.x + 1);
-
   optimized1_relu_backward_kernel<<<grid_size, block_size>>>(in, d_out, d_in, size);
 }
 
@@ -700,11 +666,9 @@ void optimized1_max_pooling_backward(float *in,
   dim3 grid_size((width - 1) / block_size.x + 1,
                  (height - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
-
   for (int i = 0; i < n; ++i) {
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * depth / 4;
-
     optimized1_max_pooling_backward_kernel<<<grid_size, block_size>>>(
         in + in_offset, d_out + out_offset, d_in + in_offset, width, height, depth);
   }
@@ -720,11 +684,9 @@ void optimized1_upsampling_backward(float *d_out,
   dim3 grid_size((width - 1) / block_size.x + 1,
                  (height - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
-
   for (int i = 0; i < n; ++i) {
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * depth * 4;
-
     optimized1_upsampling_backward_kernel<<<grid_size, block_size>>>(
         d_out + out_offset, d_in + in_offset, width, height, depth);
   }
@@ -739,7 +701,6 @@ void optimized1_bias_grad(float *d_out,
                           dim3   block_size) {
   int  size = n * width * height * depth;
   dim3 grid_size((size - 1) / block_size.x + 1);
-
   CUDA_CHECK(cudaMemset(d_bias, 0, depth * sizeof(float)));
   optimized1_bias_grad_kernel<<<grid_size, block_size>>>(
       d_out, d_bias, n, width * height, depth);
@@ -761,16 +722,13 @@ void optimized1_conv2D_grad(float *in,
                     (block_size.y + CONV_FILTER_HEIGHT - 1) *
                     depth *
                     sizeof(float);
-
   CUDA_CHECK(cudaMemset(
       d_filter,
       0,
-      CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth * n_filter * sizeof(float)));
-
+      n_filter * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth * sizeof(float)));
   for (int i = 0; i < n; ++i) {
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * n_filter;
-
     optimized1_conv2D_grad_kernel<<<grid_size, block_size, shared_size>>>(
         in + in_offset, d_out + out_offset, d_filter, width, height, depth, n_filter);
   }
@@ -799,11 +757,9 @@ void optimized1_conv2D_backward(float *d_out,
                     (block_size.y + CONV_FILTER_HEIGHT - 1) *
                     n_filter *
                     sizeof(float);
-
   for (int i = 0; i < n; ++i) {
     int d_in_offset  = i * width * height * depth;
     int d_out_offset = i * width * height * n_filter;
-
     optimized1_conv2D_backward_kernel<<<grid_size, block_size, shared_size>>>(
         d_out + d_out_offset,
         filter,

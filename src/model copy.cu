@@ -12,7 +12,6 @@ SVMmodel::SVMmodel() : C(10.0f), kernel_type("RBF"), gamma_type("auto"),
     n_support       = 0;
     bias            = 0.0f;
     n_classes       = 0;
-    use_scaling     = true; // Enable scaling by default
 }
 
 SVMmodel::SVMmodel(float C, string kernel_type, string gamma_type) : SVMmodel() {
@@ -36,8 +35,7 @@ SVMmodel::SVMmodel(const SVMmodel &other)
       gamma_type(other.gamma_type), gamma(other.gamma), tolerance(other.tolerance),
       cache_size(other.cache_size), max_iter(other.max_iter), nochange_steps(other.nochange_steps),
       verbosity(other.verbosity), n_support(other.n_support), bias(other.bias),
-      n_classes(other.n_classes), feature_means(other.feature_means), 
-      feature_stds(other.feature_stds), use_scaling(other.use_scaling) {}
+      n_classes(other.n_classes) {}
 
 SVMmodel::SVMmodel(SVMmodel &&other) noexcept
     : is_trained(other.is_trained), n_features(other.n_features), svm_model(other.svm_model),
@@ -45,8 +43,7 @@ SVMmodel::SVMmodel(SVMmodel &&other) noexcept
       gamma_type(move(other.gamma_type)), gamma(other.gamma), tolerance(other.tolerance),
       cache_size(other.cache_size), max_iter(other.max_iter), nochange_steps(other.nochange_steps),
       verbosity(other.verbosity), n_support(other.n_support), bias(other.bias),
-      n_classes(other.n_classes), feature_means(move(other.feature_means)),
-      feature_stds(move(other.feature_stds)), use_scaling(other.use_scaling) {
+      n_classes(other.n_classes) {
     other.svm_model = nullptr;
 }
 
@@ -58,11 +55,13 @@ SVMmodel::~SVMmodel() {
 
 SVMmodel &SVMmodel::operator=(const SVMmodel &other) {
     if (this != &other) {
+        // Clean up existing resources
         if (svm_model) {
             svm_free_and_destroy_model(&svm_model);
             svm_model = nullptr;
         }
 
+        // Copy members
         is_trained     = other.is_trained;
         n_features     = other.n_features;
         C              = other.C;
@@ -78,10 +77,10 @@ SVMmodel &SVMmodel::operator=(const SVMmodel &other) {
         n_support      = other.n_support;
         bias           = other.bias;
         n_classes      = other.n_classes;
-        feature_means  = other.feature_means;
-        feature_stds   = other.feature_stds;
-        use_scaling    = other.use_scaling;
 
+        // Note: Deep copy of svm_model would require custom libsvm copying logic
+        // For now, just copy the pointer reference (shallow copy)
+        // This is a limitation of libsvm - it doesn't provide a copy function
         svm_model = other.svm_model;
     }
     return *this;
@@ -89,10 +88,12 @@ SVMmodel &SVMmodel::operator=(const SVMmodel &other) {
 
 SVMmodel &SVMmodel::operator=(SVMmodel &&other) noexcept {
     if (this != &other) {
+        // Clean up existing resources
         if (svm_model) {
             svm_free_and_destroy_model(&svm_model);
         }
 
+        // Move members
         is_trained     = other.is_trained;
         n_features     = other.n_features;
         svm_model      = other.svm_model;
@@ -109,66 +110,30 @@ SVMmodel &SVMmodel::operator=(SVMmodel &&other) noexcept {
         n_support      = other.n_support;
         bias           = other.bias;
         n_classes      = other.n_classes;
-        feature_means  = move(other.feature_means);
-        feature_stds   = move(other.feature_stds);
-        use_scaling    = other.use_scaling;
 
+        // Prevent other from deleting the moved model
         other.svm_model = nullptr;
     }
     return *this;
 }
 
-// === SCALING HELPERS ===
-void SVMmodel::compute_statistics(const vector<vector<double>>& data) {
-    if (data.empty()) return;
-    
-    int n_samples = data.size();
-    int n_dims = data[0].size();
-    
-    feature_means.assign(n_dims, 0.0);
-    feature_stds.assign(n_dims, 0.0);
-    
-    // Calculate Mean
-    for (const auto& sample : data) {
-        for (int j = 0; j < n_dims; j++) {
-            feature_means[j] += sample[j];
-        }
-    }
-    for (int j = 0; j < n_dims; j++) {
-        feature_means[j] /= n_samples;
-    }
-    
-    // Calculate Std Dev
-    for (const auto& sample : data) {
-        for (int j = 0; j < n_dims; j++) {
-            feature_stds[j] += pow(sample[j] - feature_means[j], 2);
-        }
-    }
-    for (int j = 0; j < n_dims; j++) {
-        feature_stds[j] = sqrt(feature_stds[j] / n_samples);
-        // Avoid division by zero for constant features
-        if (feature_stds[j] < 1e-9) feature_stds[j] = 1.0;
-    }
-}
-
-double SVMmodel::scale_value(double value, int feature_idx) const {
-    if (!use_scaling || feature_idx >= feature_means.size()) return value;
-    return (value - feature_means[feature_idx]) / feature_stds[feature_idx];
-}
-// =======================
-
 float* SVMmodel::convertToDeviceArray(const vector<vector<double>>& data, int& n_rows, int& n_cols) {
     n_rows = data.size();
     n_cols = data[0].size();
+    
+    // Allocate host memory and convert to column-major format
     float* h_data = new float[n_rows * n_cols];
     for (int j = 0; j < n_cols; j++) {
         for (int i = 0; i < n_rows; i++) {
             h_data[j * n_rows + i] = static_cast<float>(data[i][j]);
         }
     }
+    
+    // Allocate device memory and copy
     float* d_data;
     cudaMalloc(&d_data, n_rows * n_cols * sizeof(float));
     cudaMemcpy(d_data, h_data, n_rows * n_cols * sizeof(float), cudaMemcpyHostToDevice);
+    
     delete[] h_data;
     return d_data;
 }
@@ -178,9 +143,11 @@ float* SVMmodel::convertToDeviceLabels(const vector<int>& labels, int n_rows) {
     for (int i = 0; i < n_rows; i++) {
         h_labels[i] = static_cast<float>(labels[i]);
     }
+    
     float* d_labels;
     cudaMalloc(&d_labels, n_rows * sizeof(float));
     cudaMemcpy(d_labels, h_labels, n_rows * sizeof(float), cudaMemcpyHostToDevice);
+    
     delete[] h_labels;
     return d_labels;
 }
@@ -191,6 +158,7 @@ void SVMmodel::freeDeviceMemory(float* ptr) {
     }
 }
 
+// Custom LIBSVM output handler for progress tracking
 static string libsvm_buffer = "";
 static int libsvm_epoch_counter = 0;
 static Timer* libsvm_timer = nullptr;
@@ -199,16 +167,22 @@ static vector<string> raw_lines;
 static string current_iter = "N/A";
 
 static void print_libsvm_progress(const char *s) {
+    // Append all incoming text
     libsvm_buffer += s;
+    
+    // Process complete lines
     size_t newline_pos = libsvm_buffer.find('\n');
     while (newline_pos != string::npos) {
         string line = libsvm_buffer.substr(0, newline_pos);
         libsvm_buffer = libsvm_buffer.substr(newline_pos + 1);
         
+        // Start capturing when optimization finished appears
         if (line.find("optimization finished") != string::npos) {
             capturing_raw = true;
             raw_lines.clear();
             raw_lines.push_back(line);
+            
+            // Extract #iter from this line
             size_t iter_pos = line.find("#iter = ");
             if (iter_pos != string::npos) {
                 size_t iter_end = line.find(",", iter_pos);
@@ -217,18 +191,25 @@ static void print_libsvm_progress(const char *s) {
                 while (!current_iter.empty() && isspace(current_iter.back())) current_iter.pop_back();
             }
         }
+        // Continue capturing subsequent lines (nu, obj, nSV, etc.)
         else if (capturing_raw) {
+            // Check if this line contains useful information
             bool is_data_line = (line.find("nu = ") != string::npos || 
                                  line.find("obj = ") != string::npos || 
                                  line.find("nSV") != string::npos || 
                                  line.find("rho") != string::npos);
+            
             if (is_data_line) {
+                // Continue capturing data lines
                 raw_lines.push_back(line);
             } else if (line.find("*") != string::npos || 
                        (line.empty() && raw_lines.size() > 1) ||
                        line.find("....") != string::npos) {
+                // Stop capturing when we see separator or empty line after data
                 capturing_raw = false;
                 libsvm_epoch_counter++;
+                
+                // Parse obj from captured lines
                 string obj_str = "N/A";
                 for (const auto& raw_line : raw_lines) {
                     size_t obj_pos = raw_line.find("obj = ");
@@ -240,21 +221,40 @@ static void print_libsvm_progress(const char *s) {
                         break;
                     }
                 }
+                
+                // Get elapsed time
                 float elapsed_time = 0.0f;
                 if (libsvm_timer) {
                     libsvm_timer->stop();
                     elapsed_time = libsvm_timer->get();
                 }
+                
+                // Display formatted output
                 printf("Classifier %d: #iter = %s, loss = %s, time = %s\n", 
-                       libsvm_epoch_counter, current_iter.c_str(), obj_str.c_str(), format_time(elapsed_time).c_str());
+                       libsvm_epoch_counter, 
+                       current_iter.c_str(), 
+                       obj_str.c_str(),
+                       format_time(elapsed_time).c_str());
+                
+                // Print all raw lines
+                printf("  [Raw Output:\n");
+                for (const auto& raw_line : raw_lines) {
+                    printf("    %s\n", raw_line.c_str());
+                }
+                printf("  ]\n");
+                fflush(stdout);
+                
                 raw_lines.clear();
             }
+            // If not a data line and not a stop condition, just skip it
         }
+        
         newline_pos = libsvm_buffer.find('\n');
     }
 }
 
 void SVMmodel::train(const vector<vector<double>>& data, const vector<int>& labels) {
+    // Use custom LIBSVM output handler to display progress
     libsvm_buffer.clear();
     svm_set_print_string_function(&print_libsvm_progress);
     
@@ -265,45 +265,48 @@ void SVMmodel::train(const vector<vector<double>>& data, const vector<int>& labe
     timer.start();
     
     int n_samples = data.size();
-    if (n_samples == 0) throw runtime_error("Training data is empty!");
+    if (n_samples == 0) {
+        throw runtime_error("Training data is empty!");
+    }
     
     n_features = data[0].size();
-    if (n_samples != static_cast<int>(labels.size())) throw runtime_error("Data and labels size mismatch!");
+    if (n_samples != static_cast<int>(labels.size())) {
+        throw runtime_error("Data and labels size mismatch!");
+    }
     
     cout << "Number of samples: " << n_samples << endl;
     cout << "Number of features: " << n_features << endl;
-
-    // === SCALING STEP ===
-    if (use_scaling) {
-        cout << "Computing feature statistics and scaling data..." << endl;
-        compute_statistics(data);
-    }
-
+    
+    // Set gamma if auto
     if (gamma_type == "auto") {
         gamma = 1.0f / n_features;
     } else {
         gamma = std::stof(gamma_type);
     }
     
+    // Prepare svm_problem structure
     svm_problem prob;
     prob.l = n_samples;
     prob.y = new double[n_samples];
     prob.x = new svm_node*[n_samples];
     
+    // Convert data to libsvm format
     for (int i = 0; i < n_samples; i++) {
         prob.y[i] = static_cast<double>(labels[i]);
         
+        // Allocate nodes for this sample (n_features + 1 for terminating node)
         prob.x[i] = new svm_node[n_features + 1];
         
         for (int j = 0; j < n_features; j++) {
-            prob.x[i][j].index = j + 1;
-            // Apply scaling here
-            prob.x[i][j].value = use_scaling ? scale_value(data[i][j], j) : data[i][j];
+            prob.x[i][j].index = j + 1;  // libsvm uses 1-based indexing
+            prob.x[i][j].value = data[i][j];
         }
+        // Terminating node
         prob.x[i][n_features].index = -1;
         prob.x[i][n_features].value = 0;
     }
     
+    // Set SVM parameters
     svm_parameter param;
     param.svm_type = C_SVC;
     param.kernel_type = (kernel_type == "RBF") ? RBF : LINEAR;
@@ -325,23 +328,43 @@ void SVMmodel::train(const vector<vector<double>>& data, const vector<int>& labe
     cout << "  C: " << param.C << endl;
     cout << "  Kernel: " << kernel_type << endl;
     cout << "  Gamma: " << param.gamma << endl;
-    cout << "  Scaling: " << (use_scaling ? "Enabled (Z-score)" : "Disabled") << endl;
-
+    cout << "  Max iterations: " << max_iter << endl;
+    cout << "  Tolerance: " << tolerance << endl;
+    cout << "  Cache size: " << cache_size << " MB" << endl;
+    cout << "  Shrinking: " << (param.shrinking ? "enabled" : "disabled") << endl;
+    
+    // Count unique classes
     set<int> unique_labels(labels.begin(), labels.end());
     int n_unique_classes = unique_labels.size();
     int n_binary_classifiers = (n_unique_classes * (n_unique_classes - 1)) / 2;
     
+    cout << "\nTraining information:" << endl;
+    cout << "  Training samples: " << n_samples << endl;
+    cout << "  Features per sample: " << n_features << endl;
+    cout << "  Number of classes: " << n_unique_classes << endl;
+    cout << "  Binary classifiers (one-vs-one): " << n_binary_classifiers << endl;
+    cout << "  Batch size: " << n_samples << " (full dataset)" << endl;
+    cout << endl;
+    
+    cout << "Training Progress (optimizing " << n_binary_classifiers << " binary classifiers):" << endl;
+    
+    // Initialize epoch counter and timer for LIBSVM progress tracking
     libsvm_epoch_counter = 0;
     libsvm_timer = &timer;
     
+    // Check parameters
     const char* error_msg = svm_check_parameter(&prob, &param);
     if (error_msg) {
-        for (int i = 0; i < n_samples; i++) delete[] prob.x[i];
+        // Clean up
+        for (int i = 0; i < n_samples; i++) {
+            delete[] prob.x[i];
+        }
         delete[] prob.x;
         delete[] prob.y;
         throw runtime_error(string("SVM parameter error: ") + error_msg);
     }
     
+    // Train the model
     if (svm_model) {
         svm_free_and_destroy_model(&svm_model);
     }
@@ -349,13 +372,17 @@ void SVMmodel::train(const vector<vector<double>>& data, const vector<int>& labe
     
     timer.stop();
     float training_time = timer.get();
-    libsvm_timer = nullptr;
+    libsvm_timer = nullptr;  // Clear timer reference
     
+    // Store model information
     n_support = svm_model->l;
     n_classes = svm_model->nr_class;
-    bias = -svm_model->rho[0];
+    bias = -svm_model->rho[0];  // Bias term
     
-    for (int i = 0; i < n_samples; i++) delete[] prob.x[i];
+    // Clean up problem data
+    for (int i = 0; i < n_samples; i++) {
+        delete[] prob.x[i];
+    }
     delete[] prob.x;
     delete[] prob.y;
     
@@ -363,78 +390,122 @@ void SVMmodel::train(const vector<vector<double>>& data, const vector<int>& labe
     
     printf(" - Time = %s\n", format_time(training_time).c_str());
     puts("\n========================TRAINING END========================");
+    cout << "Training completed successfully!" << endl;
     cout << "Number of support vectors: " << n_support << endl;
+    cout << "Number of classes: " << n_classes << endl;
     printf("Total training time: %s\n\n", format_time(training_time).c_str());
 }
 
 vector<int> SVMmodel::predict(const vector<vector<double>>& samples) const {
-    if (!is_trained || !svm_model) throw runtime_error("Model must be trained before testing!");
+    if (!is_trained || !svm_model) {
+        throw runtime_error("Model must be trained before testing!");
+    }
     
     int n_samples = samples.size();
-    if (n_samples == 0) throw runtime_error("Test data is empty!");
-    if (static_cast<int>(samples[0].size()) != n_features) throw runtime_error("Dimension mismatch!");
+    if (n_samples == 0) {
+        throw runtime_error("Test data is empty!");
+    }
+    
+    if (static_cast<int>(samples[0].size()) != n_features) {
+        throw runtime_error("Test data feature dimensions don't match training data!");
+    }
     
     cout << "\n======================PREDICTION START======================" << endl;
+    cout << "Predicting on " << n_samples << " test samples..." << endl;
+    
+    cout << "\nPrediction information:" << endl;
+    cout << "  Test samples: " << n_samples << endl;
+    cout << "  Features per sample: " << n_features << endl;
+    cout << "  Number of classes: " << n_classes << endl;
+    cout << "  Number of support vectors: " << n_support << endl;
+    cout << endl;
+    
+    cout << "Prediction Progress:" << endl;
     
     Timer timer;
     timer.start();
     
     vector<int> predictions(n_samples);
     
-    // Optimization: Pre-allocate ONE node buffer
-    svm_node* x = new svm_node[n_features + 1];
-    x[n_features].index = -1;
-    x[n_features].value = 0;
-
+    // Predict each sample
     for (int i = 0; i < n_samples; i++) {
+        // Convert sample to libsvm format
+        svm_node* x = new svm_node[n_features + 1];
+        
         for (int j = 0; j < n_features; j++) {
-            x[j].index = j + 1;
-            // Apply scaling using stats stored during training
-            x[j].value = use_scaling ? scale_value(samples[i][j], j) : samples[i][j];
+            x[j].index = j + 1;  // libsvm uses 1-based indexing
+            x[j].value = samples[i][j];
         }
+        x[n_features].index = -1;  // Terminating node
+        x[n_features].value = 0;
         
-        predictions[i] = static_cast<int>(svm_predict(svm_model, x));
+        // Predict
+        double pred = svm_predict(svm_model, x);
+        predictions[i] = static_cast<int>(pred);
         
+        delete[] x;
+        
+        // Display progress at milestones
         bool should_display = false;
-        if ((i + 1) % 1000 == 0) should_display = true;
-        else if (n_samples >= 4 && ((i+1) % (n_samples/4) == 0)) should_display = true;
+        
+        if ((i + 1) % 1000 == 0) {
+            should_display = true;
+        } else if (n_samples >= 4) {
+            // Show at 25%, 50%, 75%, 100%
+            if ((i + 1) == n_samples / 4 || (i + 1) == n_samples / 2 || 
+                (i + 1) == 3 * n_samples / 4 || (i + 1) == n_samples) {
+                should_display = true;
+            }
+        } else if ((i + 1) == n_samples) {
+            // Always show at end
+            should_display = true;
+        }
         
         if (should_display) {
             float elapsed_time = timer.get();
             float progress = ((i + 1) * 100.0f) / n_samples;
-            printf("Predicted %d/%d (%.1f%%), time = %s\n", 
+            printf("Predicted %d/%d samples (%.1f%%), time = %s\n", 
                    i + 1, n_samples, progress, format_time(elapsed_time).c_str());
             fflush(stdout);
         }
     }
     
-    delete[] x; // Clean up the single buffer
-    
     timer.stop();
     float total_time = timer.get();
+    float avg_time_per_sample = total_time / n_samples;
     
     puts("");
     cout << "=======================PREDICTION END=======================" << endl;
+    cout << "Prediction completed!" << endl;
     printf("Total prediction time: %s\n", format_time(total_time).c_str());
+    printf("Average time per sample: %s\n\n", format_time(avg_time_per_sample).c_str());
     return predictions;
 }
 
 double SVMmodel::calculateAccuracy(const vector<int>& predicted, const vector<int>& actual, int numClasses) {
-    if (predicted.size() != actual.size() || predicted.empty()) return 0.0;
+    if (predicted.size() != actual.size() || predicted.empty()) {
+        cerr << "Error: Size mismatch or empty vectors for accuracy calculation" << endl;
+        return 0.0;
+    }
+    
     int correct = 0;
     for (size_t i = 0; i < actual.size(); i++) {
-        if (predicted[i] == actual[i]) correct++;
+        if (predicted[i] == actual[i]) {
+            correct++;
+        }
     }
     return static_cast<double>(correct) / actual.size();
 }
 
 vector<vector<int>> SVMmodel::calculateClassificationReport(const vector<int>& predicted, const vector<int>& actual, int numClasses) {
-    vector<vector<int>> report(numClasses, vector<int>(3, 0));
+    vector<vector<int>> report(numClasses, vector<int>(3, 0)); // TP, FP, FN for each class
+    
     for (size_t i = 0; i < actual.size(); i++) {
-        if (predicted[i] == actual[i]) report[actual[i]][0]++;
-        else {
-            report[predicted[i]][1]++;
-            report[actual[i]][2]++;
+        if (predicted[i] == actual[i]) {
+            report[actual[i]][0]++; // True Positive
+        } else {
+            report[predicted[i]][1]++; // False Positive
+            report[actual[i]][2]++;    // False Negative
         }
     }
     return report;
@@ -442,8 +513,10 @@ vector<vector<int>> SVMmodel::calculateClassificationReport(const vector<int>& p
 
 vector<vector<int>> SVMmodel::calculateConfusionMatrix(const vector<int>& predicted, const vector<int>& actual, int numClasses) {
     vector<vector<int>> confusionMatrix(numClasses, vector<int>(numClasses, 0));
+    
     for (size_t i = 0; i < actual.size(); i++) {
-        if (actual[i] >= 0 && actual[i] < numClasses && predicted[i] >= 0 && predicted[i] < numClasses) {
+        if (actual[i] >= 0 && actual[i] < numClasses && 
+            predicted[i] >= 0 && predicted[i] < numClasses) {
             confusionMatrix[actual[i]][predicted[i]]++;
         }
     }
@@ -453,15 +526,22 @@ vector<vector<int>> SVMmodel::calculateConfusionMatrix(const vector<int>& predic
 void SVMmodel::printClassificationReport(const vector<vector<int>>& classificationReport) {
     cout << "\nClassification Report:" << endl;
     cout << "Class\tPrecision\tRecall\tF1-Score\tSupport" << endl;
+    
     for (size_t i = 0; i < classificationReport.size(); i++) {
         int tp = classificationReport[i][0];
         int fp = classificationReport[i][1];
         int fn = classificationReport[i][2];
         int support = tp + fn;
+        
         double precision = (tp + fp) > 0 ? static_cast<double>(tp) / (tp + fp) : 0.0;
         double recall = (tp + fn) > 0 ? static_cast<double>(tp) / (tp + fn) : 0.0;
         double f1_score = (precision + recall) > 0 ? 2 * (precision * recall) / (precision + recall) : 0.0;
-        cout << i << "\t" << precision << "\t\t" << recall << "\t" << f1_score << "\t\t" << support << endl;
+        
+        cout << i << "\t" 
+             << precision << "\t\t" 
+             << recall << "\t" 
+             << f1_score << "\t\t" 
+             << support << endl;
     }
 }
 
@@ -469,119 +549,159 @@ void SVMmodel::printConfusionMatrix(const vector<vector<int>>& confusionMatrix) 
     cout << "\nConfusion Matrix:" << endl;
     cout << "Actual \\ Predicted | ";
     int numClasses = confusionMatrix.size();
-    for (int i = 0; i < numClasses; i++) cout << i << " ";
-    cout << endl << "--------------------" << endl;
+
+    for (int i = 0; i < numClasses; i++) {
+        cout << i << " ";
+    }
+    cout << endl;
+    cout << "--------------------" << endl;
+    
     for (int i = 0; i < numClasses; i++) {
         cout << i << " | ";
-        for (int j = 0; j < numClasses; j++) cout << confusionMatrix[i][j] << " ";
+        for (int j = 0; j < numClasses; j++) {
+            cout << confusionMatrix[i][j] << " ";
+        }
         cout << endl;
     }
 }
 
 bool SVMmodel::save(const string& modelPath) const {
-    if (!is_trained || !svm_model) return false;
+    if (!is_trained || !svm_model) {
+        cerr << "Error: Model not trained or invalid" << endl;
+        return false;
+    }
     
+    // Use libsvm's save function
     if (svm_save_model(modelPath.c_str(), svm_model) == 0) {
+        // Save n_features to metadata file
         string metaPath = modelPath + ".meta";
         ofstream metaFile(metaPath, ios::binary);
         if (metaFile.is_open()) {
             metaFile.write(reinterpret_cast<const char*>(&n_features), sizeof(int));
-            // Save Scaling Params
-            size_t size = feature_means.size();
-            metaFile.write(reinterpret_cast<const char*>(&size), sizeof(size_t));
-            metaFile.write(reinterpret_cast<const char*>(feature_means.data()), size * sizeof(double));
-            metaFile.write(reinterpret_cast<const char*>(feature_stds.data()), size * sizeof(double));
             metaFile.close();
         }
         cout << "Model saved successfully to " << modelPath << endl;
         return true;
+    } else {
+        cerr << "Error: Could not save model to " << modelPath << endl;
+        return false;
     }
-    return false;
 }
 
 bool SVMmodel::load(const string& modelPath) {
-    if (svm_model) svm_free_and_destroy_model(&svm_model);
+    // Free existing model if any
+    if (svm_model) {
+        svm_free_and_destroy_model(&svm_model);
+    }
+
+    // Use libsvm's load function
     svm_model = svm_load_model(modelPath.c_str());
 
     if (!svm_model) {
         cerr << "Error: Could not load model from " << modelPath << endl;
         return false;
     }
+
+    // Extract model information safely
     n_support = svm_model->l;
     n_classes = svm_model->nr_class;
 
+    // Load n_features from metadata file
     string metaPath = modelPath + ".meta";
     ifstream metaFile(metaPath, ios::binary);
     if (metaFile.is_open()) {
         metaFile.read(reinterpret_cast<char*>(&n_features), sizeof(int));
-        
-        // Load Scaling Params
-        size_t size;
-        if (metaFile.read(reinterpret_cast<char*>(&size), sizeof(size_t))) {
-            feature_means.resize(size);
-            feature_stds.resize(size);
-            metaFile.read(reinterpret_cast<char*>(feature_means.data()), size * sizeof(double));
-            metaFile.read(reinterpret_cast<char*>(feature_stds.data()), size * sizeof(double));
-            use_scaling = true;
-            cout << "Loaded scaling stats for " << size << " features." << endl;
-        } else {
-            use_scaling = false;
-            cout << "Warning: Old meta file format (no scaling stats). Scaling disabled." << endl;
-        }
         metaFile.close();
+        cout << "Loaded feature count from metadata: " << n_features << endl;
     } else {
-        // Fallback logic for n_features if meta missing (same as before)
+        // Fallback: determine feature count by scanning all support vectors
+        cerr << "Warning: Metadata file not found, scanning support vectors..." << endl;
         n_features = 0;
         if (n_support > 0 && svm_model->SV && svm_model->SV[0]) {
-             // ... [Rest of your fallback logic] ...
-             int samples_to_check = min(n_support, 100);
-             for (int sv = 0; sv < samples_to_check; ++sv) {
+            // Scan first few support vectors to find max index
+            int samples_to_check = min(n_support, 100);  // Check up to 100 samples
+            for (int sv = 0; sv < samples_to_check; ++sv) {
                 const svm_node* node = svm_model->SV[sv];
                 if (!node) continue;
-                for (int i = 0; node[i].index != -1; ++i) 
-                    if (node[i].index > n_features) n_features = node[i].index;
-             }
+                
+                int max_iterations = 100000;  // Safety limit
+                for (int i = 0; i < max_iterations && node[i].index != -1; ++i) {
+                    if (node[i].index > n_features && node[i].index < 1000000) {
+                        n_features = node[i].index;
+                    }
+                }
+            }
         }
-        use_scaling = false; 
+        
+        // Validate n_features
+        if (n_features <= 0 || n_features > 1000000) {
+            cerr << "Error: Invalid feature count detected (" << n_features 
+                 << "). Model may be corrupted or incompatible." << endl;
+            cerr << "Please retrain the model or provide a .meta file with the correct feature count." << endl;
+            svm_free_and_destroy_model(&svm_model);
+            svm_model = nullptr;
+            return false;
+        }
+        
+        cerr << "Estimated feature count from support vectors: " << n_features << endl;
     }
 
-    if (svm_model->rho) bias = -svm_model->rho[0]; else bias = 0.0f;
-    
+    // Bias (rho) — for multi-class there are multiple rhos; use first for info
+    if (svm_model->rho)
+        bias = -svm_model->rho[0];
+    else
+        bias = 0.0f;
+
+    // Populate parameters from loaded model
     switch (svm_model->param.kernel_type) {
-        case LINEAR:   kernel_type = "LINEAR"; break;
-        case RBF:      kernel_type = "RBF";    break;
-        default:       kernel_type = "UNKNOWN"; break;
+        case LINEAR:   kernel_type = "LINEAR"; kernel = LINEAR; break;
+        case POLY:     kernel_type = "POLY";   kernel = POLY;   break;
+        case RBF:      kernel_type = "RBF";    kernel = RBF;    break;
+        case SIGMOID:  kernel_type = "SIGMOID";kernel = SIGMOID;break;
+        case PRECOMPUTED: kernel_type = "PRECOMPUTED"; kernel = PRECOMPUTED; break;
+        default:       kernel_type = "UNKNOWN"; kernel = RBF; break;
     }
     C = static_cast<float>(svm_model->param.C);
     gamma = static_cast<float>(svm_model->param.gamma);
     gamma_type = "value";
 
     is_trained = true;
-    cout << "Model loaded: " << n_support << " SVs, " << n_classes << " classes." << endl;
+    cout << "Model loaded successfully from " << modelPath << endl;
+    cout << "Number of support vectors: " << n_support << endl;
+    cout << "Number of classes: " << n_classes << endl;
+    cout << "Number of features: " << n_features << endl;
     return true;
 }
 
-bool SVMmodel::getIsTrained() const { return is_trained; }
+bool SVMmodel::getIsTrained() const {
+    return is_trained;
+}
 
 void SVMmodel::printModelInfo() const {
-    if (!is_trained) { cout << "Model is not trained" << endl; return; }
+    if (!is_trained) {
+        cout << "Model is not trained" << endl;
+        return;
+    }
+    
     cout << "\n=== cuML SVM Model Information ===" << endl;
     cout << "Number of support vectors: " << n_support << endl;
     cout << "Number of classes: " << n_classes << endl;
+    cout << "Number of features: " << n_features << endl;
     cout << "Kernel type: " << kernel_type << endl;
     cout << "C parameter: " << C << endl;
     cout << "Gamma: " << gamma << endl;
-    cout << "Scaling: " << (use_scaling ? "Enabled" : "Disabled") << endl;
     cout << "============================\n" << endl;
 }
 
 bool SVMmodel::save_evaluation(double accuracy, const vector<vector<int>>& class_report, 
                               const vector<vector<int>>& conf_matrix, const string& eval_path) const {
+    // Check if directory exists, if not create it
     size_t found = eval_path.find_last_of("/\\");
     if (found != string::npos) {
         string dir_path = eval_path.substr(0, found);
         struct stat info;
         if (stat(dir_path.c_str(), &info) != 0) {
+            cout << "Creating directory: " << dir_path << endl;
             #ifdef _WIN32
                 _mkdir(dir_path.c_str());
             #else 
@@ -589,21 +709,30 @@ bool SVMmodel::save_evaluation(double accuracy, const vector<vector<int>>& class
             #endif
         }
     }
+
+    // Save evaluation results to file
     ofstream ofs(eval_path);
     if (ofs.is_open()) {
         ofs << "SVM Test Accuracy: " << accuracy * 100.0 << "%\n";
         ofs << "Classification Report:\n";
         for (const auto& row : class_report) {
-            for (const auto& val : row) ofs << val << " ";
+            for (const auto& val : row) {
+                ofs << val << " ";
+            }
             ofs << "\n";
         }
         ofs << "Confusion Matrix:\n";
         for (const auto& row : conf_matrix) {
-            for (const auto& val : row) ofs << val << " ";
+            for (const auto& val : row) {
+                ofs << val << " ";
+            }
             ofs << "\n";
         }
         ofs.close();
+        cout << "SVM evaluation results saved to " << eval_path << endl;
         return true;
+    } else {
+        cerr << "Error: Cannot open file " << eval_path << " for writing." << endl;
+        return false;
     }
-    return false;
 }

@@ -15,9 +15,7 @@
 #include <string>
 #include <fstream>
 #include <set>
-#include <algorithm> // Added for transform
-#include <numeric>   // Added for accumulate
-
+// mkdir/stat for cross-platform directory handling used in save_evaluation()
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -26,10 +24,23 @@
 #endif
 using namespace std;
 
+// Forward declaration of libsvm structures
 struct svm_model;
 struct svm_node;
 
 class SVMmodel {
+/*
+Train SVM (Library)
++ Input: train_features + labels  
++ Kernel: RBF (Radial Basis Function)  
++ Hyperparameters: C=10, gamma=(float)auto
++ Output: trained SVM model  
+
+Evaluate
++ Predict on test_features using SVM  
++ Calculate accuracy, confusion matrix  
++ Compare with baseline methods
+*/
 private:
     bool    is_trained;
     int     n_features;
@@ -54,50 +65,54 @@ private:
     int     n_support;
     float   bias;
     int     n_classes;
-
-    // === NEW: Feature Scaling Statistics ===
-    vector<double> feature_means;
-    vector<double> feature_stds;
-    bool use_scaling;
-
-    // Helper methods
-    void    compute_statistics(const vector<vector<double>>& data);
-    double  scale_value(double value, int feature_idx) const;
     
-    // Helper methods for CUDA (kept from your original code)
-    float* convertToDeviceArray(const vector<vector<double>>& data, int& n_rows, int& n_cols);
-    float* convertToDeviceLabels(const vector<int>& labels, int n_rows);
+    // Helper methods for data conversion
+    float*  convertToDeviceArray(const vector<vector<double>>& data, int& n_rows, int& n_cols);
+    float*  convertToDeviceLabels(const vector<int>& labels, int n_rows);
     void    freeDeviceMemory(float* ptr);
 
 public:
+    // Constructor and Destructor
     SVMmodel();
     SVMmodel(float C, string kernel_type, string gamma_type);
     SVMmodel(float C, string kernel_type, string gamma_type, float tolerance, float cache_size, int max_iter, int nochange_steps);
     
+    // Copy constructor
     SVMmodel(const SVMmodel &other);
+    
+    // Move constructor
     SVMmodel(SVMmodel &&other) noexcept;
     
     ~SVMmodel();
 
+    // Copy assignment operator overload
     SVMmodel &operator=(const SVMmodel &other);
+
+    // Move assignment operator overload
     SVMmodel &operator=(SVMmodel &&other) noexcept;
 
+    // Training
     void train(const vector<vector<double>>& data, const vector<int>& labels);
     
+    // Prediction
     vector<int> predict(const vector<vector<double>>& samples) const;
     double calculateAccuracy(const vector<int>& predicted, const vector<int>& actual, int numClasses = 10);
     vector<vector<int>> calculateClassificationReport(const vector<int>& predicted, const vector<int>& actual, int numClasses = 10);
     vector<vector<int>> calculateConfusionMatrix(const vector<int>& predicted, const vector<int>& actual, int numClasses = 10);
 
+    // Testing
     void printClassificationReport(const vector<vector<int>>& classificationReport);
     void printConfusionMatrix(const vector<vector<int>>& confusionMatrix);
 
+    // Model persistence
     bool save(const string& modelPath) const;
     bool load(const string& modelPath);
     
+    // Evaluation persistence
     bool save_evaluation(double accuracy, const vector<vector<int>>& class_report, 
                         const vector<vector<int>>& conf_matrix, const string& eval_path) const;
     
+    // Utility methods
     bool getIsTrained() const;
     void printModelInfo() const;
 };

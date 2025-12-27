@@ -682,7 +682,7 @@ void Optimized2_Autoencoder::fit(const Optimized_Dataset &dataset,
   float total_time = 0;
 
   printf(
-      "Training Optimized Autoencoder (1st version) for %d epochs with batch size %d "
+      "Training Optimized Autoencoder (2nd version) for %d epochs with batch size %d "
       "and learning rate "
       "%.4f\n",
       n_epoch,
@@ -943,85 +943,85 @@ Optimized2_Autoencoder::decode(const Optimized_Dataset &dataset) const {
                            _block_size_3D_2,
                            _streams);
 
-    for (int image = 0; image < cur_batch_size; ++image) {
+    for (int image = 0; image < cur_batch_size; ++image)
       CUDA_CHECK(cudaMemcpyAsync(res_start + image * decoded_image_size,
                                  b,
                                  decoded_image_size * sizeof(float),
                                  cudaMemcpyDeviceToHost,
                                  _streams[image % N_STREAMS]));
-    }
-
-    CUDA_CHECK(cudaFree(a));
-    CUDA_CHECK(cudaFree(b));
-    CUDA_CHECK(cudaFree(c));
-
-    // Copy the result
-    memcpy(res.labels, dataset.labels, dataset.n * sizeof(int));
-    return res;
   }
 
-  float Optimized2_Autoencoder::eval(const Optimized_Dataset &dataset) const {
-    int n = dataset.n, width = dataset.width, height = dataset.height,
-        depth              = dataset.depth;
-    int               size = width * height * depth;
-    Optimized_Dataset res  = decode(encode(dataset));
+  CUDA_CHECK(cudaFree(a));
+  CUDA_CHECK(cudaFree(b));
+  CUDA_CHECK(cudaFree(c));
 
-    float *a, *b;
-    CUDA_CHECK(cudaMalloc(&a, size * sizeof(float)));
-    CUDA_CHECK(cudaMalloc(&b, size * sizeof(float)));
+  // Copy the result
+  memcpy(res.labels, dataset.labels, dataset.n * sizeof(int));
+  return res;
+}
 
-    for (int i = 0; i < n; ++i) {
-      int offset = i * size;
-      CUDA_CHECK(cudaMemcpyAsynnc(a + offset,
-                                  dataset.data + offset,
-                                  size * sizeof(float),
-                                  cudaMemcpyHostToDevice,
-                                  _streams[i % N_STREAMS]));
-      CUDA_CHECK(cudaMemcpyAsync(b + offset,
-                                 res.data + offset,
-                                 size * sizeof(float),
-                                 cudaMemcpyHostToDevice,
-                                 _streams[i % N_STREAMS]));
-    }
-    return optimized2_mse_loss(a, b, n, width, height, depth, _block_size_1D, _streams);
+float Optimized2_Autoencoder::eval(const Optimized_Dataset &dataset) const {
+  int n = dataset.n, width = dataset.width, height = dataset.height,
+      depth              = dataset.depth;
+  int               size = width * height * depth;
+  Optimized_Dataset res  = decode(encode(dataset));
+
+  float *a, *b;
+  CUDA_CHECK(cudaMalloc(&a, size * sizeof(float)));
+  CUDA_CHECK(cudaMalloc(&b, size * sizeof(float)));
+
+  for (int i = 0; i < n; ++i) {
+    int offset = i * size;
+    CUDA_CHECK(cudaMemcpyAsynnc(a + offset,
+                                dataset.data + offset,
+                                size * sizeof(float),
+                                cudaMemcpyHostToDevice,
+                                _streams[i % N_STREAMS]));
+    CUDA_CHECK(cudaMemcpyAsync(b + offset,
+                               res.data + offset,
+                               size * sizeof(float),
+                               cudaMemcpyHostToDevice,
+                               _streams[i % N_STREAMS]));
+  }
+  return optimized2_mse_loss(a, b, n, width, height, depth, _block_size_1D, _streams);
+}
+
+void Optimized2_Autoencoder::save_parameters(const char *filename) const {
+  ofstream buffer(filename, ios::out | ios::binary);
+  if (!buffer.is_open()) {
+    printf("Unable to open the file %s.\n", filename);
+    return;
   }
 
-  void Optimized2_Autoencoder::save_parameters(const char *filename) const {
-    ofstream buffer(filename, ios::out | ios::binary);
-    if (!buffer.is_open()) {
-      printf("Unable to open the file %s.\n", filename);
-      return;
-    }
+  static constexpr int FILTER_SIZES[]  = { ENCODER_FILTER_1_SIZE,
+                                           ENCODER_FILTER_2_SIZE,
+                                           DECODER_FILTER_1_SIZE,
+                                           DECODER_FILTER_2_SIZE,
+                                           DECODER_FILTER_3_SIZE };
+  constexpr int        MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
 
-    static constexpr int FILTER_SIZES[]  = { ENCODER_FILTER_1_SIZE,
-                                             ENCODER_FILTER_2_SIZE,
-                                             DECODER_FILTER_1_SIZE,
-                                             DECODER_FILTER_2_SIZE,
-                                             DECODER_FILTER_3_SIZE };
-    constexpr int        MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
+  char *tmp;
+  CUDA_CHECK(cudaMallocHost(&tmp, MAX_FILTER_SIZE * sizeof(float)));
 
-    char *tmp;
-    CUDA_CHECK(cudaMallocHost(&tmp, MAX_FILTER_SIZE * sizeof(float)));
+  // Write first encoder conv2D layer
+  write_data(buffer, _encoder_filter_1, tmp, ENCODER_FILTER_1_SIZE * sizeof(float));
+  write_data(buffer, _encoder_bias_1, tmp, ENCODER_FILTER_1_DEPTH * sizeof(float));
 
-    // Write first encoder conv2D layer
-    write_data(buffer, _encoder_filter_1, tmp, ENCODER_FILTER_1_SIZE * sizeof(float));
-    write_data(buffer, _encoder_bias_1, tmp, ENCODER_FILTER_1_DEPTH * sizeof(float));
+  // Write second encoder conv2D layer
+  write_data(buffer, _encoder_filter_2, tmp, ENCODER_FILTER_2_SIZE * sizeof(float));
+  write_data(buffer, _encoder_bias_2, tmp, ENCODER_FILTER_2_DEPTH * sizeof(float));
 
-    // Write second encoder conv2D layer
-    write_data(buffer, _encoder_filter_2, tmp, ENCODER_FILTER_2_SIZE * sizeof(float));
-    write_data(buffer, _encoder_bias_2, tmp, ENCODER_FILTER_2_DEPTH * sizeof(float));
+  // Write first decoder conv2D layer
+  write_data(buffer, _decoder_filter_1, tmp, DECODER_FILTER_1_SIZE * sizeof(float));
+  write_data(buffer, _decoder_bias_1, tmp, DECODER_FILTER_1_DEPTH * sizeof(float));
 
-    // Write first decoder conv2D layer
-    write_data(buffer, _decoder_filter_1, tmp, DECODER_FILTER_1_SIZE * sizeof(float));
-    write_data(buffer, _decoder_bias_1, tmp, DECODER_FILTER_1_DEPTH * sizeof(float));
+  // Write second decoder conv2D layer
+  write_data(buffer, _decoder_filter_2, tmp, DECODER_FILTER_2_SIZE * sizeof(float));
+  write_data(buffer, _decoder_bias_2, tmp, DECODER_FILTER_2_DEPTH * sizeof(float));
 
-    // Write second decoder conv2D layer
-    write_data(buffer, _decoder_filter_2, tmp, DECODER_FILTER_2_SIZE * sizeof(float));
-    write_data(buffer, _decoder_bias_2, tmp, DECODER_FILTER_2_DEPTH * sizeof(float));
+  // Write third encoder conv2D layer
+  write_data(buffer, _decoder_filter_3, tmp, DECODER_FILTER_3_SIZE * sizeof(float));
+  write_data(buffer, _decoder_bias_3, tmp, DECODER_FILTER_3_DEPTH * sizeof(float));
 
-    // Write third encoder conv2D layer
-    write_data(buffer, _decoder_filter_3, tmp, DECODER_FILTER_3_SIZE * sizeof(float));
-    write_data(buffer, _decoder_bias_3, tmp, DECODER_FILTER_3_DEPTH * sizeof(float));
-
-    CUDA_CHECK(cudaFreeHost(tmp));
-  }
+  CUDA_CHECK(cudaFreeHost(tmp));
+}

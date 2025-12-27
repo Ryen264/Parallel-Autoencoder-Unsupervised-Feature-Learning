@@ -15,11 +15,11 @@ using namespace std;
 //       [n_batches] [n_epoch] [batch_size] [learning_rate] \
 
 // const char *DATASET_DIR          = "./data/cifar-10-batches-bin";
-const char *DATASET_DIR = "/content/drive/MyDrive/LapTrinhSongSong/Team Project/data/cifar-10-binary/cifar-10-batches-bin";
+const char *DATASET_DIR = "/content/drive/MyDrive/@fithcmú/LapTrinhSongSong/data/cifar-10-batches-bin";
 
 // const char *OUTPUT_DIR           = "./output/";
 const char *OUTPUT_DIR = "/content/output/";
-const char *FULLTRAIN_ENCODED_DATASET_SURFIX = "_fulltrain_encoded_dataset.bin";
+// const char *FULLTRAIN_ENCODED_DATASET_SURFIX = "_fulltrain_encoded_dataset.bin";
 const char *TRAIN_ENCODED_DATASET_SURFIX = "_train_encoded_dataset.bin";
 const char *TEST_ENCODED_DATASET_SURFIX  = "_test_encoded_dataset.bin";
 
@@ -122,18 +122,18 @@ int main(int argc, char *argv[]) {
     learning_rate = atof(argv[7]);
 
   cout << "Loading and preprocessing datasets..." << endl;
-  Dataset fulltrainset = load_dataset_ds(dataset_dir, 5, true);
+  // Dataset fulltrainset = load_dataset_ds(dataset_dir, 5, true);
   Dataset trainset = load_dataset_ds(dataset_dir, n_batches, true);
   Dataset testset  = load_dataset_ds(dataset_dir, 1, false);
 
   // Branch-specific encoded datasets holders
-  Dataset            encoded_fulltrainset_ds, encoded_trainset_ds, encoded_testset_ds;
-  Optimized_Dataset  encoded_fulltrainset_opt, encoded_trainset_opt, encoded_testset_opt;
+  Dataset            encoded_trainset_ds, encoded_testset_ds; // encoded_fulltrainset_ds;
+  Optimized_Dataset  encoded_trainset_opt, encoded_testset_opt; // encoded_fulltrainset_opt;
 
-  const char* autoencoder_path = (string(MODEL_DIR) + version + string(AUTOENCODER_SURFIX)).c_str();
-  const char* fulltrain_encoded_dataset_path = (string(OUTPUT_DIR) + version + string(FULLTRAIN_ENCODED_DATASET_SURFIX)).c_str();
-  const char* train_encoded_dataset_path = (string(OUTPUT_DIR) + version + string(TRAIN_ENCODED_DATASET_SURFIX)).c_str();
-  const char* test_encoded_dataset_path = (string(OUTPUT_DIR) + version + string(TEST_ENCODED_DATASET_SURFIX)).c_str();
+  string autoencoder_path = string(MODEL_DIR) + version + string(AUTOENCODER_SURFIX);
+  // string fulltrain_encoded_dataset_path = string(OUTPUT_DIR) + version + string(FULLTRAIN_ENCODED_DATASET_SURFIX);
+  string train_encoded_dataset_path = string(OUTPUT_DIR) + version + string(TRAIN_ENCODED_DATASET_SURFIX);
+  string test_encoded_dataset_path = string(OUTPUT_DIR) + version + string(TEST_ENCODED_DATASET_SURFIX);
   bool is_save_model    = true;
   bool is_save_encoded = true;
 
@@ -142,71 +142,73 @@ int main(int argc, char *argv[]) {
     Gpu_Autoencoder autoencoder;
 
     if (train_phase_1) {
-      autoencoder = phase_1_train<Gpu_Autoencoder, Dataset>(trainset, autoencoder_path,
+      autoencoder = phase_1_train<Gpu_Autoencoder, Dataset>(trainset, autoencoder_path.c_str(),
                                                             OUTPUT_DIR, n_epoch, batch_size, learning_rate, CHECKPOINT, is_save_model);
     } else {
-      autoencoder = phase_1_load<Gpu_Autoencoder>(autoencoder_path);
+      autoencoder = phase_1_load<Gpu_Autoencoder>(autoencoder_path.c_str());
     }
 
     // Phase 1: Encode trainset and testset
     printf("Encoding trainset and testset using GPU Autoencoder...\n");
-    encoded_fulltrainset_ds = phase_1_encode<Gpu_Autoencoder, Dataset>(fulltrainset, autoencoder, fulltrain_encoded_dataset_path, is_save_encoded);
-    encoded_trainset_ds = phase_1_encode<Gpu_Autoencoder, Dataset>(trainset, autoencoder, train_encoded_dataset_path, is_save_encoded);
-    encoded_testset_ds = phase_1_encode<Gpu_Autoencoder, Dataset>(testset, autoencoder, test_encoded_dataset_path, is_save_encoded);
+    // encoded_fulltrainset_ds = phase_1_encode<Gpu_Autoencoder, Dataset>(fulltrainset, autoencoder, fulltrain_encoded_dataset_path.c_str(), is_save_encoded);
+    encoded_trainset_ds = phase_1_encode<Gpu_Autoencoder, Dataset>(trainset, autoencoder, train_encoded_dataset_path.c_str(), is_save_encoded);
+    encoded_testset_ds = phase_1_encode<Gpu_Autoencoder, Dataset>(testset, autoencoder, test_encoded_dataset_path.c_str(), is_save_encoded);
   }
   else if (version == "cpu") {
     Cpu_Autoencoder autoencoder;
 
     if (train_phase_1) {
-      autoencoder = phase_1_train<Cpu_Autoencoder, Dataset>(trainset, autoencoder_path,
+      autoencoder = phase_1_train<Cpu_Autoencoder, Dataset>(trainset, autoencoder_path.c_str(),
                                                             OUTPUT_DIR, n_epoch, batch_size, learning_rate, CHECKPOINT, is_save_model);
     } else {
-      autoencoder = phase_1_load<Cpu_Autoencoder>(autoencoder_path);
+      autoencoder = phase_1_load<Cpu_Autoencoder>(autoencoder_path.c_str());
     }
 
     // Phase 1: Encode trainset and testset
     printf("Encoding trainset and testset using CPU Autoencoder...\n");
-    encoded_fulltrainset_ds = phase_1_encode<Cpu_Autoencoder, Dataset>(fulltrainset, autoencoder, fulltrain_encoded_dataset_path, is_save_encoded);
-    encoded_trainset_ds = phase_1_encode<Cpu_Autoencoder, Dataset>(trainset, autoencoder, train_encoded_dataset_path, is_save_encoded);
-    encoded_testset_ds = phase_1_encode<Cpu_Autoencoder, Dataset>(testset, autoencoder, test_encoded_dataset_path, is_save_encoded);
+    // encoded_fulltrainset_ds = phase_1_encode<Cpu_Autoencoder, Dataset>(fulltrainset, autoencoder, fulltrain_encoded_dataset_path.c_str(), is_save_encoded);
+    encoded_trainset_ds = phase_1_encode<Cpu_Autoencoder, Dataset>(trainset, autoencoder, train_encoded_dataset_path.c_str(), is_save_encoded);
+    encoded_testset_ds = phase_1_encode<Cpu_Autoencoder, Dataset>(testset, autoencoder, test_encoded_dataset_path.c_str(), is_save_encoded);
   }
   else if (version == "opt1") {
     // Load optimized datasets directly for opt1 path
+    // Optimized_Dataset opt_fulltrainset = load_dataset_opt(DATASET_DIR, 5, true);
     Optimized_Dataset opt_trainset = load_dataset_opt(DATASET_DIR, n_batches, true);
     Optimized_Dataset opt_testset  = load_dataset_opt(DATASET_DIR, 1, false);
     Optimized1_Autoencoder autoencoder;
 
     if (train_phase_1) {
-      autoencoder = phase_1_train<Optimized1_Autoencoder, Optimized_Dataset>(opt_trainset, autoencoder_path,
+      autoencoder = phase_1_train<Optimized1_Autoencoder, Optimized_Dataset>(opt_trainset, autoencoder_path.c_str(),
                                                                             OUTPUT_DIR, n_epoch, batch_size, learning_rate, CHECKPOINT, is_save_model);
     } else {
-      autoencoder = phase_1_load<Optimized1_Autoencoder>(autoencoder_path);
+      autoencoder = phase_1_load<Optimized1_Autoencoder>(autoencoder_path.c_str());
     }
 
     // Phase 1: Encode trainset and testset
     printf("Encoding trainset and testset using Optimized1 Autoencoder...\n");
-    encoded_fulltrainset_opt = phase_1_encode<Optimized1_Autoencoder, Optimized_Dataset>(opt_trainset, autoencoder, fulltrain_encoded_dataset_path, is_save_encoded);
-    encoded_trainset_opt = phase_1_encode<Optimized1_Autoencoder, Optimized_Dataset>(opt_trainset, autoencoder, train_encoded_dataset_path, is_save_encoded);
-    encoded_testset_opt = phase_1_encode<Optimized1_Autoencoder, Optimized_Dataset>(opt_testset, autoencoder, test_encoded_dataset_path, is_save_encoded);
+    // encoded_fulltrainset_opt = phase_1_encode<Optimized1_Autoencoder, Optimized_Dataset>(opt_fulltrainset, autoencoder, fulltrain_encoded_dataset_path.c_str(), is_save_encoded);
+    encoded_trainset_opt = phase_1_encode<Optimized1_Autoencoder, Optimized_Dataset>(opt_trainset, autoencoder, train_encoded_dataset_path.c_str(), is_save_encoded);
+    encoded_testset_opt = phase_1_encode<Optimized1_Autoencoder, Optimized_Dataset>(opt_testset, autoencoder, test_encoded_dataset_path.c_str(), is_save_encoded);
   }
   else if (version == "opt2") {
     // Load optimized datasets directly for opt2 path
+    // Optimized_Dataset opt_fulltrainset = load_dataset_opt(DATASET_DIR, 5, true);
     Optimized_Dataset opt_trainset = load_dataset_opt(DATASET_DIR, n_batches, true);
     Optimized_Dataset opt_testset  = load_dataset_opt(DATASET_DIR, 1, false);
     Optimized2_Autoencoder autoencoder;
     
     if (train_phase_1) {
-      autoencoder = phase_1_train<Optimized2_Autoencoder, Optimized_Dataset>(opt_trainset, autoencoder_path,
+      autoencoder = phase_1_train<Optimized2_Autoencoder, Optimized_Dataset>(opt_trainset, autoencoder_path.c_str(),
                                                                             OUTPUT_DIR, n_epoch, batch_size, learning_rate, CHECKPOINT, is_save_model);
     } else {
-      autoencoder = phase_1_load<Optimized2_Autoencoder>(autoencoder_path);
+      autoencoder = phase_1_load<Optimized2_Autoencoder>(autoencoder_path.c_str());
     }
 
     // Phase 1: Encode trainset and testset
     printf("Encoding trainset and testset using Optimized2 Autoencoder...\n");
-    encoded_fulltrainset_opt = phase_1_encode<Optimized2_Autoencoder, Optimized_Dataset>(opt_trainset, autoencoder, fulltrain_encoded_dataset_path, is_save_encoded);
-    encoded_trainset_opt = phase_1_encode<Optimized2_Autoencoder, Optimized_Dataset>(opt_trainset, autoencoder, train_encoded_dataset_path, is_save_encoded);
-    encoded_testset_opt = phase_1_encode<Optimized2_Autoencoder, Optimized_Dataset>(opt_testset, autoencoder, test_encoded_dataset_path, is_save_encoded);
+    // encoded_fulltrainset_opt = phase_1_encode<Optimized2_Autoencoder, Optimized_Dataset>(opt_fulltrainset, autoencoder, fulltrain_encoded_dataset_path.c_str(), is_save_encoded);
+    encoded_trainset_opt = phase_1_encode<Optimized2_Autoencoder, Optimized_Dataset>(opt_trainset, autoencoder, train_encoded_dataset_path.c_str(), is_save_encoded);
+    encoded_testset_opt = phase_1_encode<Optimized2_Autoencoder, Optimized_Dataset>(opt_testset, autoencoder, test_encoded_dataset_path.c_str(), is_save_encoded);
 
   } else {
     cout << "Invalid version specified. Use 'cpu', 'gpu', 'opt1', or 'opt2'." << endl;

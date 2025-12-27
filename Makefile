@@ -6,15 +6,17 @@ NVCC = nvcc
 CXX = g++
 NVCC_FLAGS = -std=c++20 -arch=sm_75 -O3 --expt-relaxed-constexpr -diag-suppress 3012 \
 	-Xcompiler "-Wall,-Wextra,-Wunused,-Wunused-variable,-Wunused-parameter,-Wunused-function"
-INCLUDE_DIRS = -I./include -I./include/cpu -I./include/gpu -I./include/optimized1
+INCLUDE_DIRS = -I./include -I./include/cpu -I./include/gpu -I./include/optimized1 -I./include/optimized2
 
 # Source files
 SRC_DIR = src
 GPU_SRC_DIR = src/gpu
 OPT1_SRC_DIR = src/optimized1
+OPT2_SRC_DIR = src/optimized2
 SRC := $(shell find $(SRC_DIR) -maxdepth 1 -name '*.cu')
 GPU_SRC := $(shell find $(GPU_SRC_DIR) -maxdepth 1 -name '*.cu')
 OPT1_SRC := $(shell find $(OPT1_SRC_DIR) -maxdepth 1 -name '*.cu')
+OPT2_SRC := $(shell find $(OPT2_SRC_DIR) -maxdepth 1 -name '*.cu')
 CONSTANTS = include/constants.h
 MACRO = include/macro.h
 
@@ -23,6 +25,7 @@ OBJ_DIR = obj
 OBJECTS := $(patsubst $(SRC_DIR)/%.cu, $(OBJ_DIR)/%.o, $(SRC))
 GPU_OBJECTS := $(patsubst $(SRC_DIR)/%.cu, $(OBJ_DIR)/%.o, $(GPU_SRC))
 OPT1_OBJECTS := $(patsubst $(SRC_DIR)/%.cu, $(OBJ_DIR)/%.o, $(OPT1_SRC))
+OPT2_OBJECTS := $(patsubst $(SRC_DIR)/%.cu, $(OBJ_DIR)/%.o, $(OPT2_SRC))
 
 # Dependancies
 DEPS := $(OBJECTS:.o=.d)
@@ -33,6 +36,8 @@ GPU_AUTOENCODER_DEPS = $(OBJ_DIR)/data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_
 GPU_AUTOENCODER_TARGET = gpu_main
 OPT1_AUTOENCODER_DEPS = $(OBJ_DIR)/optimized_data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_DIR)/timer.o $(OBJ_DIR)/utils.o $(OPT1_OBJECTS)
 OPT1_AUTOENCODER_TARGET = opt1_main
+OP2_AUTOENCODER_DEPS = $(OBJ_DIR)/optimized_data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_DIR)/timer.o $(OBJ_DIR)/utils.o $(OPT2_OBJECTS)
+OPT2_AUTOENCODER_TARGET = opt2_main
 
 gpu_main: $(GPU_AUTOENCODER_DEPS)
 	@echo "Compiling gpu autoencoder..."
@@ -43,6 +48,11 @@ opt1_main: $(OPT1_AUTOENCODER_DEPS)
 	@echo "Compiling optimized autoencoder..."
 	@mkdir -p $(TARGET_DIR)
 	$(NVCC) $(NVCC_FLAGS) -o $(TARGET_DIR)/$(OPT1_AUTOENCODER_TARGET) $(OPT1_AUTOENCODER_DEPS)
+
+	opt2_main: $(OPT2_AUTOENCODER_DEPS)
+	@echo "Compiling optimized autoencoder (version 2)..."
+	@mkdir -p $(TARGET_DIR)
+	$(NVCC) $(NVCC_FLAGS) -o $(TARGET_DIR)/$(OPT2_AUTOENCODER_TARGET) $(OPT2_AUTOENCODER_DEPS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cu $(CONSTANTS) $(MACRO)
 	@echo "Compiling $<..."

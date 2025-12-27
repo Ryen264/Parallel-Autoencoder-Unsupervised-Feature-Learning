@@ -622,9 +622,6 @@ float optimized2_mse_loss(float       *expected,
         expected + offset, actual + offset, d_loss, n, size);
   }
 
-  for (int i = 0; i < N_STREAMS; ++i)
-    CUDA_CHECK(cudaStreamSynchronize(streams[i]));
-
   CUDA_CHECK(cudaMemcpy(&loss, d_loss, sizeof(float), cudaMemcpyDeviceToHost));
   CUDA_CHECK(cudaFree(d_loss));
 
@@ -746,9 +743,6 @@ void optimized2_full_filter_grad(float       *in,
       0,
       CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth * n_filter * sizeof(float)));
 
-  for (int i = 0; i < N_STREAMS; ++i)
-    CUDA_CHECK(cudaStreamSynchronize(streams[i]));
-
   for (int i = 0; i < n; ++i) {
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * n_filter;
@@ -774,8 +768,6 @@ void optimized2_update_weight(float       *weight,
                               dim3         block_size,
                               cudaStream_t streams[]) {
   dim3 grid_size((size - 1) / block_size.x + 1);
-  for (int i = 0; i < N_STREAMS; ++i)
-    CUDA_CHECK(cudaStreamSynchronize(streams[i]));
 
   optimized2_update_weight_kernel<<<grid_size, block_size>>>(
       weight, gradient, size, learning_rate);

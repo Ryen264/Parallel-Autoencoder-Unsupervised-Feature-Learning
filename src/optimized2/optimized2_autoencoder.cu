@@ -615,7 +615,8 @@ void Optimized2_Autoencoder::fit(const Optimized_Dataset &dataset,
          eval(dataset));
 }
 
-Optimized_Dataset Optimized2_Autoencoder::encode(const Optimized_Dataset &dataset) const {
+Optimized_Dataset
+Optimized2_Autoencoder::encode(const Optimized_Dataset &dataset) const {
   // Encode by batches to use less memory
   int width = dataset.width, height = dataset.height, depth = dataset.depth,
       n                  = dataset.n;

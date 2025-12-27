@@ -1,15 +1,15 @@
 #include "optimized2_layers.h"
 
 // -------------------- Conv2D Forward --------------------
-__global__ void void optimized2_full_filter_kernel(float *in,
-                                                   float *filter,
-                                                   float *bias,
-                                                   float *in_relu,
-                                                   float *out,
-                                                   int    width,
-                                                   int    height,
-                                                   int    depth,
-                                                   int    n_filter) {
+__global__ void optimized2_full_filter_kernel(float *in,
+                                              float *filter,
+                                              float *bias,
+                                              float *in_relu,
+                                              float *out,
+                                              int    width,
+                                              int    height,
+                                              int    depth,
+                                              int    n_filter) {
   extern __shared__ float s_in[];
 
   int tid_y = threadIdx.y;
@@ -333,8 +333,8 @@ __global__ void optimized2_full_filter_grad_kernel(float *in,
   int    shared_width  = dim_x + CONV_FILTER_WIDTH - 1;
   float *d_filter_offset =
       d_filter + f * CONV_FILTER_HEIGHT * CONV_FILTER_WIDTH * depth;
-  float d_out_val = d_out[idx];
   int   idx       = GET_1D_IDX(i, j, f, width, height);
+  float d_out_val = d_out[idx];
   atomicAdd(d_bias + f, d_out_val);
 
   if (tid_x == 0 && tid_y == 0 && tid_z == 0)
@@ -655,18 +655,18 @@ void optimized2_full_filter(float       *in,
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * n_filter;
 
-    optimized2_conv2D_kernel<<<grid_size,
-                               block_size,
-                               shared_size,
-                               streams[i % N_STREAMS]>>>(in + in_offset,
-                                                         filter,
-                                                         bias,
-                                                         in_relu + out_offset,
-                                                         out + out_offset,
-                                                         width,
-                                                         height,
-                                                         depth,
-                                                         n_filter);
+    optimized2_full_filter_kernel<<<grid_size,
+                                    block_size,
+                                    shared_size,
+                                    streams[i % N_STREAMS]>>>(in + in_offset,
+                                                              filter,
+                                                              bias,
+                                                              in_relu + out_offset,
+                                                              out + out_offset,
+                                                              width,
+                                                              height,
+                                                              depth,
+                                                              n_filter);
   }
 }
 

@@ -851,7 +851,6 @@ Optimized_Dataset Optimized2_Autoencoder::decode(const Optimized_Dataset &datase
   int n_batch            = (n - 1) / ENCODE_BATCH_SIZE + 1;
   int image_size         = width * height * depth;
   int decoded_image_size = 4 * width * 4 * height * DECODER_FILTER_3_DEPTH;
-  int out_offset         = 0;
 
   Optimized_Dataset res(dataset.n, width * 4, height * 4, DECODER_FILTER_3_DEPTH);
 

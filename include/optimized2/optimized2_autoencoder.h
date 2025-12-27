@@ -143,7 +143,7 @@ public:
    * @param dataset The dataset to be encoded
    * @return Optimized_Dataset The encoded dataset
    */
-  Optimized_Dataset encode(const Optimized_Dataset &dataset) const;
+  Optimized_Dataset encode(const Optimized_Dataset &dataset);
 
   /**
    * @brief Decodes a dataset
@@ -151,7 +151,7 @@ public:
    * @param dataset The dataset to be decoded
    * @return Optimized_Dataset The decoded dataset
    */
-  Optimized_Dataset decode(const Optimized_Dataset &dataset) const;
+  Optimized_Dataset decode(const Optimized_Dataset &dataset);
 
   /**
    * @brief Trains the model using a dataset
@@ -177,7 +177,7 @@ public:
    * @param dataset The dataset to be evaluated
    * @return float The MSE between the actual and expected result
    */
-  float eval(const Optimized_Dataset &dataset) const;
+  float eval(const Optimized_Dataset &dataset);
 
   /**
    * @brief Write the model's parameters to a file

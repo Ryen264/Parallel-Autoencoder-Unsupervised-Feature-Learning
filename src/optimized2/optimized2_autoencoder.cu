@@ -354,7 +354,7 @@ void Optimized2_Autoencoder::_deallocate_output_mem() {
   CUDA_CHECK(cudaFree(_out_upsampling_2));
 
   CUDA_CHECK(cudaFree(_out_decoder_filter_3));
-  CUDA_CHECK(cudaFree(_out_decoder_bias_3));
+  CUDA_CHECK(cudaFree(_in_decoder_relu_3));
 
   CUDA_CHECK(cudaFree(_batch_data));
   CUDA_CHECK(cudaFree(_res_data));
@@ -748,8 +748,7 @@ void Optimized2_Autoencoder::fit(const Optimized_Dataset &dataset,
          eval(dataset));
 }
 
-Optimized_Dataset
-Optimized2_Autoencoder::encode(const Optimized_Dataset &dataset) const {
+Optimized_Dataset Optimized2_Autoencoder::encode(const Optimized_Dataset &dataset) {
   // Encode by batches to use less memory
   int width = dataset.width, height = dataset.height, depth = dataset.depth,
       n                  = dataset.n;
@@ -846,8 +845,7 @@ Optimized2_Autoencoder::encode(const Optimized_Dataset &dataset) const {
   return res;
 }
 
-Optimized_Dataset
-Optimized2_Autoencoder::decode(const Optimized_Dataset &dataset) const {
+Optimized_Dataset Optimized2_Autoencoder::decode(const Optimized_Dataset &dataset) {
   int width = dataset.width, height = dataset.height, depth = dataset.depth,
       n                  = dataset.n;
   int n_batch            = (n - 1) / ENCODE_BATCH_SIZE + 1;
@@ -960,7 +958,7 @@ Optimized2_Autoencoder::decode(const Optimized_Dataset &dataset) const {
   return res;
 }
 
-float Optimized2_Autoencoder::eval(const Optimized_Dataset &dataset) const {
+float Optimized2_Autoencoder::eval(const Optimized_Dataset &dataset) {
   int n = dataset.n, width = dataset.width, height = dataset.height,
       depth              = dataset.depth;
   int               size = width * height * depth;

@@ -77,6 +77,8 @@ class Optimized2_Autoencoder {
   static constexpr dim3 _conv_block_size_2 = dim3(4, 4, 64);
   static constexpr dim3 _conv_block_size_3 = dim3(8, 4, 32);
 
+  cudaStream_t _streams[N_STREAMS];
+
   /**
    * @brief Perform a formward pass
    *

@@ -557,7 +557,7 @@ void optimized2_full_filter(float *in,
 }
 
 void optimized2_max_pooling(
-    float *in, float *out, int n, int width, int height, int depth, dim3 block_size, ) {
+    float *in, float *out, int n, int width, int height, int depth, dim3 block_size) {
   dim3 grid_size((width / 2 - 1) / block_size.x + 1,
                  (height / 2 - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
@@ -572,7 +572,7 @@ void optimized2_max_pooling(
 }
 
 void optimized2_upsampling(
-    float *in, float *out, int n, int width, int height, int depth, dim3 block_size, ) {
+    float *in, float *out, int n, int width, int height, int depth, dim3 block_size) {
   dim3 grid_size((2 * width - 1) / block_size.x + 1,
                  (2 * height - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);

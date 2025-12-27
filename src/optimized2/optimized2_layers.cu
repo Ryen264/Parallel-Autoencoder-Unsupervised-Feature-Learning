@@ -285,8 +285,8 @@ __global__ void optimized2_upsampling_backward_kernel(
 }
 
 // -------------------- MSE Loss & Gradient --------------------
-__global__ void optimized2_mse_loss_kernel(
-    float *expected, float *actual, float *out, int n, int size) {
+__global__ void
+optimized2_mse_loss_kernel(float *expected, float *actual, float *out, int size) {
   __shared__ float shared[MAX_BLOCK_SIZE];
   int              tid    = threadIdx.x;
   int              offset = (blockDim.x * blockIdx.x) * 2 + tid;
@@ -317,14 +317,14 @@ __global__ void optimized2_mse_loss_kernel(
   }
 
   if (tid == 0)
-    atomicAdd(out, shared[0] / size / n);
+    atomicAdd(out, shared[0] / size);
 }
 
-__global__ void optimized2_mse_grad_kernel(
-    float *expected, float *actual, float *d_out, int n, int size) {
+__global__ void
+optimized2_mse_grad_kernel(float *expected, float *actual, float *d_out, int size) {
   int idx = blockIdx.x * blockDim.x + threadIdx.x;
   if (idx < size)
-    d_out[idx] = 2.0f * (actual[idx] - expected[idx]) / size / n;
+    d_out[idx] = 2.0f * (actual[idx] - expected[idx]) / size;
 }
 
 // -------------------- ReLU Backward --------------------
@@ -520,18 +520,17 @@ __global__ void optimized2_max_pooling_backward_kernel(
                   : 0.0f;
 }
 
-void optimized2_full_filter(float       *in,
-                            float       *filter,
-                            float       *bias,
-                            float       *in_relu,
-                            float       *out,
-                            int          n,
-                            int          width,
-                            int          height,
-                            int          depth,
-                            int          n_filter,
-                            dim3         block_size,
-                            cudaStream_t streams[]) {
+void optimized2_full_filter(float *in,
+                            float *filter,
+                            float *bias,
+                            float *in_relu,
+                            float *out,
+                            int    n,
+                            int    width,
+                            int    height,
+                            int    depth,
+                            int    n_filter,
+                            dim3   block_size) {
   dim3 grid_size((width - 1) / block_size.x + 1,
                  (height - 1) / block_size.y + 1,
                  (n_filter - 1) / block_size.z + 1);
@@ -544,29 +543,21 @@ void optimized2_full_filter(float       *in,
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * n_filter;
 
-    optimized2_full_filter_kernel<<<grid_size,
-                                    block_size,
-                                    shared_size,
-                                    streams[i % N_STREAMS]>>>(in + in_offset,
-                                                              filter,
-                                                              bias,
-                                                              in_relu + out_offset,
-                                                              out + out_offset,
-                                                              width,
-                                                              height,
-                                                              depth,
-                                                              n_filter);
+    optimized2_full_filter_kernel<<<grid_size, block_size, shared_size>>>(
+        in + in_offset,
+        filter,
+        bias,
+        in_relu + out_offset,
+        out + out_offset,
+        width,
+        height,
+        depth,
+        n_filter);
   }
 }
 
-void optimized2_max_pooling(float       *in,
-                            float       *out,
-                            int          n,
-                            int          width,
-                            int          height,
-                            int          depth,
-                            dim3         block_size,
-                            cudaStream_t streams[]) {
+void optimized2_max_pooling(
+    float *in, float *out, int n, int width, int height, int depth, dim3 block_size, ) {
   dim3 grid_size((width / 2 - 1) / block_size.x + 1,
                  (height / 2 - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
@@ -575,19 +566,13 @@ void optimized2_max_pooling(float       *in,
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * depth / 4;
 
-    optimized2_max_pooling_kernel<<<grid_size, block_size, 0, streams[i % N_STREAMS]>>>(
+    optimized2_max_pooling_kernel<<<grid_size, block_size>>>(
         in + in_offset, out + out_offset, width, height, depth);
   }
 }
 
-void optimized2_upsampling(float       *in,
-                           float       *out,
-                           int          n,
-                           int          width,
-                           int          height,
-                           int          depth,
-                           dim3         block_size,
-                           cudaStream_t streams[]) {
+void optimized2_upsampling(
+    float *in, float *out, int n, int width, int height, int depth, dim3 block_size, ) {
   dim3 grid_size((2 * width - 1) / block_size.x + 1,
                  (2 * height - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
@@ -596,31 +581,26 @@ void optimized2_upsampling(float       *in,
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * depth * 4;
 
-    optimized2_upsampling_kernel<<<grid_size, block_size, 0, streams[i % N_STREAMS]>>>(
+    optimized2_upsampling_kernel<<<grid_size, block_size>>>(
         in + in_offset, out + out_offset, width, height, depth);
   }
 }
 
-float optimized2_mse_loss(float       *expected,
-                          float       *actual,
-                          int          n,
-                          int          width,
-                          int          height,
-                          int          depth,
-                          dim3         block_size,
-                          cudaStream_t streams[]) {
-  int    size = width * height * depth;
+float optimized2_mse_loss(float *expected,
+                          float *actual,
+                          int    n,
+                          int    width,
+                          int    height,
+                          int    depth,
+                          dim3   block_size) {
+  int    size = n * width * height * depth;
   dim3   grid_size((size - 1) / block_size.x + 1);
   float  loss = 0;
   float *d_loss;
   CUDA_CHECK(cudaMalloc(&d_loss, sizeof(float)));
   CUDA_CHECK(cudaMemset(d_loss, 0, sizeof(float)));
 
-  for (int i = 0; i < n; ++i) {
-    int offset = i * size;
-    optimized2_mse_loss_kernel<<<grid_size, block_size, 0, streams[i % N_STREAMS]>>>(
-        expected + offset, actual + offset, d_loss, n, size);
-  }
+  optimized2_mse_loss_kernel<<<grid_size, block_size>>>(expected, actual, d_loss, size);
 
   CUDA_CHECK(cudaMemcpy(&loss, d_loss, sizeof(float), cudaMemcpyDeviceToHost));
   CUDA_CHECK(cudaFree(d_loss));
@@ -628,56 +608,42 @@ float optimized2_mse_loss(float       *expected,
   return loss;
 }
 
-void optimized2_mse_grad(float       *expected,
-                         float       *actual,
-                         float       *d_out,
-                         int          n,
-                         int          width,
-                         int          height,
-                         int          depth,
-                         dim3         block_size,
-                         cudaStream_t streams[]) {
-  int  size = width * height * depth;
+void optimized2_mse_grad(float *expected,
+                         float *actual,
+                         float *d_out,
+                         int    n,
+                         int    width,
+                         int    height,
+                         int    depth,
+                         dim3   block_size) {
+  int  size = n * width * height * depth;
   dim3 grid_size((size - 1) / block_size.x + 1);
 
-  for (int i = 0; i < n; ++i) {
-    int offset = i * size;
-    optimized2_mse_grad_kernel<<<grid_size, block_size, 0, streams[i % N_STREAMS]>>>(
-        expected + offset, actual + offset, d_out + offset, n, size);
-  }
+  optimized2_mse_grad_kernel<<<grid_size, block_size>>>(expected, actual, d_out, size);
 }
 
-void optimized2_relu_backward(float       *in,
-                              float       *d_out,
-                              float       *d_in,
-                              int          n,
-                              int          width,
-                              int          height,
-                              int          depth,
-                              dim3         block_size,
-                              cudaStream_t streams[]) {
-  int  size = width * height * depth;
+void optimized2_relu_backward(float *in,
+                              float *d_out,
+                              float *d_in,
+                              int    n,
+                              int    width,
+                              int    height,
+                              int    depth,
+                              dim3   block_size) {
+  int  size = n * width * height * depth;
   dim3 grid_size((size - 1) / block_size.x + 1);
 
-  for (int i = 0; i < n; ++i) {
-    int offset = i * size;
-    optimized2_relu_backward_kernel<<<grid_size,
-                                      block_size,
-                                      0,
-                                      streams[i % N_STREAMS]>>>(
-        in + offset, d_out + offset, d_in + offset, size);
-  }
+  optimized2_relu_backward_kernel<<<grid_size, block_size>>>(in, d_out, d_in, size);
 }
 
-void optimized2_max_pooling_backward(float       *in,
-                                     float       *d_out,
-                                     float       *d_in,
-                                     int          n,
-                                     int          width,
-                                     int          height,
-                                     int          depth,
-                                     dim3         block_size,
-                                     cudaStream_t streams[]) {
+void optimized2_max_pooling_backward(float *in,
+                                     float *d_out,
+                                     float *d_in,
+                                     int    n,
+                                     int    width,
+                                     int    height,
+                                     int    depth,
+                                     dim3   block_size) {
   dim3 grid_size((width - 1) / block_size.x + 1,
                  (height - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
@@ -686,22 +652,18 @@ void optimized2_max_pooling_backward(float       *in,
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * depth / 4;
 
-    optimized2_max_pooling_backward_kernel<<<grid_size,
-                                             block_size,
-                                             0,
-                                             streams[i % N_STREAMS]>>>(
+    optimized2_max_pooling_backward_kernel<<<grid_size, block_size>>>(
         in + in_offset, d_out + out_offset, d_in + in_offset, width, height, depth);
   }
 }
 
-void optimized2_upsampling_backward(float       *d_out,
-                                    float       *d_in,
-                                    int          n,
-                                    int          width,
-                                    int          height,
-                                    int          depth,
-                                    dim3         block_size,
-                                    cudaStream_t streams[]) {
+void optimized2_upsampling_backward(float *d_out,
+                                    float *d_in,
+                                    int    n,
+                                    int    width,
+                                    int    height,
+                                    int    depth,
+                                    dim3   block_size) {
   dim3 grid_size((width - 1) / block_size.x + 1,
                  (height - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
@@ -710,25 +672,21 @@ void optimized2_upsampling_backward(float       *d_out,
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * depth * 4;
 
-    optimized2_upsampling_backward_kernel<<<grid_size,
-                                            block_size,
-                                            0,
-                                            streams[i % N_STREAMS]>>>(
+    optimized2_upsampling_backward_kernel<<<grid_size, block_size>>>(
         d_out + out_offset, d_in + in_offset, width, height, depth);
   }
 }
 
-void optimized2_full_filter_grad(float       *in,
-                                 float       *d_out,
-                                 float       *d_bias,
-                                 float       *d_filter,
-                                 int          n,
-                                 int          width,
-                                 int          height,
-                                 int          depth,
-                                 int          n_filter,
-                                 dim3         block_size,
-                                 cudaStream_t streams[]) {
+void optimized2_full_filter_grad(float *in,
+                                 float *d_out,
+                                 float *d_bias,
+                                 float *d_filter,
+                                 int    n,
+                                 int    width,
+                                 int    height,
+                                 int    depth,
+                                 int    n_filter,
+                                 dim3   block_size) {
   dim3 grid_size((width - 1) / block_size.x + 1,
                  (height - 1) / block_size.y + 1,
                  (n_filter - 1) / block_size.z + 1);
@@ -747,42 +705,35 @@ void optimized2_full_filter_grad(float       *in,
     int in_offset  = i * width * height * depth;
     int out_offset = i * width * height * n_filter;
 
-    optimized2_full_filter_grad_kernel<<<grid_size,
-                                         block_size,
-                                         shared_size,
-                                         streams[i % N_STREAMS]>>>(in + in_offset,
-                                                                   d_out + out_offset,
-                                                                   d_bias,
-                                                                   d_filter,
-                                                                   width,
-                                                                   height,
-                                                                   depth,
-                                                                   n_filter);
+    optimized2_full_filter_grad_kernel<<<grid_size, block_size, shared_size>>>(
+        in + in_offset,
+        d_out + out_offset,
+        d_bias,
+        d_filter,
+        width,
+        height,
+        depth,
+        n_filter);
   }
 }
 
-void optimized2_update_weight(float       *weight,
-                              float       *gradient,
-                              int          size,
-                              float        learning_rate,
-                              dim3         block_size,
-                              cudaStream_t streams[]) {
+void optimized2_update_weight(
+    float *weight, float *gradient, int size, float learning_rate, dim3 block_size) {
   dim3 grid_size((size - 1) / block_size.x + 1);
 
   optimized2_update_weight_kernel<<<grid_size, block_size>>>(
       weight, gradient, size, learning_rate);
 }
 
-void optimized2_conv2D_backward(float       *d_out,
-                                float       *filter,
-                                float       *d_in,
-                                int          n,
-                                int          width,
-                                int          height,
-                                int          depth,
-                                int          n_filter,
-                                dim3         block_size,
-                                cudaStream_t streams[]) {
+void optimized2_conv2D_backward(float *d_out,
+                                float *filter,
+                                float *d_in,
+                                int    n,
+                                int    width,
+                                int    height,
+                                int    depth,
+                                int    n_filter,
+                                dim3   block_size) {
   dim3 grid_size((width - 1) / block_size.x + 1,
                  (height - 1) / block_size.y + 1,
                  (depth - 1) / block_size.z + 1);
@@ -795,15 +746,13 @@ void optimized2_conv2D_backward(float       *d_out,
     int d_in_offset  = i * width * height * depth;
     int d_out_offset = i * width * height * n_filter;
 
-    optimized2_conv2D_backward_kernel<<<grid_size,
-                                        block_size,
-                                        shared_size,
-                                        streams[i % N_STREAMS]>>>(d_out + d_out_offset,
-                                                                  filter,
-                                                                  d_in + d_in_offset,
-                                                                  width,
-                                                                  height,
-                                                                  depth,
-                                                                  n_filter);
+    optimized2_conv2D_backward_kernel<<<grid_size, block_size, shared_size>>>(
+        d_out + d_out_offset,
+        filter,
+        d_in + d_in_offset,
+        width,
+        height,
+        depth,
+        n_filter);
   }
 }

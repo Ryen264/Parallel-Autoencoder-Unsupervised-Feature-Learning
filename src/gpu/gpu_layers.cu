@@ -314,8 +314,11 @@ __global__ void gpu_conv2D_backward_kernel(float *d_out,
         if (col < 0 || col >= width)
           continue;
 
-        d_sum += filter_offset[GET_1D_IDX(
-                     f_i, f_j, d, CONV_FILTER_WIDTH, CONV_FILTER_HEIGHT)] *
+        d_sum += filter_offset[GET_1D_IDX(CONV_FILTER_HEIGHT - 1 - f_i,
+                                          CONV_FILTER_WIDTH - 1 - f_j,
+                                          d,
+                                          CONV_FILTER_WIDTH,
+                                          CONV_FILTER_HEIGHT)] *
                  d_out[GET_1D_IDX(row, col, f, width, height)];
       }
     }

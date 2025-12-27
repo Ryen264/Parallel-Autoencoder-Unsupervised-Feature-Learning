@@ -98,65 +98,36 @@ gpu_upsampling_kernel(float *in, float *out, int width, int height, int depth) {
 __global__ void
 gpu_mse_loss_kernel(float *expected, float *actual, float *out, int size) {
   __shared__ float shared[MAX_BLOCK_SIZE];
+  int              tid    = threadIdx.x;
+  int              offset = (blockDim.x * blockIdx.x) * 2 + tid;
+  shared[tid]             = 0;
 
-  int    tid    = threadIdx.x;
-  float *elem   = shared + tid;
-  int    offset = (blockDim.x * blockIdx.x) * 2 + tid;
-
-  // Set all the element to 0
-  *elem = 0;
-
-  // Copy into shared memory, and doing the first pass at the same time
   if (offset < size) {
-    *elem = SQR(expected[offset] - actual[offset]);
-    // If block size is less than 32,
-    // we do the unroll directly
+    shared[tid] = SQR(expected[offset] - actual[offset]);
     if (blockDim.x > 32 && (offset += blockDim.x) < size)
-      *elem += SQR(expected[offset] - actual[offset]);
+      shared[tid] += SQR(expected[offset] - actual[offset]);
   }
   __syncthreads();
 
-  // Since MAX_BLOCK_SIZE is 1024, we start from 512
-  // because we already did the first pass
-  if (blockDim.x > 512) {
-    if (tid < 512)
-      *elem += elem[512];
+  for (int s = blockDim.x / 2; s > 32; s >>= 1) {
+    if (tid < s)
+      shared[tid] += shared[tid + s];
     __syncthreads();
   }
 
-  if (blockDim.x > 256) {
-    if (tid < 256)
-      *elem += elem[256];
-    __syncthreads();
-  }
-
-  if (blockDim.x > 128) {
-    if (tid < 128)
-      *elem += elem[128];
-    __syncthreads();
-  }
-
-  if (blockDim.x > 64) {
-    if (tid < 64)
-      *elem += elem[64];
-    __syncthreads();
-  }
-
-  // Unroll last warp
   if (tid < 32) {
-    volatile float *vmem = elem;
-
-    *vmem = *vmem + vmem[32];
-    *vmem = *vmem + vmem[16];
-    *vmem = *vmem + vmem[8];
-    *vmem = *vmem + vmem[4];
-    *vmem = *vmem + vmem[2];
-    *vmem = *vmem + vmem[1];
+    volatile float *vmem = shared;
+    if (blockDim.x >= 64)
+      vmem[tid] = vmem[tid] + vmem[tid + 32];
+    vmem[tid] = vmem[tid] + vmem[tid + 16];
+    vmem[tid] = vmem[tid] + vmem[tid + 8];
+    vmem[tid] = vmem[tid] + vmem[tid + 4];
+    vmem[tid] = vmem[tid + 2];
+    vmem[tid] = vmem[tid + 1];
   }
 
-  // Copy to output
   if (tid == 0)
-    atomicAdd(out, *elem / size);
+    atomicAdd(out, shared[0] / size);
 }
 
 __global__ void

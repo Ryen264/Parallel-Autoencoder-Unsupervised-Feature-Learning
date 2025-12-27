@@ -392,6 +392,7 @@ __global__ void optimized2_full_filter_grad_kernel(float *in,
   float *d_filter_offset =
       d_filter + f * CONV_FILTER_WIDTH * CONV_FILTER_HEIGHT * depth;
   float d_out_val = d_out[GET_1D_IDX(i, j, f, width, height)];
+  atomicAdd(d_bias + f, d_out_val);
 
   for (int f_i = 0; f_i < CONV_FILTER_HEIGHT; ++f_i) {
     for (int f_j = 0; f_j < CONV_FILTER_WIDTH; ++f_j) {

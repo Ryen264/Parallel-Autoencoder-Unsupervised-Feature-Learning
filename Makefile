@@ -36,7 +36,7 @@ GPU_AUTOENCODER_DEPS = $(OBJ_DIR)/data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_
 GPU_AUTOENCODER_TARGET = gpu_main
 OPT1_AUTOENCODER_DEPS = $(OBJ_DIR)/optimized_data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_DIR)/timer.o $(OBJ_DIR)/utils.o $(OPT1_OBJECTS)
 OPT1_AUTOENCODER_TARGET = opt1_main
-OP2_AUTOENCODER_DEPS = $(OBJ_DIR)/optimized_data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_DIR)/timer.o $(OBJ_DIR)/utils.o $(OPT2_OBJECTS)
+OPT2_AUTOENCODER_DEPS = $(OBJ_DIR)/optimized_data_loader.o $(OBJ_DIR)/progress_bar.o $(OBJ_DIR)/timer.o $(OBJ_DIR)/utils.o $(OPT2_OBJECTS)
 OPT2_AUTOENCODER_TARGET = opt2_main
 
 gpu_main: $(GPU_AUTOENCODER_DEPS)

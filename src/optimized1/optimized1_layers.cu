@@ -4,20 +4,20 @@
 // HELPER: Shared Memory Loading (Giữ nguyên)
 // =========================================================
 static __device__ void load_tile_to_shared(float *d_in,
-                                    float *s_in,
-                                    int    n_channels,
-                                    int    width,
-                                    int    height,
-                                    int    i,
-                                    int    j,
-                                    int    tid_y,
-                                    int    tid_x,
-                                    int    dim_y,
-                                    int    dim_x,
-                                    int    padding_y,
-                                    int    padding_x,
-                                    int    shared_width,
-                                    int    shared_height) {
+                                           float *s_in,
+                                           int    n_channels,
+                                           int    width,
+                                           int    height,
+                                           int    i,
+                                           int    j,
+                                           int    tid_y,
+                                           int    tid_x,
+                                           int    dim_y,
+                                           int    dim_x,
+                                           int    padding_y,
+                                           int    padding_x,
+                                           int    shared_width,
+                                           int    shared_height) {
   // 1. Center
   for (int c = 0; c < n_channels; ++c) {
     if (i < height && j < width) {

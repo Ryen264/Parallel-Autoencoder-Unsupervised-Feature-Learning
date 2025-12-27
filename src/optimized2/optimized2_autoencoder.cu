@@ -780,7 +780,7 @@ Optimized2_Autoencoder::decode(const Optimized_Dataset &dataset) const {
                            _block_size_3D_2);
 
     CUDA_CHECK(cudaMemcpy(res.data + in_offset * decoded_image_size,
-                          b,
+                          a,
                           cur_batch_size * decoded_image_size * sizeof(float),
                           cudaMemcpyDeviceToHost));
   }

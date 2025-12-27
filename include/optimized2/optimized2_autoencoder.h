@@ -141,7 +141,7 @@ public:
    * @param dataset The dataset to be encoded
    * @return Optimized_Dataset The encoded dataset
    */
-  Optimized_Dataset encode(const Optimized_Dataset &dataset);
+  Optimized_Dataset encode(const Optimized_Dataset &dataset) const;
 
   /**
    * @brief Decodes a dataset

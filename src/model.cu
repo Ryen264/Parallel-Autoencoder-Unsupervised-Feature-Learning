@@ -329,7 +329,6 @@ void SVMmodel::train(const vector<vector<double>>& data, const vector<int>& labe
 
     set<int> unique_labels(labels.begin(), labels.end());
     int n_unique_classes = unique_labels.size();
-    int n_binary_classifiers = (n_unique_classes * (n_unique_classes - 1)) / 2;
     
     libsvm_epoch_counter = 0;
     libsvm_timer = &timer;

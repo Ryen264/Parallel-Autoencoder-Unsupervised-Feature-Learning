@@ -3,6 +3,7 @@
 #include "cpu_autoencoder.h"
 #include "gpu_autoencoder.h"
 #include "optimized1_autoencoder.h"
+#include "optimized2_autoencoder.h"
 #include "optimized_data_loader.h"
 #include "model.h"
 
@@ -11,7 +12,7 @@
 using namespace std;
 #include <type_traits>
 
-//./main [version=cpu/gpu/opt1] [phase_1_mode=train/load] [phase_2_mode=train/load] \
+//./main [version=cpu/gpu/opt1/opt2] [phase_1_mode=train/load] [phase_2_mode=train/load] \
 //       [n_batches] [n_epoch] [batch_size] [learning_rate] \
 //       [c_param] [kernel_type] [gamma_type]
 
@@ -92,8 +93,7 @@ AE phase_1_train(const DT   &dataset,
 
 template <typename AE>
 AE phase_1_load(const char *autoencoder_path = CPU_AUTOENCODER_PATH) {
-  AE autoencoder;
-  autoencoder.load_parameters(autoencoder_path);
+  AE autoencoder(autoencoder_path);
   printf("Loaded Autoencoder model from %s\n", autoencoder_path);
   return autoencoder;
 }
@@ -353,6 +353,30 @@ int main(int argc, char *argv[]) {
         opt_trainset, opt1_autoencoder, ENCODED_DATASET_PATH, true);
     encoded_testset_opt = phase_1_encode<Optimized1_Autoencoder, Optimized_Dataset>(
         opt_testset, opt1_autoencoder, ENCODED_DATASET_PATH, false);
+  } else if (version == "opt2") {
+    // Load optimized datasets directly for opt2 path
+    Optimized_Dataset opt_trainset = load_dataset_opt(DATASET_DIR, n_batches, true);
+    Optimized_Dataset opt_testset  = load_dataset_opt(DATASET_DIR, 1, false);
+    Optimized2_Autoencoder opt2_autoencoder;
+    if (train_phase_1) {
+      opt2_autoencoder = phase_1_train<Optimized2_Autoencoder, Optimized_Dataset>(opt_trainset,
+                                                               OUTPUT_DIR,
+                                                               GPU_AUTOENCODER_PATH,
+                                                               n_epoch,
+                                                               batch_size,
+                                                               learning_rate,
+                                                               CHECKPOINT,
+                                                               true);
+    } else {
+      opt2_autoencoder = phase_1_load<Optimized2_Autoencoder>(GPU_AUTOENCODER_PATH);
+    }
+    // Phase 1: Encode trainset and testset
+    printf("Encoding trainset and testset using Optimized2 Autoencoder...\n");
+    encoded_trainset_opt = phase_1_encode<Optimized2_Autoencoder, Optimized_Dataset>(
+        opt_trainset, opt2_autoencoder, ENCODED_DATASET_PATH, true);
+    encoded_testset_opt = phase_1_encode<Optimized2_Autoencoder, Optimized_Dataset>(
+        opt_testset, opt2_autoencoder, ENCODED_DATASET_PATH, false);
+
   } else {
     cout << "Invalid version specified. Use 'cpu', 'gpu', or 'opt1'." << endl;
     return -1;

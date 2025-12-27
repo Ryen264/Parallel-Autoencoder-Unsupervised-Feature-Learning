@@ -22,31 +22,4 @@ int main() {
 
   autoencoder.fit(
       dataset, N_EPOCH, BATCH_SIZE, LEARNING_RATE, CHECKPOINT, MODEL_OUTPUT_DIR);
-
-  puts("\n=======================ENCODING TRAIN DATASET=======================");
-  filesystem::create_directories(ENCODED_DATASET_DIR);
-  dataset = autoencoder.encode(dataset);
-
-  int encoded_dataset_size =
-      dataset.n * dataset.width * dataset.height * dataset.depth * sizeof(float);
-  ofstream buffer(ENCODED_DATASET_FILE, ios::out | ios::binary);
-  buffer.write(reinterpret_cast<char *>(dataset.data), encoded_dataset_size);
-  buffer.close();
-
-  buffer.open(ENCODED_LABEL_FILE, ios::out | ios::binary);
-  buffer.write(reinterpret_cast<char *>(dataset.labels), dataset.n * sizeof(int));
-  buffer.close();
-
-  puts("\n=======================ENCODING TEST DATASET=======================");
-  dataset = autoencoder.encode(read_optimized_dataset(DATASET_DIR, 1, false));
-
-  encoded_dataset_size =
-      dataset.n * dataset.width * dataset.height * dataset.depth * sizeof(float);
-  buffer.open(ENCODED_DATASET_FILE, ios::out | ios::binary);
-  buffer.write(reinterpret_cast<char *>(dataset.data), encoded_dataset_size);
-  buffer.close();
-
-  buffer.open(ENCODED_LABEL_FILE, ios::out | ios::binary);
-  buffer.write(reinterpret_cast<char *>(dataset.labels), dataset.n * sizeof(int));
-  buffer.close();
 }

@@ -54,7 +54,7 @@ class Optimized2_Autoencoder {
 
   float *_decoder_filter_3;
   float *_decoder_bias_3;
-  
+
   float *_out_decoder_filter_3;
   float *_in_decoder_relu_3;
 

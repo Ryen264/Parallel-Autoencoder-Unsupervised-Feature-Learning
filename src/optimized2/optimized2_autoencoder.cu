@@ -749,7 +749,8 @@ Optimized_Dataset Optimized2_Autoencoder::encode(const Optimized_Dataset &datase
   return res;
 }
 
-Optimized_Dataset Optimized2_Autoencoder::decode(const Optimized_Dataset &dataset) {
+Optimized_Dataset
+Optimized2_Autoencoder::decode(const Optimized_Dataset &dataset) const {
   int width = dataset.width, height = dataset.height, depth = dataset.depth,
       n                  = dataset.n;
   int n_batch            = (n - 1) / ENCODE_BATCH_SIZE + 1;
@@ -845,7 +846,7 @@ Optimized_Dataset Optimized2_Autoencoder::decode(const Optimized_Dataset &datase
   return res;
 }
 
-float Optimized2_Autoencoder::eval(const Optimized_Dataset &dataset) {
+float Optimized2_Autoencoder::eval(const Optimized_Dataset &dataset) const {
   int n = dataset.n, width = dataset.width, height = dataset.height,
       depth              = dataset.depth;
   int               size = n * width * height * depth;

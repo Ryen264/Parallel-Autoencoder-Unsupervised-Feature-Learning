@@ -49,7 +49,7 @@ opt1_main: $(OPT1_AUTOENCODER_DEPS)
 	@mkdir -p $(TARGET_DIR)
 	$(NVCC) $(NVCC_FLAGS) -o $(TARGET_DIR)/$(OPT1_AUTOENCODER_TARGET) $(OPT1_AUTOENCODER_DEPS)
 
-	opt2_main: $(OPT2_AUTOENCODER_DEPS)
+opt2_main: $(OPT2_AUTOENCODER_DEPS)
 	@echo "Compiling optimized autoencoder (version 2)..."
 	@mkdir -p $(TARGET_DIR)
 	$(NVCC) $(NVCC_FLAGS) -o $(TARGET_DIR)/$(OPT2_AUTOENCODER_TARGET) $(OPT2_AUTOENCODER_DEPS)

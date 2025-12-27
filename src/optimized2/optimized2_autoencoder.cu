@@ -668,7 +668,8 @@ void Optimized2_Autoencoder::fit(const Optimized_Dataset &dataset,
          eval(dataset));
 }
 
-Optimized_Dataset Optimized2_Autoencoder::encode(const Optimized_Dataset &dataset) {
+Optimized_Dataset
+Optimized2_Autoencoder::encode(const Optimized_Dataset &dataset) const {
   // Encode by batches to use less memory
   int width = dataset.width, height = dataset.height, depth = dataset.depth,
       n                  = dataset.n;
@@ -706,7 +707,7 @@ Optimized_Dataset Optimized2_Autoencoder::encode(const Optimized_Dataset &datase
                            height,
                            depth,
                            ENCODER_FILTER_1_DEPTH,
-                           _conv_block_size_1);
+                           _block_size_3D_1);
 
     // Max pooling
     optimized2_max_pooling(
@@ -722,7 +723,7 @@ Optimized_Dataset Optimized2_Autoencoder::encode(const Optimized_Dataset &datase
                            height / 2,
                            ENCODER_FILTER_1_DEPTH,
                            ENCODER_FILTER_2_DEPTH,
-                           _conv_block_size_2);
+                           _block_size_3D_2);
 
     // Second max pooling
     optimized2_max_pooling(a,
@@ -749,7 +750,8 @@ Optimized_Dataset Optimized2_Autoencoder::encode(const Optimized_Dataset &datase
   return res;
 }
 
-Optimized_Dataset Optimized2_Autoencoder::decode(const Optimized_Dataset &dataset) {
+Optimized_Dataset
+Optimized2_Autoencoder::decode(const Optimized_Dataset &dataset) const {
   int width = dataset.width, height = dataset.height, depth = dataset.depth,
       n                  = dataset.n;
   int n_batch            = (n - 1) / ENCODE_BATCH_SIZE + 1;
@@ -790,7 +792,7 @@ Optimized_Dataset Optimized2_Autoencoder::decode(const Optimized_Dataset &datase
                            height,
                            depth,
                            DECODER_FILTER_1_DEPTH,
-                           _conv_block_size_3);
+                           _block_size_3D_3);
 
     // Upsampling
     optimized2_upsampling(
@@ -807,7 +809,7 @@ Optimized_Dataset Optimized2_Autoencoder::decode(const Optimized_Dataset &datase
                            height * 2,
                            DECODER_FILTER_1_DEPTH,
                            DECODER_FILTER_2_DEPTH,
-                           _conv_block_size_3);
+                           _block_size_3D_2);
 
     // Upsampling
     optimized2_upsampling(a,
@@ -845,7 +847,7 @@ Optimized_Dataset Optimized2_Autoencoder::decode(const Optimized_Dataset &datase
   return res;
 }
 
-float Optimized2_Autoencoder::eval(const Optimized_Dataset &dataset) {
+float Optimized2_Autoencoder::eval(const Optimized_Dataset &dataset) const {
   int n = dataset.n, width = dataset.width, height = dataset.height,
       depth              = dataset.depth;
   int               size = n * width * height * depth;

@@ -3,7 +3,7 @@
 // =========================================================
 // HELPER: Shared Memory Loading (Giữ nguyên)
 // =========================================================
-__device__ void load_tile_to_shared(float *d_in,
+static __device__ void load_tile_to_shared(float *d_in,
                                     float *s_in,
                                     int    n_channels,
                                     int    width,

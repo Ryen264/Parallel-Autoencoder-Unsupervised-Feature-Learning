@@ -2,8 +2,8 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #ifdef _WIN32
-  #include <direct.h>
-  #define mkdir(path, mode) _mkdir(path)
+#include <direct.h>
+#define mkdir(path, mode) _mkdir(path)
 #endif
 
 /**
@@ -103,78 +103,88 @@ Gpu_Autoencoder::Gpu_Autoencoder(const char *filename) {
 
 Gpu_Autoencoder::Gpu_Autoencoder(const Gpu_Autoencoder &other) {
   // Allocate and deep-copy parameters only
-  CUDA_CHECK(cudaMalloc(&_encoder_filter_1,
-                        ENCODER_FILTER_1_SIZE * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_encoder_filter_1, other._encoder_filter_1,
-                        ENCODER_FILTER_1_SIZE * sizeof(float), cudaMemcpyDeviceToDevice));
-  CUDA_CHECK(cudaMalloc(&_encoder_bias_1,
-                        ENCODER_FILTER_1_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_encoder_bias_1, other._encoder_bias_1,
-                        ENCODER_FILTER_1_DEPTH * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_encoder_filter_1,
+                        other._encoder_filter_1,
+                        ENCODER_FILTER_1_SIZE * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_encoder_bias_1,
+                        other._encoder_bias_1,
+                        ENCODER_FILTER_1_DEPTH * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
-  CUDA_CHECK(cudaMalloc(&_encoder_filter_2,
-                        ENCODER_FILTER_2_SIZE * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_encoder_filter_2, other._encoder_filter_2,
-                        ENCODER_FILTER_2_SIZE * sizeof(float), cudaMemcpyDeviceToDevice));
-  CUDA_CHECK(cudaMalloc(&_encoder_bias_2, 
-                        ENCODER_FILTER_2_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_encoder_bias_2, other._encoder_bias_2,
-                        ENCODER_FILTER_2_DEPTH * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_encoder_filter_2,
+                        other._encoder_filter_2,
+                        ENCODER_FILTER_2_SIZE * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_encoder_bias_2,
+                        other._encoder_bias_2,
+                        ENCODER_FILTER_2_DEPTH * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
-  CUDA_CHECK(cudaMalloc(&_decoder_filter_1,
-                        DECODER_FILTER_1_SIZE * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_decoder_filter_1, other._decoder_filter_1,
-                        DECODER_FILTER_1_SIZE * sizeof(float), cudaMemcpyDeviceToDevice));
-  CUDA_CHECK(cudaMalloc(&_decoder_bias_1,
-                        DECODER_FILTER_1_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_decoder_bias_1, other._decoder_bias_1,
-                        DECODER_FILTER_1_DEPTH * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_decoder_filter_1,
+                        other._decoder_filter_1,
+                        DECODER_FILTER_1_SIZE * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_decoder_bias_1,
+                        other._decoder_bias_1,
+                        DECODER_FILTER_1_DEPTH * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
-  CUDA_CHECK(cudaMalloc(&_decoder_filter_2,
-                        DECODER_FILTER_2_SIZE * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_decoder_filter_2, other._decoder_filter_2,
-                        DECODER_FILTER_2_SIZE * sizeof(float), cudaMemcpyDeviceToDevice));
-  CUDA_CHECK(cudaMalloc(&_decoder_bias_2,
-                        DECODER_FILTER_2_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_decoder_bias_2, other._decoder_bias_2,
-                        DECODER_FILTER_2_DEPTH * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_decoder_filter_2,
+                        other._decoder_filter_2,
+                        DECODER_FILTER_2_SIZE * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_decoder_bias_2,
+                        other._decoder_bias_2,
+                        DECODER_FILTER_2_DEPTH * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
-  CUDA_CHECK(cudaMalloc(&_decoder_filter_3,
-                        DECODER_FILTER_3_SIZE * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_decoder_filter_3, other._decoder_filter_3,
-                        DECODER_FILTER_3_SIZE * sizeof(float), cudaMemcpyDeviceToDevice));
-  CUDA_CHECK(cudaMalloc(&_decoder_bias_3, 
-                        DECODER_FILTER_3_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_decoder_bias_3, other._decoder_bias_3,
-                        DECODER_FILTER_3_DEPTH * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_decoder_filter_3,
+                        other._decoder_filter_3,
+                        DECODER_FILTER_3_SIZE * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_decoder_bias_3,
+                        other._decoder_bias_3,
+                        DECODER_FILTER_3_DEPTH * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
   // Transient buffers remain null (will be allocated on demand)
-  _out_encoder_filter_1   = nullptr;
-  _out_encoder_bias_1     = nullptr;
-  _out_encoder_relu_1     = nullptr;
-  _out_max_pooling_1      = nullptr;
+  _out_encoder_filter_1 = nullptr;
+  _out_encoder_bias_1   = nullptr;
+  _out_encoder_relu_1   = nullptr;
+  _out_max_pooling_1    = nullptr;
 
-  _out_encoder_filter_2   = nullptr;
-  _out_encoder_bias_2     = nullptr;
-  _out_encoder_relu_2     = nullptr;
-  _out_max_pooling_2      = nullptr;
+  _out_encoder_filter_2 = nullptr;
+  _out_encoder_bias_2   = nullptr;
+  _out_encoder_relu_2   = nullptr;
+  _out_max_pooling_2    = nullptr;
 
-  _out_decoder_filter_1   = nullptr;
-  _out_decoder_bias_1     = nullptr;
-  _out_decoder_relu_1     = nullptr;
-  _out_upsampling_1       = nullptr;
+  _out_decoder_filter_1 = nullptr;
+  _out_decoder_bias_1   = nullptr;
+  _out_decoder_relu_1   = nullptr;
+  _out_upsampling_1     = nullptr;
 
-  _out_decoder_filter_2   = nullptr;
-  _out_decoder_bias_2     = nullptr;
-  _out_decoder_relu_2     = nullptr;
-  _out_upsampling_2       = nullptr;
+  _out_decoder_filter_2 = nullptr;
+  _out_decoder_bias_2   = nullptr;
+  _out_decoder_relu_2   = nullptr;
+  _out_upsampling_2     = nullptr;
 
-  _out_decoder_filter_3   = nullptr;
-  _out_decoder_bias_3     = nullptr;
+  _out_decoder_filter_3 = nullptr;
+  _out_decoder_bias_3   = nullptr;
 
-  _d_in       = nullptr;
-  _d_out      = nullptr;
-  _d_filter   = nullptr;
+  _d_in     = nullptr;
+  _d_out    = nullptr;
+  _d_filter = nullptr;
 
   _batch_data = nullptr;
   _res_data   = nullptr;
@@ -182,197 +192,307 @@ Gpu_Autoencoder::Gpu_Autoencoder(const Gpu_Autoencoder &other) {
 
 Gpu_Autoencoder::Gpu_Autoencoder(Gpu_Autoencoder &&other) noexcept {
   // Transfer ownership of all pointers
-  _encoder_filter_1     = other._encoder_filter_1;      other._encoder_filter_1     = nullptr;
-  _encoder_bias_1       = other._encoder_bias_1;        other._encoder_bias_1       = nullptr;
+  _encoder_filter_1       = other._encoder_filter_1;
+  other._encoder_filter_1 = nullptr;
+  _encoder_bias_1         = other._encoder_bias_1;
+  other._encoder_bias_1   = nullptr;
 
-  _out_encoder_filter_1 = other._out_encoder_filter_1;  other._out_encoder_filter_1 = nullptr;
-  _out_encoder_bias_1   = other._out_encoder_bias_1;    other._out_encoder_bias_1   = nullptr;
-  _out_encoder_relu_1   = other._out_encoder_relu_1;    other._out_encoder_relu_1   = nullptr;
-  _out_max_pooling_1    = other._out_max_pooling_1;     other._out_max_pooling_1    = nullptr;
+  _out_encoder_filter_1       = other._out_encoder_filter_1;
+  other._out_encoder_filter_1 = nullptr;
+  _out_encoder_bias_1         = other._out_encoder_bias_1;
+  other._out_encoder_bias_1   = nullptr;
+  _out_encoder_relu_1         = other._out_encoder_relu_1;
+  other._out_encoder_relu_1   = nullptr;
+  _out_max_pooling_1          = other._out_max_pooling_1;
+  other._out_max_pooling_1    = nullptr;
 
-  _encoder_filter_2     = other._encoder_filter_2;      other._encoder_filter_2     = nullptr;
-  _encoder_bias_2       = other._encoder_bias_2;        other._encoder_bias_2       = nullptr;
+  _encoder_filter_2       = other._encoder_filter_2;
+  other._encoder_filter_2 = nullptr;
+  _encoder_bias_2         = other._encoder_bias_2;
+  other._encoder_bias_2   = nullptr;
 
-  _out_encoder_filter_2 = other._out_encoder_filter_2;  other._out_encoder_filter_2 = nullptr;
-  _out_encoder_bias_2   = other._out_encoder_bias_2;    other._out_encoder_bias_2   = nullptr;
-  _out_encoder_relu_2   = other._out_encoder_relu_2;    other._out_encoder_relu_2   = nullptr;
-  _out_max_pooling_2    = other._out_max_pooling_2;     other._out_max_pooling_2    = nullptr;
+  _out_encoder_filter_2       = other._out_encoder_filter_2;
+  other._out_encoder_filter_2 = nullptr;
+  _out_encoder_bias_2         = other._out_encoder_bias_2;
+  other._out_encoder_bias_2   = nullptr;
+  _out_encoder_relu_2         = other._out_encoder_relu_2;
+  other._out_encoder_relu_2   = nullptr;
+  _out_max_pooling_2          = other._out_max_pooling_2;
+  other._out_max_pooling_2    = nullptr;
 
-  _decoder_filter_1     = other._decoder_filter_1;      other._decoder_filter_1     = nullptr;
-  _decoder_bias_1       = other._decoder_bias_1;        other._decoder_bias_1       = nullptr;
+  _decoder_filter_1       = other._decoder_filter_1;
+  other._decoder_filter_1 = nullptr;
+  _decoder_bias_1         = other._decoder_bias_1;
+  other._decoder_bias_1   = nullptr;
 
-  _out_decoder_filter_1 = other._out_decoder_filter_1;  other._out_decoder_filter_1 = nullptr;
-  _out_decoder_bias_1   = other._out_decoder_bias_1;    other._out_decoder_bias_1   = nullptr;
-  _out_decoder_relu_1   = other._out_decoder_relu_1;    other._out_decoder_relu_1   = nullptr;
-  _out_upsampling_1     = other._out_upsampling_1;      other._out_upsampling_1     = nullptr;
+  _out_decoder_filter_1       = other._out_decoder_filter_1;
+  other._out_decoder_filter_1 = nullptr;
+  _out_decoder_bias_1         = other._out_decoder_bias_1;
+  other._out_decoder_bias_1   = nullptr;
+  _out_decoder_relu_1         = other._out_decoder_relu_1;
+  other._out_decoder_relu_1   = nullptr;
+  _out_upsampling_1           = other._out_upsampling_1;
+  other._out_upsampling_1     = nullptr;
 
-  _decoder_filter_2     = other._decoder_filter_2;      other._decoder_filter_2     = nullptr;
-  _decoder_bias_2       = other._decoder_bias_2;        other._decoder_bias_2       = nullptr;
+  _decoder_filter_2       = other._decoder_filter_2;
+  other._decoder_filter_2 = nullptr;
+  _decoder_bias_2         = other._decoder_bias_2;
+  other._decoder_bias_2   = nullptr;
 
-  _out_decoder_filter_2 = other._out_decoder_filter_2;  other._out_decoder_filter_2 = nullptr;
-  _out_decoder_bias_2   = other._out_decoder_bias_2;    other._out_decoder_bias_2   = nullptr;
-  _out_decoder_relu_2   = other._out_decoder_relu_2;    other._out_decoder_relu_2   = nullptr;
-  _out_upsampling_2     = other._out_upsampling_2;      other._out_upsampling_2     = nullptr;
+  _out_decoder_filter_2       = other._out_decoder_filter_2;
+  other._out_decoder_filter_2 = nullptr;
+  _out_decoder_bias_2         = other._out_decoder_bias_2;
+  other._out_decoder_bias_2   = nullptr;
+  _out_decoder_relu_2         = other._out_decoder_relu_2;
+  other._out_decoder_relu_2   = nullptr;
+  _out_upsampling_2           = other._out_upsampling_2;
+  other._out_upsampling_2     = nullptr;
 
-  _decoder_filter_3     = other._decoder_filter_3;      other._decoder_filter_3     = nullptr;
-  _decoder_bias_3       = other._decoder_bias_3;        other._decoder_bias_3       = nullptr;
+  _decoder_filter_3       = other._decoder_filter_3;
+  other._decoder_filter_3 = nullptr;
+  _decoder_bias_3         = other._decoder_bias_3;
+  other._decoder_bias_3   = nullptr;
 
-  _out_decoder_filter_3 = other._out_decoder_filter_3;  other._out_decoder_filter_3 = nullptr;
-  _out_decoder_bias_3   = other._out_decoder_bias_3;    other._out_decoder_bias_3   = nullptr;
+  _out_decoder_filter_3       = other._out_decoder_filter_3;
+  other._out_decoder_filter_3 = nullptr;
+  _out_decoder_bias_3         = other._out_decoder_bias_3;
+  other._out_decoder_bias_3   = nullptr;
 
-  _d_in                 = other._d_in;                  other._d_in                 = nullptr;
-  _d_out                = other._d_out;                 other._d_out                = nullptr;
-  _d_filter             = other._d_filter;              other._d_filter             = nullptr;
+  _d_in           = other._d_in;
+  other._d_in     = nullptr;
+  _d_out          = other._d_out;
+  other._d_out    = nullptr;
+  _d_filter       = other._d_filter;
+  other._d_filter = nullptr;
 
-  _batch_data           = other._batch_data;            other._batch_data           = nullptr;
-  _res_data             = other._res_data;              other._res_data             = nullptr;
+  _batch_data       = other._batch_data;
+  other._batch_data = nullptr;
+  _res_data         = other._res_data;
+  other._res_data   = nullptr;
 }
 
 Gpu_Autoencoder::~Gpu_Autoencoder() {
   // Free parameter buffers
-  if (_encoder_filter_1)      cudaFree(_encoder_filter_1);
-  if (_encoder_bias_1)        cudaFree(_encoder_bias_1);
+  if (_encoder_filter_1)
+    cudaFree(_encoder_filter_1);
+  if (_encoder_bias_1)
+    cudaFree(_encoder_bias_1);
 
-  if (_encoder_filter_2)      cudaFree(_encoder_filter_2);
-  if (_encoder_bias_2)        cudaFree(_encoder_bias_2);
-  if (_decoder_filter_1)      cudaFree(_decoder_filter_1);
-  if (_decoder_bias_1)        cudaFree(_decoder_bias_1);
+  if (_encoder_filter_2)
+    cudaFree(_encoder_filter_2);
+  if (_encoder_bias_2)
+    cudaFree(_encoder_bias_2);
+  if (_decoder_filter_1)
+    cudaFree(_decoder_filter_1);
+  if (_decoder_bias_1)
+    cudaFree(_decoder_bias_1);
 
-  if (_decoder_filter_2)      cudaFree(_decoder_filter_2);
-  if (_decoder_bias_2)        cudaFree(_decoder_bias_2);
-  if (_decoder_filter_3)      cudaFree(_decoder_filter_3);
-  if (_decoder_bias_3)        cudaFree(_decoder_bias_3);
+  if (_decoder_filter_2)
+    cudaFree(_decoder_filter_2);
+  if (_decoder_bias_2)
+    cudaFree(_decoder_bias_2);
+  if (_decoder_filter_3)
+    cudaFree(_decoder_filter_3);
+  if (_decoder_bias_3)
+    cudaFree(_decoder_bias_3);
 
-  if (_out_encoder_filter_1)  cudaFree(_out_encoder_filter_1);
-  if (_out_encoder_bias_1)    cudaFree(_out_encoder_bias_1);
-  if (_out_encoder_relu_1)    cudaFree(_out_encoder_relu_1);
-  if (_out_max_pooling_1)     cudaFree(_out_max_pooling_1);
-  
-  if (_out_encoder_filter_2)  cudaFree(_out_encoder_filter_2);
-  if (_out_encoder_bias_2)    cudaFree(_out_encoder_bias_2);
-  if (_out_encoder_relu_2)    cudaFree(_out_encoder_relu_2);
-  if (_out_max_pooling_2)     cudaFree(_out_max_pooling_2);
-  
-  if (_out_decoder_filter_1)  cudaFree(_out_decoder_filter_1);
-  if (_out_decoder_bias_1)    cudaFree(_out_decoder_bias_1);
-  if (_out_decoder_relu_1)    cudaFree(_out_decoder_relu_1);
-  if (_out_upsampling_1)      cudaFree(_out_upsampling_1);
-  
-  if (_out_decoder_filter_2)  cudaFree(_out_decoder_filter_2);
-  if (_out_decoder_bias_2)    cudaFree(_out_decoder_bias_2);
-  if (_out_decoder_relu_2)    cudaFree(_out_decoder_relu_2);
-  if (_out_upsampling_2)      cudaFree(_out_upsampling_2);
-  
-  if (_out_decoder_filter_3)  cudaFree(_out_decoder_filter_3);
-  if (_out_decoder_bias_3)    cudaFree(_out_decoder_bias_3);
-  
-  if (_d_in)        cudaFree(_d_in);
-  if (_d_out)       cudaFree(_d_out);
-  if (_d_filter)    cudaFree(_d_filter);
-  
-  if (_batch_data)  cudaFree(_batch_data);
-  if (_res_data)    cudaFree(_res_data);
+  if (_out_encoder_filter_1)
+    cudaFree(_out_encoder_filter_1);
+  if (_out_encoder_bias_1)
+    cudaFree(_out_encoder_bias_1);
+  if (_out_encoder_relu_1)
+    cudaFree(_out_encoder_relu_1);
+  if (_out_max_pooling_1)
+    cudaFree(_out_max_pooling_1);
+
+  if (_out_encoder_filter_2)
+    cudaFree(_out_encoder_filter_2);
+  if (_out_encoder_bias_2)
+    cudaFree(_out_encoder_bias_2);
+  if (_out_encoder_relu_2)
+    cudaFree(_out_encoder_relu_2);
+  if (_out_max_pooling_2)
+    cudaFree(_out_max_pooling_2);
+
+  if (_out_decoder_filter_1)
+    cudaFree(_out_decoder_filter_1);
+  if (_out_decoder_bias_1)
+    cudaFree(_out_decoder_bias_1);
+  if (_out_decoder_relu_1)
+    cudaFree(_out_decoder_relu_1);
+  if (_out_upsampling_1)
+    cudaFree(_out_upsampling_1);
+
+  if (_out_decoder_filter_2)
+    cudaFree(_out_decoder_filter_2);
+  if (_out_decoder_bias_2)
+    cudaFree(_out_decoder_bias_2);
+  if (_out_decoder_relu_2)
+    cudaFree(_out_decoder_relu_2);
+  if (_out_upsampling_2)
+    cudaFree(_out_upsampling_2);
+
+  if (_out_decoder_filter_3)
+    cudaFree(_out_decoder_filter_3);
+  if (_out_decoder_bias_3)
+    cudaFree(_out_decoder_bias_3);
+
+  if (_d_in)
+    cudaFree(_d_in);
+  if (_d_out)
+    cudaFree(_d_out);
+  if (_d_filter)
+    cudaFree(_d_filter);
+
+  if (_batch_data)
+    cudaFree(_batch_data);
+  if (_res_data)
+    cudaFree(_res_data);
 }
 
 Gpu_Autoencoder &Gpu_Autoencoder::operator=(const Gpu_Autoencoder &other) {
-  if (this == &other) return *this;
+  if (this == &other)
+    return *this;
 
   // Free existing device memory for all buffers, since we'll only recreate params
-  if (_encoder_filter_1)      cudaFree(_encoder_filter_1);
-  if (_encoder_bias_1)        cudaFree(_encoder_bias_1);
+  if (_encoder_filter_1)
+    cudaFree(_encoder_filter_1);
+  if (_encoder_bias_1)
+    cudaFree(_encoder_bias_1);
 
-  if (_out_encoder_filter_1)  cudaFree(_out_encoder_filter_1);
-  if (_out_encoder_bias_1)    cudaFree(_out_encoder_bias_1);
-  if (_out_encoder_relu_1)    cudaFree(_out_encoder_relu_1);
-  if (_out_max_pooling_1)     cudaFree(_out_max_pooling_1);
+  if (_out_encoder_filter_1)
+    cudaFree(_out_encoder_filter_1);
+  if (_out_encoder_bias_1)
+    cudaFree(_out_encoder_bias_1);
+  if (_out_encoder_relu_1)
+    cudaFree(_out_encoder_relu_1);
+  if (_out_max_pooling_1)
+    cudaFree(_out_max_pooling_1);
 
-  if (_encoder_filter_2)      cudaFree(_encoder_filter_2);
-  if (_encoder_bias_2)        cudaFree(_encoder_bias_2);
+  if (_encoder_filter_2)
+    cudaFree(_encoder_filter_2);
+  if (_encoder_bias_2)
+    cudaFree(_encoder_bias_2);
 
-  if (_out_encoder_filter_2)  cudaFree(_out_encoder_filter_2);
-  if (_out_encoder_bias_2)    cudaFree(_out_encoder_bias_2);
-  if (_out_encoder_relu_2)    cudaFree(_out_encoder_relu_2);
-  if (_out_max_pooling_2)     cudaFree(_out_max_pooling_2);
+  if (_out_encoder_filter_2)
+    cudaFree(_out_encoder_filter_2);
+  if (_out_encoder_bias_2)
+    cudaFree(_out_encoder_bias_2);
+  if (_out_encoder_relu_2)
+    cudaFree(_out_encoder_relu_2);
+  if (_out_max_pooling_2)
+    cudaFree(_out_max_pooling_2);
 
-  if (_decoder_filter_1)      cudaFree(_decoder_filter_1);
-  if (_decoder_bias_1)        cudaFree(_decoder_bias_1);
+  if (_decoder_filter_1)
+    cudaFree(_decoder_filter_1);
+  if (_decoder_bias_1)
+    cudaFree(_decoder_bias_1);
 
-  if (_out_decoder_filter_1)  cudaFree(_out_decoder_filter_1);
-  if (_out_decoder_bias_1)    cudaFree(_out_decoder_bias_1);
-  if (_out_decoder_relu_1)    cudaFree(_out_decoder_relu_1);
-  if (_out_upsampling_1)      cudaFree(_out_upsampling_1);
+  if (_out_decoder_filter_1)
+    cudaFree(_out_decoder_filter_1);
+  if (_out_decoder_bias_1)
+    cudaFree(_out_decoder_bias_1);
+  if (_out_decoder_relu_1)
+    cudaFree(_out_decoder_relu_1);
+  if (_out_upsampling_1)
+    cudaFree(_out_upsampling_1);
 
-  if (_decoder_filter_2)      cudaFree(_decoder_filter_2);
-  if (_decoder_bias_2)        cudaFree(_decoder_bias_2);
+  if (_decoder_filter_2)
+    cudaFree(_decoder_filter_2);
+  if (_decoder_bias_2)
+    cudaFree(_decoder_bias_2);
 
-  if (_out_decoder_filter_2)  cudaFree(_out_decoder_filter_2);
-  if (_out_decoder_bias_2)    cudaFree(_out_decoder_bias_2);
-  if (_out_decoder_relu_2)    cudaFree(_out_decoder_relu_2);
-  if (_out_upsampling_2)      cudaFree(_out_upsampling_2);
+  if (_out_decoder_filter_2)
+    cudaFree(_out_decoder_filter_2);
+  if (_out_decoder_bias_2)
+    cudaFree(_out_decoder_bias_2);
+  if (_out_decoder_relu_2)
+    cudaFree(_out_decoder_relu_2);
+  if (_out_upsampling_2)
+    cudaFree(_out_upsampling_2);
 
-  if (_decoder_filter_3)      cudaFree(_decoder_filter_3);
-  if (_decoder_bias_3)        cudaFree(_decoder_bias_3);
+  if (_decoder_filter_3)
+    cudaFree(_decoder_filter_3);
+  if (_decoder_bias_3)
+    cudaFree(_decoder_bias_3);
 
-  if (_out_decoder_filter_3)  cudaFree(_out_decoder_filter_3);
-  if (_out_decoder_bias_3)    cudaFree(_out_decoder_bias_3);
+  if (_out_decoder_filter_3)
+    cudaFree(_out_decoder_filter_3);
+  if (_out_decoder_bias_3)
+    cudaFree(_out_decoder_bias_3);
 
-  if (_d_in)        cudaFree(_d_in);
-  if (_d_out)       cudaFree(_d_out);
-  if (_d_filter)    cudaFree(_d_filter);
+  if (_d_in)
+    cudaFree(_d_in);
+  if (_d_out)
+    cudaFree(_d_out);
+  if (_d_filter)
+    cudaFree(_d_filter);
 
-  if (_batch_data)  cudaFree(_batch_data);
-  if (_res_data)    cudaFree(_res_data);
+  if (_batch_data)
+    cudaFree(_batch_data);
+  if (_res_data)
+    cudaFree(_res_data);
 
   // Recreate parameter buffers and deep-copy from other
-  CUDA_CHECK(cudaMalloc(&_encoder_filter_1,
-                        ENCODER_FILTER_1_SIZE * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_encoder_filter_1, other._encoder_filter_1,
-                        ENCODER_FILTER_1_SIZE * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_encoder_filter_1,
+                        other._encoder_filter_1,
+                        ENCODER_FILTER_1_SIZE * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
-  CUDA_CHECK(cudaMalloc(&_encoder_bias_1,
-                        ENCODER_FILTER_1_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_encoder_bias_1, other._encoder_bias_1,
-                        ENCODER_FILTER_1_DEPTH * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_encoder_bias_1,
+                        other._encoder_bias_1,
+                        ENCODER_FILTER_1_DEPTH * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
-  CUDA_CHECK(cudaMalloc(&_encoder_filter_2,
-                        ENCODER_FILTER_2_SIZE * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_encoder_filter_2, other._encoder_filter_2,
-                        ENCODER_FILTER_2_SIZE * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_encoder_filter_2,
+                        other._encoder_filter_2,
+                        ENCODER_FILTER_2_SIZE * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
-  CUDA_CHECK(cudaMalloc(&_encoder_bias_2,
-                        ENCODER_FILTER_2_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_encoder_bias_2, other._encoder_bias_2,
-                        ENCODER_FILTER_2_DEPTH * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_encoder_bias_2,
+                        other._encoder_bias_2,
+                        ENCODER_FILTER_2_DEPTH * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
-  CUDA_CHECK(cudaMalloc(&_decoder_filter_1,
-                        DECODER_FILTER_1_SIZE * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_decoder_filter_1, other._decoder_filter_1,
-                        DECODER_FILTER_1_SIZE * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_decoder_filter_1,
+                        other._decoder_filter_1,
+                        DECODER_FILTER_1_SIZE * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
-  CUDA_CHECK(cudaMalloc(&_decoder_bias_1,
-                        DECODER_FILTER_1_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_decoder_bias_1, other._decoder_bias_1,
-                        DECODER_FILTER_1_DEPTH * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_decoder_bias_1,
+                        other._decoder_bias_1,
+                        DECODER_FILTER_1_DEPTH * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
-  CUDA_CHECK(cudaMalloc(&_decoder_filter_2,
-                        DECODER_FILTER_2_SIZE * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_decoder_filter_2, other._decoder_filter_2,
-                        DECODER_FILTER_2_SIZE * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_decoder_filter_2,
+                        other._decoder_filter_2,
+                        DECODER_FILTER_2_SIZE * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
-  CUDA_CHECK(cudaMalloc(&_decoder_bias_2,
-                        DECODER_FILTER_2_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_decoder_bias_2, other._decoder_bias_2,
-                        DECODER_FILTER_2_DEPTH * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_decoder_bias_2,
+                        other._decoder_bias_2,
+                        DECODER_FILTER_2_DEPTH * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
-  CUDA_CHECK(cudaMalloc(&_decoder_filter_3,
-                        DECODER_FILTER_3_SIZE * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_decoder_filter_3, other._decoder_filter_3,
-                        DECODER_FILTER_3_SIZE * sizeof(float), cudaMemcpyDeviceToDevice));
-                        
-  CUDA_CHECK(cudaMalloc(&_decoder_bias_3,
-                        DECODER_FILTER_3_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMemcpy(_decoder_bias_3, other._decoder_bias_3,
-                        DECODER_FILTER_3_DEPTH * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMalloc(&_decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_decoder_filter_3,
+                        other._decoder_filter_3,
+                        DECODER_FILTER_3_SIZE * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
+
+  CUDA_CHECK(cudaMalloc(&_decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMemcpy(_decoder_bias_3,
+                        other._decoder_bias_3,
+                        DECODER_FILTER_3_DEPTH * sizeof(float),
+                        cudaMemcpyDeviceToDevice));
 
   // Transient buffers remain null; they'll be allocated on demand
   _out_encoder_filter_1 = nullptr;
@@ -398,9 +518,9 @@ Gpu_Autoencoder &Gpu_Autoencoder::operator=(const Gpu_Autoencoder &other) {
   _out_decoder_filter_3 = nullptr;
   _out_decoder_bias_3   = nullptr;
 
-  _d_in       = nullptr;
-  _d_out      = nullptr;
-  _d_filter   = nullptr;
+  _d_in     = nullptr;
+  _d_out    = nullptr;
+  _d_filter = nullptr;
 
   _batch_data = nullptr;
   _res_data   = nullptr;
@@ -409,99 +529,166 @@ Gpu_Autoencoder &Gpu_Autoencoder::operator=(const Gpu_Autoencoder &other) {
 }
 
 Gpu_Autoencoder &Gpu_Autoencoder::operator=(Gpu_Autoencoder &&other) noexcept {
-  if (this == &other) return *this;
+  if (this == &other)
+    return *this;
 
   // Free current resources
-  if (_encoder_filter_1)     cudaFree(_encoder_filter_1);
-  if (_encoder_bias_1)       cudaFree(_encoder_bias_1);
+  if (_encoder_filter_1)
+    cudaFree(_encoder_filter_1);
+  if (_encoder_bias_1)
+    cudaFree(_encoder_bias_1);
 
-  if (_out_encoder_filter_1) cudaFree(_out_encoder_filter_1);
-  if (_out_encoder_bias_1)   cudaFree(_out_encoder_bias_1);
-  if (_out_encoder_relu_1)   cudaFree(_out_encoder_relu_1);
-  if (_out_max_pooling_1)    cudaFree(_out_max_pooling_1);
+  if (_out_encoder_filter_1)
+    cudaFree(_out_encoder_filter_1);
+  if (_out_encoder_bias_1)
+    cudaFree(_out_encoder_bias_1);
+  if (_out_encoder_relu_1)
+    cudaFree(_out_encoder_relu_1);
+  if (_out_max_pooling_1)
+    cudaFree(_out_max_pooling_1);
 
-  if (_encoder_filter_2)     cudaFree(_encoder_filter_2);
-  if (_encoder_bias_2)       cudaFree(_encoder_bias_2);
+  if (_encoder_filter_2)
+    cudaFree(_encoder_filter_2);
+  if (_encoder_bias_2)
+    cudaFree(_encoder_bias_2);
 
-  if (_out_encoder_filter_2) cudaFree(_out_encoder_filter_2);
-  if (_out_encoder_bias_2)   cudaFree(_out_encoder_bias_2);
-  if (_out_encoder_relu_2)   cudaFree(_out_encoder_relu_2);
-  if (_out_max_pooling_2)    cudaFree(_out_max_pooling_2);
+  if (_out_encoder_filter_2)
+    cudaFree(_out_encoder_filter_2);
+  if (_out_encoder_bias_2)
+    cudaFree(_out_encoder_bias_2);
+  if (_out_encoder_relu_2)
+    cudaFree(_out_encoder_relu_2);
+  if (_out_max_pooling_2)
+    cudaFree(_out_max_pooling_2);
 
-  if (_decoder_filter_1)     cudaFree(_decoder_filter_1);
-  if (_decoder_bias_1)       cudaFree(_decoder_bias_1);
+  if (_decoder_filter_1)
+    cudaFree(_decoder_filter_1);
+  if (_decoder_bias_1)
+    cudaFree(_decoder_bias_1);
 
-  if (_out_decoder_filter_1) cudaFree(_out_decoder_filter_1);
-  if (_out_decoder_bias_1)   cudaFree(_out_decoder_bias_1);
-  if (_out_decoder_relu_1)   cudaFree(_out_decoder_relu_1);
-  if (_out_upsampling_1)     cudaFree(_out_upsampling_1);
+  if (_out_decoder_filter_1)
+    cudaFree(_out_decoder_filter_1);
+  if (_out_decoder_bias_1)
+    cudaFree(_out_decoder_bias_1);
+  if (_out_decoder_relu_1)
+    cudaFree(_out_decoder_relu_1);
+  if (_out_upsampling_1)
+    cudaFree(_out_upsampling_1);
 
-  if (_decoder_filter_2)     cudaFree(_decoder_filter_2);
-  if (_decoder_bias_2)       cudaFree(_decoder_bias_2);
+  if (_decoder_filter_2)
+    cudaFree(_decoder_filter_2);
+  if (_decoder_bias_2)
+    cudaFree(_decoder_bias_2);
 
-  if (_out_decoder_filter_2) cudaFree(_out_decoder_filter_2);
-  if (_out_decoder_bias_2)   cudaFree(_out_decoder_bias_2);
-  if (_out_decoder_relu_2)   cudaFree(_out_decoder_relu_2);
-  if (_out_upsampling_2)     cudaFree(_out_upsampling_2);
+  if (_out_decoder_filter_2)
+    cudaFree(_out_decoder_filter_2);
+  if (_out_decoder_bias_2)
+    cudaFree(_out_decoder_bias_2);
+  if (_out_decoder_relu_2)
+    cudaFree(_out_decoder_relu_2);
+  if (_out_upsampling_2)
+    cudaFree(_out_upsampling_2);
 
-  if (_decoder_filter_3)     cudaFree(_decoder_filter_3);
-  if (_decoder_bias_3)       cudaFree(_decoder_bias_3);
+  if (_decoder_filter_3)
+    cudaFree(_decoder_filter_3);
+  if (_decoder_bias_3)
+    cudaFree(_decoder_bias_3);
 
-  if (_out_decoder_filter_3) cudaFree(_out_decoder_filter_3);
-  if (_out_decoder_bias_3)   cudaFree(_out_decoder_bias_3);
+  if (_out_decoder_filter_3)
+    cudaFree(_out_decoder_filter_3);
+  if (_out_decoder_bias_3)
+    cudaFree(_out_decoder_bias_3);
 
-  if (_d_in)        cudaFree(_d_in);
-  if (_d_out)       cudaFree(_d_out);
-  if (_d_filter)    cudaFree(_d_filter);
+  if (_d_in)
+    cudaFree(_d_in);
+  if (_d_out)
+    cudaFree(_d_out);
+  if (_d_filter)
+    cudaFree(_d_filter);
 
-  if (_batch_data)  cudaFree(_batch_data);
-  if (_res_data)    cudaFree(_res_data);
+  if (_batch_data)
+    cudaFree(_batch_data);
+  if (_res_data)
+    cudaFree(_res_data);
 
   // Move pointers
-  _encoder_filter_1     = other._encoder_filter_1;         other._encoder_filter_1     = nullptr;
-  _encoder_bias_1       = other._encoder_bias_1;           other._encoder_bias_1       = nullptr;
+  _encoder_filter_1       = other._encoder_filter_1;
+  other._encoder_filter_1 = nullptr;
+  _encoder_bias_1         = other._encoder_bias_1;
+  other._encoder_bias_1   = nullptr;
 
-  _out_encoder_filter_1 = other._out_encoder_filter_1;     other._out_encoder_filter_1 = nullptr;
-  _out_encoder_bias_1   = other._out_encoder_bias_1;       other._out_encoder_bias_1   = nullptr;
-  _out_encoder_relu_1   = other._out_encoder_relu_1;       other._out_encoder_relu_1   = nullptr;
-  _out_max_pooling_1    = other._out_max_pooling_1;        other._out_max_pooling_1    = nullptr;
+  _out_encoder_filter_1       = other._out_encoder_filter_1;
+  other._out_encoder_filter_1 = nullptr;
+  _out_encoder_bias_1         = other._out_encoder_bias_1;
+  other._out_encoder_bias_1   = nullptr;
+  _out_encoder_relu_1         = other._out_encoder_relu_1;
+  other._out_encoder_relu_1   = nullptr;
+  _out_max_pooling_1          = other._out_max_pooling_1;
+  other._out_max_pooling_1    = nullptr;
 
-  _encoder_filter_2     = other._encoder_filter_2;         other._encoder_filter_2     = nullptr;
-  _encoder_bias_2       = other._encoder_bias_2;           other._encoder_bias_2       = nullptr;
+  _encoder_filter_2       = other._encoder_filter_2;
+  other._encoder_filter_2 = nullptr;
+  _encoder_bias_2         = other._encoder_bias_2;
+  other._encoder_bias_2   = nullptr;
 
-  _out_encoder_filter_2 = other._out_encoder_filter_2;     other._out_encoder_filter_2 = nullptr;
-  _out_encoder_bias_2   = other._out_encoder_bias_2;       other._out_encoder_bias_2   = nullptr;
-  _out_encoder_relu_2   = other._out_encoder_relu_2;       other._out_encoder_relu_2   = nullptr;
-  _out_max_pooling_2    = other._out_max_pooling_2;        other._out_max_pooling_2    = nullptr;
+  _out_encoder_filter_2       = other._out_encoder_filter_2;
+  other._out_encoder_filter_2 = nullptr;
+  _out_encoder_bias_2         = other._out_encoder_bias_2;
+  other._out_encoder_bias_2   = nullptr;
+  _out_encoder_relu_2         = other._out_encoder_relu_2;
+  other._out_encoder_relu_2   = nullptr;
+  _out_max_pooling_2          = other._out_max_pooling_2;
+  other._out_max_pooling_2    = nullptr;
 
-  _decoder_filter_1     = other._decoder_filter_1;         other._decoder_filter_1     = nullptr;
-  _decoder_bias_1       = other._decoder_bias_1;           other._decoder_bias_1       = nullptr;
+  _decoder_filter_1       = other._decoder_filter_1;
+  other._decoder_filter_1 = nullptr;
+  _decoder_bias_1         = other._decoder_bias_1;
+  other._decoder_bias_1   = nullptr;
 
-  _out_decoder_filter_1 = other._out_decoder_filter_1;     other._out_decoder_filter_1 = nullptr;
-  _out_decoder_bias_1   = other._out_decoder_bias_1;       other._out_decoder_bias_1   = nullptr;
-  _out_decoder_relu_1   = other._out_decoder_relu_1;       other._out_decoder_relu_1   = nullptr;
-  _out_upsampling_1     = other._out_upsampling_1;         other._out_upsampling_1     = nullptr;
+  _out_decoder_filter_1       = other._out_decoder_filter_1;
+  other._out_decoder_filter_1 = nullptr;
+  _out_decoder_bias_1         = other._out_decoder_bias_1;
+  other._out_decoder_bias_1   = nullptr;
+  _out_decoder_relu_1         = other._out_decoder_relu_1;
+  other._out_decoder_relu_1   = nullptr;
+  _out_upsampling_1           = other._out_upsampling_1;
+  other._out_upsampling_1     = nullptr;
 
-  _decoder_filter_2     = other._decoder_filter_2;         other._decoder_filter_2     = nullptr;
-  _decoder_bias_2       = other._decoder_bias_2;           other._decoder_bias_2       = nullptr;
+  _decoder_filter_2       = other._decoder_filter_2;
+  other._decoder_filter_2 = nullptr;
+  _decoder_bias_2         = other._decoder_bias_2;
+  other._decoder_bias_2   = nullptr;
 
-  _out_decoder_filter_2 = other._out_decoder_filter_2;     other._out_decoder_filter_2 = nullptr;
-  _out_decoder_bias_2   = other._out_decoder_bias_2;       other._out_decoder_bias_2   = nullptr;
-  _out_decoder_relu_2   = other._out_decoder_relu_2;       other._out_decoder_relu_2   = nullptr;
-  _out_upsampling_2     = other._out_upsampling_2;         other._out_upsampling_2     = nullptr;
-  
-  _decoder_filter_3     = other._decoder_filter_3;         other._decoder_filter_3     = nullptr;
-  _decoder_bias_3       = other._decoder_bias_3;           other._decoder_bias_3       = nullptr;
+  _out_decoder_filter_2       = other._out_decoder_filter_2;
+  other._out_decoder_filter_2 = nullptr;
+  _out_decoder_bias_2         = other._out_decoder_bias_2;
+  other._out_decoder_bias_2   = nullptr;
+  _out_decoder_relu_2         = other._out_decoder_relu_2;
+  other._out_decoder_relu_2   = nullptr;
+  _out_upsampling_2           = other._out_upsampling_2;
+  other._out_upsampling_2     = nullptr;
 
-  _out_decoder_filter_3 = other._out_decoder_filter_3;     other._out_decoder_filter_3 = nullptr;
-  _out_decoder_bias_3   = other._out_decoder_bias_3;       other._out_decoder_bias_3   = nullptr;
+  _decoder_filter_3       = other._decoder_filter_3;
+  other._decoder_filter_3 = nullptr;
+  _decoder_bias_3         = other._decoder_bias_3;
+  other._decoder_bias_3   = nullptr;
 
-  _d_in                 = other._d_in;                     other._d_in                 = nullptr;
-  _d_out                = other._d_out;                    other._d_out                = nullptr;
-  _d_filter             = other._d_filter;                 other._d_filter             = nullptr;
+  _out_decoder_filter_3       = other._out_decoder_filter_3;
+  other._out_decoder_filter_3 = nullptr;
+  _out_decoder_bias_3         = other._out_decoder_bias_3;
+  other._out_decoder_bias_3   = nullptr;
 
-  _batch_data           = other._batch_data;               other._batch_data           = nullptr;
-  _res_data             = other._res_data;                 other._res_data             = nullptr;
+  _d_in           = other._d_in;
+  other._d_in     = nullptr;
+  _d_out          = other._d_out;
+  other._d_out    = nullptr;
+  _d_filter       = other._d_filter;
+  other._d_filter = nullptr;
+
+  _batch_data       = other._batch_data;
+  other._batch_data = nullptr;
+  _res_data         = other._res_data;
+  other._res_data   = nullptr;
 
   return *this;
 }
@@ -558,18 +745,16 @@ void Gpu_Autoencoder::_allocate_output_mem(int n, int width, int height) {
                         n_pixel * DECODER_FILTER_2_DEPTH * sizeof(float) / 4));
   CUDA_CHECK(cudaMalloc(&_out_decoder_relu_2,
                         n_pixel * DECODER_FILTER_2_DEPTH * sizeof(float) / 4));
-  CUDA_CHECK(cudaMalloc(&_out_upsampling_2,
-                        n_pixel * DECODER_FILTER_2_DEPTH * sizeof(float)));
+  CUDA_CHECK(
+      cudaMalloc(&_out_upsampling_2, n_pixel * DECODER_FILTER_2_DEPTH * sizeof(float)));
 
   CUDA_CHECK(cudaMalloc(&_out_decoder_filter_3,
                         n_pixel * DECODER_FILTER_3_DEPTH * sizeof(float)));
   CUDA_CHECK(cudaMalloc(&_out_decoder_bias_3,
                         n_pixel * DECODER_FILTER_3_DEPTH * sizeof(float)));
 
-  CUDA_CHECK(cudaMalloc(&_batch_data,
-                        n_pixel * IMAGE_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&_res_data,
-                        n_pixel * IMAGE_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMalloc(&_batch_data, n_pixel * IMAGE_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMalloc(&_res_data, n_pixel * IMAGE_DEPTH * sizeof(float)));
 
   static constexpr int FILTER_SIZES[]  = { ENCODER_FILTER_1_SIZE,
                                            ENCODER_FILTER_2_SIZE,
@@ -578,49 +763,71 @@ void Gpu_Autoencoder::_allocate_output_mem(int n, int width, int height) {
                                            DECODER_FILTER_3_SIZE };
   constexpr int        MAX_FILTER_SIZE = *max_element(FILTER_SIZES, FILTER_SIZES + 5);
 
-  CUDA_CHECK(cudaMalloc(&_d_in,
-                        n_pixel * MAX_FILTER_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&_d_out,
-                        n_pixel * MAX_FILTER_DEPTH * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&_d_filter,
-                        MAX_FILTER_SIZE * sizeof(float)));
+  CUDA_CHECK(cudaMalloc(&_d_in, n_pixel * MAX_FILTER_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMalloc(&_d_out, n_pixel * MAX_FILTER_DEPTH * sizeof(float)));
+  CUDA_CHECK(cudaMalloc(&_d_filter, MAX_FILTER_SIZE * sizeof(float)));
 }
 
 void Gpu_Autoencoder::_deallocate_output_mem() {
-  if(_out_encoder_filter_1) cudaFree(_out_encoder_filter_1);
-  if(_out_encoder_bias_1)   cudaFree(_out_encoder_bias_1);
-  if(_out_encoder_relu_1)   cudaFree(_out_encoder_relu_1);
-  if(_out_max_pooling_1)    cudaFree(_out_max_pooling_1);
+  if (_out_encoder_filter_1)
+    cudaFree(_out_encoder_filter_1);
+  if (_out_encoder_bias_1)
+    cudaFree(_out_encoder_bias_1);
+  if (_out_encoder_relu_1)
+    cudaFree(_out_encoder_relu_1);
+  if (_out_max_pooling_1)
+    cudaFree(_out_max_pooling_1);
 
-  if(_out_encoder_filter_2) cudaFree(_out_encoder_filter_2);
-  if(_out_encoder_bias_2)   cudaFree(_out_encoder_bias_2);
-  if(_out_encoder_relu_2)   cudaFree(_out_encoder_relu_2);
-  if(_out_max_pooling_2)    cudaFree(_out_max_pooling_2);
+  if (_out_encoder_filter_2)
+    cudaFree(_out_encoder_filter_2);
+  if (_out_encoder_bias_2)
+    cudaFree(_out_encoder_bias_2);
+  if (_out_encoder_relu_2)
+    cudaFree(_out_encoder_relu_2);
+  if (_out_max_pooling_2)
+    cudaFree(_out_max_pooling_2);
 
-  if(_out_decoder_filter_1) cudaFree(_out_decoder_filter_1);
-  if(_out_decoder_bias_1)   cudaFree(_out_decoder_bias_1);
-  if(_out_decoder_relu_1)   cudaFree(_out_decoder_relu_1);
-  if(_out_upsampling_1)     cudaFree(_out_upsampling_1);
+  if (_out_decoder_filter_1)
+    cudaFree(_out_decoder_filter_1);
+  if (_out_decoder_bias_1)
+    cudaFree(_out_decoder_bias_1);
+  if (_out_decoder_relu_1)
+    cudaFree(_out_decoder_relu_1);
+  if (_out_upsampling_1)
+    cudaFree(_out_upsampling_1);
 
-  if(_out_decoder_filter_2) cudaFree(_out_decoder_filter_2);
-  if(_out_decoder_bias_2)   cudaFree(_out_decoder_bias_2);
-  if(_out_decoder_relu_2)   cudaFree(_out_decoder_relu_2);
-  if(_out_upsampling_2)     cudaFree(_out_upsampling_2);
+  if (_out_decoder_filter_2)
+    cudaFree(_out_decoder_filter_2);
+  if (_out_decoder_bias_2)
+    cudaFree(_out_decoder_bias_2);
+  if (_out_decoder_relu_2)
+    cudaFree(_out_decoder_relu_2);
+  if (_out_upsampling_2)
+    cudaFree(_out_upsampling_2);
 
-  if(_out_decoder_filter_3) cudaFree(_out_decoder_filter_3);
-  if(_out_decoder_bias_3)   cudaFree(_out_decoder_bias_3);
+  if (_out_decoder_filter_3)
+    cudaFree(_out_decoder_filter_3);
+  if (_out_decoder_bias_3)
+    cudaFree(_out_decoder_bias_3);
 
-  if(_d_in)       cudaFree(_d_in);
-  if(_d_out)      cudaFree(_d_out);
-  if(_d_filter)   cudaFree(_d_filter);
+  if (_d_in)
+    cudaFree(_d_in);
+  if (_d_out)
+    cudaFree(_d_out);
+  if (_d_filter)
+    cudaFree(_d_filter);
 
-  if(_batch_data) cudaFree(_batch_data);
-  if(_res_data)   cudaFree(_res_data);
+  if (_batch_data)
+    cudaFree(_batch_data);
+  if (_res_data)
+    cudaFree(_res_data);
 }
 
-void Gpu_Autoencoder::_forward_pass(float *data, int n, int width, int height, int depth) {
+void
+Gpu_Autoencoder::_forward_pass(float *data, int n, int width, int height, int depth) {
   int size = n * width * height * depth;
-  CUDA_CHECK(cudaMemcpy(_batch_data, data, size * sizeof(float), cudaMemcpyHostToDevice));
+  CUDA_CHECK(
+      cudaMemcpy(_batch_data, data, size * sizeof(float), cudaMemcpyHostToDevice));
 
   // First conv2D layer
   gpu_conv2D(_batch_data,
@@ -803,7 +1010,8 @@ void Gpu_Autoencoder::_forward_pass(float *data, int n, int width, int height, i
                _block_size_1D);
 
   // Return the result (Dim: n * w * w * 3)
-  CUDA_CHECK(cudaMemcpy(_res_data, _out_decoder_bias_3, size * sizeof(float), cudaMemcpyDeviceToDevice));
+  CUDA_CHECK(cudaMemcpy(
+      _res_data, _out_decoder_bias_3, size * sizeof(float), cudaMemcpyDeviceToDevice));
 }
 
 float Gpu_Autoencoder::_fit_batch(
@@ -1084,7 +1292,8 @@ float Gpu_Autoencoder::_fit_batch(
   // Fifth conv2D
   gpu_bias_grad(d_out, d_in, n, width, height, ENCODER_FILTER_1_DEPTH, _block_size_1D);
 
-  gpu_update_weight(_encoder_bias_1, d_in, ENCODER_FILTER_1_DEPTH, learning_rate, _block_size_1D);
+  gpu_update_weight(
+      _encoder_bias_1, d_in, ENCODER_FILTER_1_DEPTH, learning_rate, _block_size_1D);
 
   gpu_conv2D_grad(_batch_data,  // in
                   d_out,        // d_out
@@ -1193,14 +1402,14 @@ void Gpu_Autoencoder::fit(const Dataset &dataset,
   builder << output_dir << '/' << "gpu_autoencoder.bin";
   save_parameters(builder.str().c_str());
 
-  printf("\nTotal time: %s (ms), Loss: %.4f\n",
-         format_time(total_time).c_str(),
-         eval(dataset));
+  printf(
+      "\nTotal time: %s, Loss: %.4f\n", format_time(total_time).c_str(), eval(dataset));
 }
 
 Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const {
   // Encode by batches to use less memory
-  int n = dataset.n, width = dataset.width, height = dataset.height, depth = dataset.depth;
+  int n = dataset.n, width = dataset.width, height = dataset.height,
+      depth      = dataset.depth;
   int n_batch    = (n - 1) / ENCODE_BATCH_SIZE + 1;
   int image_size = width * height * depth;
 
@@ -1211,11 +1420,9 @@ Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const {
 
   // Placeholder, alternating
   float *a, *b;
-  int max_buffer_size = ENCODE_BATCH_SIZE * width * height * ENCODER_FILTER_1_DEPTH;
-  CUDA_CHECK(cudaMalloc(&a,
-                        max_buffer_size * sizeof(float)));
-  CUDA_CHECK(cudaMalloc(&b,
-                        max_buffer_size * sizeof(float)));
+  int    max_buffer_size = ENCODE_BATCH_SIZE * width * height * ENCODER_FILTER_1_DEPTH;
+  CUDA_CHECK(cudaMalloc(&a, max_buffer_size * sizeof(float)));
+  CUDA_CHECK(cudaMalloc(&b, max_buffer_size * sizeof(float)));
 
   for (int i = 0; i < n_batch; ++i) {
     int in_offset      = i * ENCODE_BATCH_SIZE;
@@ -1248,22 +1455,12 @@ Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const {
                  _block_size_1D);
 
     // ReLU
-    gpu_relu(b,
-            a,
-            cur_batch_size,
-            width,
-            height,
-            ENCODER_FILTER_1_DEPTH,
-            _block_size_1D);
+    gpu_relu(
+        b, a, cur_batch_size, width, height, ENCODER_FILTER_1_DEPTH, _block_size_1D);
 
     // Max pooling
-    gpu_max_pooling(a,
-                    b,
-                    cur_batch_size,
-                    width,
-                    height,
-                    ENCODER_FILTER_1_DEPTH,
-                    _block_size_3D_2);
+    gpu_max_pooling(
+        a, b, cur_batch_size, width, height, ENCODER_FILTER_1_DEPTH, _block_size_3D_2);
 
     // Second conv2D
     gpu_conv2D(b,
@@ -1312,8 +1509,10 @@ Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const {
   }
 
   // Free memory
-  if (a) cudaFree(a);
-  if (b) cudaFree(b);
+  if (a)
+    cudaFree(a);
+  if (b)
+    cudaFree(b);
 
   // Copy labels
   memcpy(res.get_labels(), dataset.get_labels(), n * sizeof(int));
@@ -1321,7 +1520,8 @@ Dataset Gpu_Autoencoder::encode(const Dataset &dataset) const {
 }
 
 Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
-  int n = dataset.n, width = dataset.width, height = dataset.height, depth = dataset.depth;
+  int n = dataset.n, width = dataset.width, height = dataset.height,
+      depth      = dataset.depth;
   int n_batch    = (n - 1) / ENCODE_BATCH_SIZE + 1;
   int image_size = width * height * depth;
 
@@ -1331,10 +1531,13 @@ Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
   Dataset res(dataset.n, width * 4, height * 4, DECODER_FILTER_3_DEPTH);
 
   // Placeholder, alternating
-  // Need to allocate enough for largest intermediate result (4*width x 4*height x DECODER_FILTER_2_DEPTH)
+  // Need to allocate enough for largest intermediate result (4*width x 4*height x
+  // DECODER_FILTER_2_DEPTH)
   float *a, *b;
-  int max_buffer_size_a = ENCODE_BATCH_SIZE * 16 * width * height * DECODER_FILTER_2_DEPTH;
-  int max_buffer_size_b = ENCODE_BATCH_SIZE * 16 * width * height * DECODER_FILTER_2_DEPTH;
+  int    max_buffer_size_a =
+      ENCODE_BATCH_SIZE * 16 * width * height * DECODER_FILTER_2_DEPTH;
+  int max_buffer_size_b =
+      ENCODE_BATCH_SIZE * 16 * width * height * DECODER_FILTER_2_DEPTH;
   CUDA_CHECK(cudaMalloc(&a, max_buffer_size_a * sizeof(float)));
   CUDA_CHECK(cudaMalloc(&b, max_buffer_size_b * sizeof(float)));
 
@@ -1369,22 +1572,12 @@ Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
                  _block_size_1D);
 
     // ReLU
-    gpu_relu(b,
-            a,
-            cur_batch_size,
-            width,
-            height,
-            DECODER_FILTER_1_DEPTH,
-            _block_size_1D);
+    gpu_relu(
+        b, a, cur_batch_size, width, height, DECODER_FILTER_1_DEPTH, _block_size_1D);
 
     // Upsampling
-    gpu_upsampling(a,
-                   b,         
-                   cur_batch_size,
-                   width,
-                   height,
-                   DECODER_FILTER_1_DEPTH,
-                   _block_size_3D_3);
+    gpu_upsampling(
+        a, b, cur_batch_size, width, height, DECODER_FILTER_1_DEPTH, _block_size_3D_3);
 
     // Second conv2D
     gpu_conv2D(b,
@@ -1452,8 +1645,10 @@ Dataset Gpu_Autoencoder::decode(const Dataset &dataset) const {
     out_offset += cur_batch_size;
   }
 
-  if (a) cudaFree(a);
-  if (b) cudaFree(b);
+  if (a)
+    cudaFree(a);
+  if (b)
+    cudaFree(b);
 
   // Copy the result
   memcpy(res.get_labels(), dataset.get_labels(), n * sizeof(int));
@@ -1470,8 +1665,10 @@ float Gpu_Autoencoder::eval(const Dataset &dataset) const {
   CUDA_CHECK(cudaMalloc(&expected, size * sizeof(float)));
   CUDA_CHECK(cudaMalloc(&actual, size * sizeof(float)));
 
-  CUDA_CHECK(cudaMemcpy(expected, dataset.get_data(), size * sizeof(float), cudaMemcpyHostToDevice));
-  CUDA_CHECK(cudaMemcpy(actual, res.get_data(), size * sizeof(float), cudaMemcpyHostToDevice));
+  CUDA_CHECK(cudaMemcpy(
+      expected, dataset.get_data(), size * sizeof(float), cudaMemcpyHostToDevice));
+  CUDA_CHECK(
+      cudaMemcpy(actual, res.get_data(), size * sizeof(float), cudaMemcpyHostToDevice));
   return gpu_mse_loss(expected, actual, n, width, height, depth, _block_size_1D);
 }
 
@@ -1480,43 +1677,43 @@ void Gpu_Autoencoder::save_parameters(const char *filename) const {
   string filepath_str(filename);
   size_t found = filepath_str.find_last_of("/\\");
   if (found != string::npos) {
-    string dir_path = filepath_str.substr(0, found);
+    string      dir_path = filepath_str.substr(0, found);
     struct stat info;
     if (stat(dir_path.c_str(), &info) != 0) {
       printf("Creating directory: %s\n", dir_path.c_str());
-      #ifdef _WIN32
-        _mkdir(dir_path.c_str());
-      #else
-        mkdir(dir_path.c_str(), 0777);
-      #endif
+#ifdef _WIN32
+      _mkdir(dir_path.c_str());
+#else
+      mkdir(dir_path.c_str(), 0777);
+#endif
     }
   }
 
   ofstream buffer(filename, ios::out | ios::binary);
   if (!buffer.is_open()) {
-      fprintf(stderr, "Error: Cannot open file %s for writing\n", filename);
-      return;
+    fprintf(stderr, "Error: Cannot open file %s for writing\n", filename);
+    return;
   }
 
   // Write first encoder conv2D layer
   write_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
-  write_data(buffer, _encoder_bias_1,   ENCODER_FILTER_1_DEPTH * sizeof(float));
+  write_data(buffer, _encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float));
 
   // Write second encoder conv2D layer
   write_data(buffer, _encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float));
-  write_data(buffer, _encoder_bias_2,   ENCODER_FILTER_2_DEPTH * sizeof(float));
+  write_data(buffer, _encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float));
 
   // Write first decoder conv2D layer
   write_data(buffer, _decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float));
-  write_data(buffer, _decoder_bias_1,   DECODER_FILTER_1_DEPTH * sizeof(float));
+  write_data(buffer, _decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float));
 
   // Write second decoder conv2D layer
   write_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
-  write_data(buffer, _decoder_bias_2,   DECODER_FILTER_2_DEPTH * sizeof(float));
-  
+  write_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
+
   // Write third decoder conv2D layer
   write_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
-  write_data(buffer, _decoder_bias_3,   DECODER_FILTER_3_DEPTH * sizeof(float));
+  write_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
 
   buffer.close();
   printf("✓ GPU Autoencoder parameters saved successfully to %s\n", filename);
@@ -1525,29 +1722,29 @@ void Gpu_Autoencoder::save_parameters(const char *filename) const {
 void Gpu_Autoencoder::load_parameters(const char *filename) {
   ifstream buffer(filename, ios::in | ios::binary);
   if (!buffer.is_open()) {
-      fprintf(stderr, "Error: Cannot open file %s for reading\n", filename);
-      return;
+    fprintf(stderr, "Error: Cannot open file %s for reading\n", filename);
+    return;
   }
 
   // Read first encoder conv2D layer
   read_data(buffer, _encoder_filter_1, ENCODER_FILTER_1_SIZE * sizeof(float));
-  read_data(buffer, _encoder_bias_1,   ENCODER_FILTER_1_DEPTH * sizeof(float));
+  read_data(buffer, _encoder_bias_1, ENCODER_FILTER_1_DEPTH * sizeof(float));
 
   // Read second encoder conv2D layer
   read_data(buffer, _encoder_filter_2, ENCODER_FILTER_2_SIZE * sizeof(float));
-  read_data(buffer, _encoder_bias_2,   ENCODER_FILTER_2_DEPTH * sizeof(float));
+  read_data(buffer, _encoder_bias_2, ENCODER_FILTER_2_DEPTH * sizeof(float));
 
   // Read first decoder conv2D layer
   read_data(buffer, _decoder_filter_1, DECODER_FILTER_1_SIZE * sizeof(float));
-  read_data(buffer, _decoder_bias_1,   DECODER_FILTER_1_DEPTH * sizeof(float));
+  read_data(buffer, _decoder_bias_1, DECODER_FILTER_1_DEPTH * sizeof(float));
 
   // Read second decoder conv2D layer
   read_data(buffer, _decoder_filter_2, DECODER_FILTER_2_SIZE * sizeof(float));
-  read_data(buffer, _decoder_bias_2,   DECODER_FILTER_2_DEPTH * sizeof(float));
+  read_data(buffer, _decoder_bias_2, DECODER_FILTER_2_DEPTH * sizeof(float));
 
   // Read third decoder conv2D layer
   read_data(buffer, _decoder_filter_3, DECODER_FILTER_3_SIZE * sizeof(float));
-  read_data(buffer, _decoder_bias_3,   DECODER_FILTER_3_DEPTH * sizeof(float));
+  read_data(buffer, _decoder_bias_3, DECODER_FILTER_3_DEPTH * sizeof(float));
 
   buffer.close();
   printf("✓ GPU Autoencoder parameters loaded successfully from %s\n", filename);

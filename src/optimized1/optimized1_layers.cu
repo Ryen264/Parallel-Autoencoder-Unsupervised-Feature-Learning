@@ -521,48 +521,6 @@ __global__ void optimized1_conv2D_backward_kernel(float *d_out,
 // optimized1 Max Pooling Backward
 __global__ void optimized1_max_pooling_backward_kernel(
     float *in, float *d_out, float *d_in, int width, int height, int depth) {
-  int j = blockIdx.x * blockDim.x + threadIdx.x; // x
-  int i = blockIdx.y * blockDim.y + threadIdx.y; // y
-  int d = blockIdx.z * blockDim.z + threadIdx.z;
-
-  if (j >= width || i >= height || d >= depth)
-    return;
-
-  int idx        = GET_1D_IDX(i, j, d, width, height);
-  int out_i      = i / 2;
-  int out_j      = j / 2;
-  int new_width  = width / 2;
-  int new_height = height / 2;
-
-  // Indices of the 2x2 block
-  int base_y          = out_i * 2;
-  int base_x          = out_j * 2;
-  int neighbors_idx[] = {
-    GET_1D_IDX(base_y, base_x, d, width, height),
-    GET_1D_IDX(base_y, base_x + 1, d, width, height),
-    GET_1D_IDX(base_y + 1, base_x, d, width, height),
-    GET_1D_IDX(base_y + 1, base_x + 1, d, width, height),
-  };
-
-  int   max_idx = neighbors_idx[0];
-  float max_val = in[max_idx];
-  for (int k = 1; k < 4; ++k) {
-    int   n_idx = neighbors_idx[k];
-    float n_val = in[n_idx];
-    if (n_val > max_val) {
-      max_val = n_val;
-      max_idx = n_idx;
-    }
-  }
-
-  d_in[idx] = (idx == max_idx)
-                  ? d_out[GET_1D_IDX(out_i, out_j, d, new_width, new_height)]
-                  : 0.0f;
-}
-
-// optimized1 Max Pooling Backward
-__global__ void optimized1_max_pooling_backward_kernel(
-    float *in, float *d_out, float *d_in, int width, int height, int depth) {
   int i = blockIdx.y * blockDim.y + threadIdx.y; // y
   int j = blockIdx.x * blockDim.x + threadIdx.x; // x
   int d = blockIdx.z * blockDim.z + threadIdx.z;

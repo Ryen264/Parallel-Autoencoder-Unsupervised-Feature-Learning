@@ -213,6 +213,7 @@ __global__ void optimized2_full_filter_kernel(float *in,
     }
   }
 
+  int idx       = GET_1D_IDX(i, j, f, width, height);
   sum          += bias[f];
   in_relu[idx]  = sum;
   out[idx]      = fmaxf(0.0f, sum);

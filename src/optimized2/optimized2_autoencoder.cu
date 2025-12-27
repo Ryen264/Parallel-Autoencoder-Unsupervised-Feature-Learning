@@ -970,11 +970,11 @@ float Optimized2_Autoencoder::eval(const Optimized_Dataset &dataset) {
 
   for (int i = 0; i < n; ++i) {
     int offset = i * size;
-    CUDA_CHECK(cudaMemcpyAsynnc(a + offset,
-                                dataset.data + offset,
-                                size * sizeof(float),
-                                cudaMemcpyHostToDevice,
-                                _streams[i % N_STREAMS]));
+    CUDA_CHECK(cudaMemcpyAsync(a + offset,
+                               dataset.data + offset,
+                               size * sizeof(float),
+                               cudaMemcpyHostToDevice,
+                               _streams[i % N_STREAMS]));
     CUDA_CHECK(cudaMemcpyAsync(b + offset,
                                res.data + offset,
                                size * sizeof(float),
